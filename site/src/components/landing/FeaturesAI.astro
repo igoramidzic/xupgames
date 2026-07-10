@@ -1,14 +1,5 @@
 ---
-import {
-  ArrowUp,
-  ChartLine,
-  Maximize2,
-  MessageCircleQuestion,
-  Minus,
-  Paperclip,
-  ScanSearch,
-  X,
-} from '@lucide/astro';
+import { ArrowUp, ChartLine, Maximize2, MessageCircleQuestion, Minus, Paperclip, ScanSearch, X } from '@lucide/astro';
 ---
 
 <section class="px-5 py-16 sm:py-20">
@@ -547,16 +538,8 @@ import {
       onDone?: () => void;
     }
 
-    const IMPORT_TOOLS = [
-      'Read your Q3 report',
-      'Extracted 45 records',
-      'Tagged by your routing rules',
-    ];
-    const IMPORT_RUNNING = [
-      'Reading your Q3 report',
-      'Extracting records',
-      'Tagging by your routing rules',
-    ];
+    const IMPORT_TOOLS = ['Read your Q3 report', 'Extracted 45 records', 'Tagged by your routing rules'];
+    const IMPORT_RUNNING = ['Reading your Q3 report', 'Extracting records', 'Tagging by your routing rules'];
     const REPORT_TOOLS = [
       'Queried last quarter’s records',
       'Rolled up activity by segment',

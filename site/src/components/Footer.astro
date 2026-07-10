@@ -94,11 +94,7 @@ const iconWrapClass = 'text-muted-foreground inline-flex h-4 w-4 shrink-0 items-
           {
             (resources as FooterLink[]).map((item) => (
               <li>
-                <a
-                  href={item.href}
-                  class={linkClass}
-                  {...(item.external ? { target: '_blank', rel: 'noopener' } : {})}
-                >
+                <a href={item.href} class={linkClass} {...(item.external ? { target: '_blank', rel: 'noopener' } : {})}>
                   <span class={iconWrapClass}>{item.icon && <item.icon size={14} stroke-width={1.5} />}</span>
                   <span>{item.label}</span>
                 </a>
