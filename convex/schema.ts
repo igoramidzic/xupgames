@@ -1,11 +1,3 @@
-import { defineSchema, defineTable } from 'convex/server';
-import { v } from 'convex/values';
+import { defineSchema } from 'convex/server';
 
-export default defineSchema({
-  userProfile: defineTable({
-    clerkId: v.string(),
-    email: v.string(),
-    name: v.optional(v.string()),
-    updatedAt: v.optional(v.string()),
-  }).index('by_clerkId', ['clerkId']),
-});
+export default defineSchema({});

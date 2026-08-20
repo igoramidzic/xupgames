@@ -1,9 +1,9 @@
-# Startup Template
+# Xup Games
 
-A starter monorepo with:
+A multiplayer game platform monorepo with:
 
-- **Angular** web app (`web/`) — login + authed home, Clerk auth, SpartanUI, TailwindCSS
-- **Convex** backend (`convex/`) — `userProfile` table with Clerk webhook auth
+- **React** web app (`web/`) — Vite, React Router, shadcn/ui, and Tailwind CSS
+- **Convex** backend (`convex/`) — realtime application data and functions
 - **Astro** marketing + blog site (`site/`)
 - **Mintlify** docs (`docs/`)
 
@@ -13,27 +13,27 @@ A starter monorepo with:
 pnpm install
 ```
 
-Configure environment variables in `.env.local` and `web/src/environments/environment.ts` (Clerk publishable key, Convex URL).
+Copy `web/.env.example` to `web/.env.local` and configure the Convex URL.
 
 ## Development
 
 ```bash
-# Web app (http://localhost:4200)
-pnpm start
+# Web app and Convex backend
+pnpm dev
 
-# Convex backend (watch mode)
-npx convex dev
+# Web app only
+pnpm dev:web
 
 # Astro site
-cd site && pnpm dev
+pnpm dev:site
 
 # Mintlify docs
-cd docs && mintlify dev
+pnpm dev:docs
 ```
 
 ## Build
 
 ```bash
-pnpm build       # Angular web build
-cd site && pnpm build
+pnpm build
+pnpm build:site
 ```
