@@ -25,6 +25,7 @@
     "check:write": "biome check --write ."
   },
   "dependencies": {
+    "@convex-dev/presence": "^0.4.0",
     "convex": "^1.44.0"
   },
   "devDependencies": {

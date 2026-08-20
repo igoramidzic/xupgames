@@ -1145,6 +1145,54 @@
   outline-offset: -4px;
 }
 
+.remote-cursors {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.remote-cursor {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  color: var(--remote-cursor-color);
+  opacity: 0.68;
+  will-change: transform;
+}
+
+.remote-cursor svg {
+  width: 24px;
+  height: 30px;
+  flex: none;
+  filter: drop-shadow(0 2px 2px rgb(23 32 58 / 24%));
+}
+
+.remote-cursor path {
+  fill: currentcolor;
+  stroke: rgb(255 255 255 / 88%);
+  stroke-linejoin: round;
+  stroke-width: 1.5px;
+}
+
+.remote-cursor span {
+  overflow: hidden;
+  max-width: 150px;
+  margin: 16px 0 0 -2px;
+  padding: 4px 7px;
+  border: 1px solid rgb(255 255 255 / 62%);
+  border-radius: 4px 8px 7px 6px;
+  background: var(--remote-cursor-color);
+  box-shadow: 0 3px 8px rgb(23 32 58 / 16%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 760;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .canvas-navigation {
   display: flex;
   gap: 3px;

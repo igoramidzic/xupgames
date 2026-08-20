@@ -3,6 +3,7 @@ import type { Id } from '@convex/_generated/dataModel';
 import { useMutation } from 'convex/react';
 import { Hand, Maximize2, Minus, Pencil, Plus } from 'lucide-react';
 import {
+  type CSSProperties,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
@@ -11,6 +12,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { type RemoteCursor, useCursorPresence } from '@/lib/useCursorPresence';
 
 export type DrawingPoint = {
   x: number;
@@ -116,6 +118,7 @@ export default function DrawingCanvas({
   const startStroke = useMutation(api.drawing.start);
   const appendPoints = useMutation(api.drawing.append);
   const finishStroke = useMutation(api.drawing.finish);
+  const { remoteCursors, updateCursor } = useCursorPresence({ roomId, memberId, sessionToken });
   const frameRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
@@ -339,6 +342,7 @@ export default function DrawingCanvas({
 
   function handlePointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
     event.currentTarget.focus({ preventScroll: true });
+    updateCursor(pointFromPointer(event));
     const wantsToPan = tool === 'pan' || spacePanningRef.current || event.button === 1;
     if (wantsToPan && !activeRef.current) {
       event.preventDefault();
@@ -394,6 +398,9 @@ export default function DrawingCanvas({
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
+    const pointerPoint = pointFromPointer(event);
+    updateCursor(pointerPoint);
+
     const pan = panRef.current;
     if (pan?.pointerId === event.pointerId && event.currentTarget.hasPointerCapture(event.pointerId)) {
       const deltaX = event.clientX - pan.startClientX;
@@ -416,7 +423,7 @@ export default function DrawingCanvas({
       return;
     }
 
-    const nextPoint = pointFromPointer(event);
+    const nextPoint = pointerPoint;
     const previousPoint = active.points.at(-1);
     if (!nextPoint || !previousPoint) {
       return;
@@ -591,8 +598,16 @@ export default function DrawingCanvas({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerEnd}
+          onPointerLeave={() => updateCursor(null)}
           onWheel={handleWheel}
         />
+
+        <div className="remote-cursors" aria-hidden="true">
+          {remoteCursors.map((cursor) => {
+            const position = cursorScreenPosition(cursor, camera, canvasSize);
+            return <RemoteCursorMarker cursor={cursor} key={cursor.memberId} target={position} />;
+          })}
+        </div>
 
         {strokes.length === 0 && !activeRef.current ? (
           <div className="canvas-empty" aria-hidden="true">
@@ -624,6 +639,79 @@ export default function DrawingCanvas({
         ) : null}
       </div>
     </>
+  );
+}
+
+function RemoteCursorMarker({ cursor, target }: { cursor: RemoteCursor; target: { x: number; y: number } }) {
+  const markerRef = useRef<HTMLDivElement>(null);
+  const currentRef = useRef(target);
+  const targetRef = useRef(target);
+  const lastFrameRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const animateRef = useRef<(time: number) => void>(() => undefined);
+
+  targetRef.current = target;
+  animateRef.current = (time: number) => {
+    const marker = markerRef.current;
+    if (marker === null) {
+      animationFrameRef.current = null;
+      return;
+    }
+
+    const previousTime = lastFrameRef.current ?? time;
+    const elapsed = Math.min(64, time - previousTime);
+    const interpolation = cursorInterpolation(elapsed);
+    const next = {
+      x: currentRef.current.x + (targetRef.current.x - currentRef.current.x) * interpolation,
+      y: currentRef.current.y + (targetRef.current.y - currentRef.current.y) * interpolation,
+    };
+    currentRef.current = next;
+    lastFrameRef.current = time;
+    marker.style.transform = `translate3d(${next.x - 3}px, ${next.y - 2}px, 0)`;
+
+    if (Math.hypot(targetRef.current.x - next.x, targetRef.current.y - next.y) < 0.1) {
+      currentRef.current = targetRef.current;
+      marker.style.transform = `translate3d(${targetRef.current.x - 3}px, ${targetRef.current.y - 2}px, 0)`;
+      animationFrameRef.current = null;
+      lastFrameRef.current = null;
+      return;
+    }
+    animationFrameRef.current = window.requestAnimationFrame(animateRef.current);
+  };
+
+  useEffect(() => {
+    if (animationFrameRef.current === null) {
+      animationFrameRef.current = window.requestAnimationFrame(animateRef.current);
+    }
+  });
+
+  useEffect(
+    () => () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+        lastFrameRef.current = null;
+      }
+    },
+    []
+  );
+
+  return (
+    <div
+      className="remote-cursor"
+      ref={markerRef}
+      style={
+        {
+          '--remote-cursor-color': cursorColor(cursor.memberId),
+          transform: `translate3d(${currentRef.current.x - 3}px, ${currentRef.current.y - 2}px, 0)`,
+        } as CSSProperties
+      }
+    >
+      <svg viewBox="0 0 24 30" aria-hidden="true">
+        <path d="M3 2 20 17l-8 .8-4.2 8.4z" />
+      </svg>
+      <span>{cursor.displayName}</span>
+    </div>
   );
 }
 
@@ -659,6 +747,26 @@ export function clampCamera(camera: Camera, size: CanvasSize): Camera {
       : Math.min(WORLD_HEIGHT - visibleHeight / 2, Math.max(visibleHeight / 2, camera.centerY));
 
   return { centerX, centerY, zoom };
+}
+
+export function cursorScreenPosition(point: DrawingPoint, camera: Camera, size: CanvasSize) {
+  return {
+    x: (point.x * WORLD_WIDTH - camera.centerX) * camera.zoom + size.width / 2,
+    y: (point.y * WORLD_HEIGHT - camera.centerY) * camera.zoom + size.height / 2,
+  };
+}
+
+export function cursorInterpolation(elapsedMs: number) {
+  return 1 - Math.exp(-Math.max(0, elapsedMs) / 85);
+}
+
+export function cursorColor(memberId: string) {
+  const colors = ['#3155d9', '#e94f45', '#1f9b69', '#7a4ed3', '#c57d11', '#187ca3'];
+  let hash = 0;
+  for (const character of memberId) {
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  }
+  return colors[hash % colors.length];
 }
 
 function getRenderableStrokes(
