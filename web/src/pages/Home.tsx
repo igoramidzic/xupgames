@@ -1,13 +1,14 @@
 import { api } from '@convex/_generated/api';
 import { useMutation } from 'convex/react';
-import { ArrowRight, LoaderCircle, UsersRound } from 'lucide-react';
+import { ArrowRight, LoaderCircle, LockKeyhole, UsersRound } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { readGuest, saveGuest, validateDisplayName } from '@/lib/guest';
 
 function errorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
-    return error.message.replace(/^Uncaught Error:\s*/, '');
+    const convexPayload = error.message.match(/\{.*"message":"([^"]+)".*\}/)?.[1];
+    return convexPayload ?? error.message.replace(/^Uncaught Error:\s*/, '');
   }
 
   return 'The room could not be created. Try again.';
@@ -17,6 +18,8 @@ export default function Home() {
   const navigate = useNavigate();
   const createRoom = useMutation(api.rooms.create);
   const [displayName, setDisplayName] = useState(() => readGuest()?.displayName ?? '');
+  const [passwordProtected, setPasswordProtected] = useState(false);
+  const [password, setPassword] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +36,10 @@ export default function Home() {
 
     try {
       const guest = saveGuest(displayName);
-      const room = await createRoom(guest);
+      const room = await createRoom({
+        ...guest,
+        ...(passwordProtected ? { password } : {}),
+      });
       navigate(`/r/${room.code}`);
     } catch (createError) {
       setError(errorMessage(createError));
@@ -87,6 +93,38 @@ export default function Home() {
                 {isCreating ? 'Opening…' : 'Create a room'}
               </button>
             </div>
+            <label className="password-toggle" htmlFor="password-protected">
+              <input
+                id="password-protected"
+                type="checkbox"
+                checked={passwordProtected}
+                onChange={(event) => {
+                  setPasswordProtected(event.target.checked);
+                  setError(null);
+                }}
+              />
+              <LockKeyhole aria-hidden="true" />
+              Require a password to join
+            </label>
+            {passwordProtected ? (
+              <div className="create-password-field">
+                <label htmlFor="room-password">Room password</label>
+                <input
+                  id="room-password"
+                  name="password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={4}
+                  maxLength={64}
+                  required
+                  placeholder="At least 4 characters"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? 'create-error' : 'create-hint'}
+                />
+              </div>
+            ) : null}
             {error ? (
               <p className="form-error" id="create-error" role="alert">
                 {error}

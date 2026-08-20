@@ -7,8 +7,10 @@ import {
   MAX_PLAYERS,
   normalizeDisplayName,
   normalizeRoomCode,
+  normalizeRoomPassword,
   validateSessionToken,
 } from './domain';
+import { createPasswordCredential, verifyPasswordCredential } from './passwords';
 
 const roomStatusValidator = v.union(v.literal('open'), v.literal('closed'));
 
@@ -21,6 +23,7 @@ const previewResultValidator = v.union(
     activeMemberCount: v.number(),
     maxPlayers: v.number(),
     ownerName: v.string(),
+    isPasswordProtected: v.boolean(),
   })
 );
 
@@ -113,6 +116,22 @@ async function upsertGuest(
   return guest;
 }
 
+function getRoomPasswordCredential(room: Doc<'rooms'>) {
+  const fields = [room.passwordHash, room.passwordSalt, room.passwordIterations];
+  const isPasswordProtected = fields.some((field) => field !== undefined);
+  if (!isPasswordProtected) {
+    return null;
+  }
+  if (room.passwordHash === undefined || room.passwordSalt === undefined || room.passwordIterations === undefined) {
+    throw new Error('Room password credential is incomplete.');
+  }
+  return {
+    hash: room.passwordHash,
+    salt: room.passwordSalt,
+    iterations: room.passwordIterations,
+  };
+}
+
 export const preview = query({
   args: { code: v.string() },
   returns: previewResultValidator,
@@ -135,6 +154,7 @@ export const preview = query({
       activeMemberCount: room.activeMemberCount,
       maxPlayers: room.maxPlayers,
       ownerName: ownerMembership.displayName,
+      isPasswordProtected: getRoomPasswordCredential(room) !== null,
     };
   },
 });
@@ -194,11 +214,13 @@ export const getSession = query({
 });
 
 export const create = mutation({
-  args: { sessionToken: v.string(), displayName: v.string() },
+  args: { sessionToken: v.string(), displayName: v.string(), password: v.optional(v.string()) },
   returns: v.object({ code: v.string() }),
   handler: async (ctx, args) => {
     const sessionToken = validateSessionToken(args.sessionToken);
     const displayName = normalizeDisplayName(args.displayName);
+    const password = args.password === undefined ? null : normalizeRoomPassword(args.password);
+    const passwordCredential = password === null ? null : await createPasswordCredential(password);
     const now = Date.now();
     const guest = await upsertGuest(ctx, sessionToken, displayName, now);
 
@@ -222,6 +244,13 @@ export const create = mutation({
       activeMemberCount: 1,
       ownerGuestId: guest._id,
       nextStrokeSequence: 1,
+      ...(passwordCredential === null
+        ? {}
+        : {
+            passwordHash: passwordCredential.hash,
+            passwordSalt: passwordCredential.salt,
+            passwordIterations: passwordCredential.iterations,
+          }),
       createdAt: now,
       closedAt: null,
     });
@@ -239,7 +268,7 @@ export const create = mutation({
 });
 
 export const join = mutation({
-  args: { code: v.string(), sessionToken: v.string(), displayName: v.string() },
+  args: { code: v.string(), sessionToken: v.string(), displayName: v.string(), password: v.optional(v.string()) },
   returns: v.object({ code: v.string() }),
   handler: async (ctx, args) => {
     const code = normalizeRoomCode(args.code);
@@ -251,6 +280,17 @@ export const join = mutation({
     }
     if (room.status === 'closed') {
       fail('ROOM_CLOSED', 'This room is closed.');
+    }
+
+    const passwordCredential = getRoomPasswordCredential(room);
+    if (passwordCredential !== null) {
+      if (args.password === undefined || args.password.trim() === '') {
+        fail('ROOM_PASSWORD_REQUIRED', 'Enter the room password.');
+      }
+      const password = normalizeRoomPassword(args.password);
+      if (!(await verifyPasswordCredential(password, passwordCredential))) {
+        fail('INVALID_ROOM_PASSWORD', 'That room password is incorrect.');
+      }
     }
 
     const now = Date.now();

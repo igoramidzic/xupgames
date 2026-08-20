@@ -105,6 +105,7 @@ function JoinRoom({
 }) {
   const joinRoom = useMutation(api.rooms.join);
   const [displayName, setDisplayName] = useState(guest?.displayName ?? '');
+  const [password, setPassword] = useState('');
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isClosed = preview.status === 'closed';
@@ -122,7 +123,7 @@ function JoinRoom({
     setJoining(true);
     try {
       const identity = saveGuest(displayName);
-      await joinRoom({ code, ...identity });
+      await joinRoom({ code, ...identity, ...(preview.isPasswordProtected ? { password } : {}) });
       onJoined(identity);
     } catch (joinError) {
       setError(errorMessage(joinError, 'The room could not be joined. Try again.'));
@@ -157,6 +158,11 @@ function JoinRoom({
             <span>
               <UsersRound aria-hidden="true" /> {preview.activeMemberCount} / {preview.maxPlayers} people
             </span>
+            {preview.isPasswordProtected ? (
+              <span className="password-protected">
+                <LockKeyhole aria-hidden="true" /> Password protected
+              </span>
+            ) : null}
             <span className={isClosed ? 'status-closed' : 'status-open'}>{isClosed ? 'Closed' : 'Live now'}</span>
           </div>
 
@@ -181,6 +187,23 @@ function JoinRoom({
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? 'join-error' : 'join-hint'}
               />
+              {preview.isPasswordProtected ? (
+                <>
+                  <label htmlFor="join-password">Room password</label>
+                  <input
+                    id="join-password"
+                    type="password"
+                    autoComplete="current-password"
+                    maxLength={64}
+                    required
+                    placeholder="Enter the password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? 'join-error' : 'join-hint'}
+                  />
+                </>
+              ) : null}
               <button className="primary-action" type="submit" disabled={joining}>
                 {joining ? <LoaderCircle className="spin" aria-hidden="true" /> : null}
                 {joining ? 'Joining…' : guest ? 'Rejoin the canvas' : 'Join the canvas'}
@@ -353,48 +376,6 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
 
       <main className="room-workspace">
         <section className="canvas-column">
-          <div className="drawing-toolbar" role="toolbar" aria-label="Drawing tools">
-            <div className="tool-group">
-              <span className="tool-label">Ink</span>
-              <div className="color-list">
-                {COLORS.map((option) => (
-                  <button
-                    className="color-swatch"
-                    type="button"
-                    key={option}
-                    style={{ '--swatch': option } as CSSProperties}
-                    data-selected={color === option}
-                    onClick={() => setColor(option)}
-                    aria-label={`Use ${option} ink`}
-                    aria-pressed={color === option}
-                    disabled={isClosed}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="toolbar-divider" />
-            <div className="tool-group">
-              <span className="tool-label">Brush</span>
-              <div className="size-list">
-                {WIDTHS.map((option) => (
-                  <button
-                    className="size-button"
-                    type="button"
-                    key={option}
-                    data-selected={width === option}
-                    onClick={() => setWidth(option)}
-                    aria-label={`Use ${option} pixel brush`}
-                    aria-pressed={width === option}
-                    disabled={isClosed}
-                  >
-                    <span style={{ width: option, height: option }} />
-                  </button>
-                ))}
-              </div>
-            </div>
-            <p className="toolbar-tip">Draw · Hold Space to move</p>
-          </div>
-
           {strokeHistoryStatus === 'LoadingFirstPage' ? (
             <div className="canvas-loading">
               <LoaderCircle className="spin" aria-hidden="true" /> Loading every mark…
@@ -408,6 +389,49 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
               strokes={strokes}
               color={color}
               width={width}
+              drawingControls={
+                <>
+                  <div className="tool-group">
+                    <span className="tool-label">Ink</span>
+                    <div className="color-list">
+                      {COLORS.map((option) => (
+                        <button
+                          className="color-swatch"
+                          type="button"
+                          key={option}
+                          style={{ '--swatch': option } as CSSProperties}
+                          data-selected={color === option}
+                          onClick={() => setColor(option)}
+                          aria-label={`Use ${option} ink`}
+                          aria-pressed={color === option}
+                          disabled={isClosed}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <span className="toolbar-divider" />
+                  <div className="tool-group">
+                    <span className="tool-label">Brush</span>
+                    <div className="size-list">
+                      {WIDTHS.map((option) => (
+                        <button
+                          className="size-button"
+                          type="button"
+                          key={option}
+                          data-selected={width === option}
+                          onClick={() => setWidth(option)}
+                          aria-label={`Use ${option} pixel brush`}
+                          aria-pressed={width === option}
+                          disabled={isClosed}
+                        >
+                          <span style={{ width: option, height: option }} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="toolbar-tip">Hold Space to move</p>
+                </>
+              }
               disabled={isClosed}
               onError={setNotice}
             />
@@ -458,13 +482,15 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
                 </div>
               ))}
             </div>
-            <div className="members-share">
-              <UsersRound aria-hidden="true" />
-              <p>Share the room link to bring more people to the sheet.</p>
-              <button type="button" onClick={copyRoomLink}>
-                {copied ? 'Link copied' : 'Copy invite link'}
-              </button>
-            </div>
+            {!isClosed ? (
+              <div className="members-share">
+                <UsersRound aria-hidden="true" />
+                <p>Share the room link to bring more people to the sheet.</p>
+                <button type="button" onClick={copyRoomLink}>
+                  {copied ? 'Link copied' : 'Copy invite link'}
+                </button>
+              </div>
+            ) : null}
           </div>
         </aside>
       </main>

@@ -5,6 +5,8 @@ export const ROOM_CODE_LENGTH = 8;
 export const MAX_STROKES_RETURNED = 200;
 export const MAX_POINTS_PER_STROKE = 1024;
 export const MAX_APPEND_POINTS = 64;
+export const MIN_ROOM_PASSWORD_LENGTH = 4;
+export const MAX_ROOM_PASSWORD_LENGTH = 64;
 
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
@@ -23,6 +25,8 @@ export type AppErrorCode =
   | 'ROOM_NOT_FOUND'
   | 'ROOM_CLOSED'
   | 'ROOM_FULL'
+  | 'INVALID_ROOM_PASSWORD'
+  | 'ROOM_PASSWORD_REQUIRED'
   | 'NOT_A_MEMBER'
   | 'MEMBER_INACTIVE'
   | 'NOT_ROOM_OWNER'
@@ -65,6 +69,22 @@ export function normalizeRoomCode(code: string): string {
   const normalized = code.trim().toUpperCase();
   if (!ROOM_CODE_PATTERN.test(normalized)) {
     fail('INVALID_ROOM_CODE', 'The room code is invalid.');
+  }
+  return normalized;
+}
+
+export function normalizeRoomPassword(password: string): string {
+  const normalized = password.normalize('NFKC').trim();
+  const characterCount = Array.from(normalized).length;
+  const hasControlCharacter = Array.from(normalized).some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && (codePoint <= 31 || codePoint === 127);
+  });
+  if (characterCount < MIN_ROOM_PASSWORD_LENGTH || characterCount > MAX_ROOM_PASSWORD_LENGTH || hasControlCharacter) {
+    fail(
+      'INVALID_ROOM_PASSWORD',
+      `Room passwords must contain ${MIN_ROOM_PASSWORD_LENGTH}-${MAX_ROOM_PASSWORD_LENGTH} visible characters.`
+    );
   }
   return normalized;
 }

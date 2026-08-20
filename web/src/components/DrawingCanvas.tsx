@@ -3,6 +3,7 @@ import type { Id } from '@convex/_generated/dataModel';
 import { useMutation } from 'convex/react';
 import { Hand, Maximize2, Minus, Pencil, Plus } from 'lucide-react';
 import {
+  type ReactNode,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
   useCallback,
@@ -78,6 +79,7 @@ type DrawingCanvasProps = {
   strokes: CanvasStroke[];
   color: string;
   width: number;
+  drawingControls: ReactNode;
   disabled?: boolean;
   onError: (message: string) => void;
 };
@@ -107,6 +109,7 @@ export default function DrawingCanvas({
   strokes,
   color,
   width,
+  drawingControls,
   disabled = false,
   onError,
 }: DrawingCanvasProps) {
@@ -533,87 +536,94 @@ export default function DrawingCanvas({
   const showMinimap = cameraInitializedRef.current && !isEntireWorldVisible(camera, canvasSize);
 
   return (
-    <div className="drawing-frame" ref={frameRef}>
-      <canvas
-        ref={canvasRef}
-        className={`drawing-canvas${panningEnabled ? ' is-pan-tool' : ''}${pointerPanning ? ' is-panning' : ''}`}
-        aria-label={disabled ? 'Shared drawing canvas, read only' : 'Shared drawing canvas'}
-        tabIndex={0}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
-        onWheel={handleWheel}
-      />
-
-      <div className="canvas-navigation" role="toolbar" aria-label="Canvas navigation">
-        <div className="canvas-tool-toggle">
-          <button
-            type="button"
-            data-active={tool === 'draw' && !spacePanning}
-            onClick={() => setTool('draw')}
-            disabled={disabled}
-            aria-label="Draw on the canvas"
-            aria-pressed={tool === 'draw'}
-            title="Draw"
-          >
-            <Pencil aria-hidden="true" />
+    <>
+      <div className="drawing-toolbar" role="toolbar" aria-label="Drawing and canvas tools">
+        {drawingControls}
+        <span className="toolbar-divider toolbar-view-divider" />
+        <div className="canvas-navigation">
+          <span className="tool-label">View</span>
+          <div className="canvas-tool-toggle">
+            <button
+              type="button"
+              data-active={tool === 'draw' && !spacePanning}
+              onClick={() => setTool('draw')}
+              disabled={disabled}
+              aria-label="Draw on the canvas"
+              aria-pressed={tool === 'draw'}
+              title="Draw"
+            >
+              <Pencil aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              data-active={tool === 'pan' || spacePanning}
+              onClick={() => setTool('pan')}
+              aria-label="Move around the canvas"
+              aria-pressed={tool === 'pan'}
+              title="Hand tool (or hold Space)"
+            >
+              <Hand aria-hidden="true" />
+            </button>
+          </div>
+          <span className="canvas-navigation-divider" />
+          <button type="button" onClick={() => zoomFromCenter(0.8)} aria-label="Zoom out" title="Zoom out">
+            <Minus aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            data-active={tool === 'pan' || spacePanning}
-            onClick={() => setTool('pan')}
-            aria-label="Move around the canvas"
-            aria-pressed={tool === 'pan'}
-            title="Hand tool (or hold Space)"
-          >
-            <Hand aria-hidden="true" />
+          <output className="canvas-zoom-value" aria-label="Current zoom">
+            {Math.round(camera.zoom * 100)}%
+          </output>
+          <button type="button" onClick={() => zoomFromCenter(1.25)} aria-label="Zoom in" title="Zoom in">
+            <Plus aria-hidden="true" />
+          </button>
+          <button type="button" onClick={fitView} aria-label="Fit drawing in view" title="Fit drawing in view">
+            <Maximize2 aria-hidden="true" />
           </button>
         </div>
-        <span className="canvas-navigation-divider" />
-        <button type="button" onClick={() => zoomFromCenter(0.8)} aria-label="Zoom out" title="Zoom out">
-          <Minus aria-hidden="true" />
-        </button>
-        <output className="canvas-zoom-value" aria-label="Current zoom">
-          {Math.round(camera.zoom * 100)}%
-        </output>
-        <button type="button" onClick={() => zoomFromCenter(1.25)} aria-label="Zoom in" title="Zoom in">
-          <Plus aria-hidden="true" />
-        </button>
-        <button type="button" onClick={fitView} aria-label="Fit drawing in view" title="Fit drawing in view">
-          <Maximize2 aria-hidden="true" />
-        </button>
       </div>
 
-      {strokes.length === 0 && !activeRef.current ? (
-        <div className="canvas-empty" aria-hidden="true">
-          <span>Make the first mark</span>
-          <svg viewBox="0 0 86 54">
-            <title>Arrow pointing to the canvas</title>
-            <path d="M4 14 C 24 0, 45 42, 80 18" />
-            <path d="m72 10 10 7-7 10" />
-          </svg>
-        </div>
-      ) : null}
+      <div className="drawing-frame" ref={frameRef}>
+        <canvas
+          ref={canvasRef}
+          className={`drawing-canvas${panningEnabled ? ' is-pan-tool' : ''}${pointerPanning ? ' is-panning' : ''}`}
+          aria-label={disabled ? 'Shared drawing canvas, read only' : 'Shared drawing canvas'}
+          tabIndex={0}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerEnd}
+          onPointerCancel={handlePointerEnd}
+          onWheel={handleWheel}
+        />
 
-      {showMinimap ? (
-        <div className="canvas-minimap">
-          <span>Map</span>
-          <canvas
-            ref={minimapRef}
-            aria-label="Canvas minimap. Drag to move around the drawing."
-            onPointerDown={handleMinimapPointerDown}
-            onPointerMove={handleMinimapPointerMove}
-          />
-        </div>
-      ) : null}
+        {strokes.length === 0 && !activeRef.current ? (
+          <div className="canvas-empty" aria-hidden="true">
+            <span>Make the first mark</span>
+            <svg viewBox="0 0 86 54">
+              <title>Arrow pointing to the canvas</title>
+              <path d="M4 14 C 24 0, 45 42, 80 18" />
+              <path d="m72 10 10 7-7 10" />
+            </svg>
+          </div>
+        ) : null}
 
-      {!disabled ? (
-        <div className="canvas-shortcut-hint">
-          Hold <kbd>Space</kbd> and drag to move · Pinch or <kbd>⌘</kbd>/<kbd>Ctrl</kbd> + scroll to zoom
-        </div>
-      ) : null}
-    </div>
+        {showMinimap ? (
+          <div className="canvas-minimap">
+            <span>Map</span>
+            <canvas
+              ref={minimapRef}
+              aria-label="Canvas minimap. Drag to move around the drawing."
+              onPointerDown={handleMinimapPointerDown}
+              onPointerMove={handleMinimapPointerMove}
+            />
+          </div>
+        ) : null}
+
+        {!disabled ? (
+          <div className="canvas-shortcut-hint">
+            Hold <kbd>Space</kbd> and drag to move · Pinch or <kbd>⌘</kbd>/<kbd>Ctrl</kbd> + scroll to zoom
+          </div>
+        ) : null}
+      </div>
+    </>
   );
 }
 
