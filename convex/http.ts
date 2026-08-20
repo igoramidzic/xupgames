@@ -10,7 +10,7 @@ http.route({
   path: '/clerk-webhook',
   method: 'POST',
   handler: httpAction(async (ctx, request) => {
-    const webhookSecret = process.env['CLERK_WEBHOOK_SECRET'];
+    const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
       console.error('Missing CLERK_WEBHOOK_SECRET environment variable');
@@ -40,7 +40,7 @@ http.route({
       return new Response('Invalid webhook signature', { status: 400 });
     }
 
-    const eventType = payload['type'] as string;
+    const eventType = payload.type as string;
 
     switch (eventType) {
       case 'user.created':

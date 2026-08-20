@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "dev": "concurrently -n web,convex -c blue,green --kill-others-on-fail \"pnpm dev:web\" \"pnpm dev:convex\"",
     "dev:web": "pnpm --filter web dev",
     "dev:convex": "convex dev",
@@ -15,29 +16,28 @@
     "preview": "pnpm --filter web preview",
     "preview:web": "pnpm --filter web preview",
     "preview:site": "pnpm --filter site preview",
-    "lint": "pnpm --filter web lint",
+    "lint": "biome lint .",
     "test": "vitest",
     "test:ci": "vitest run",
-    "format:check": "prettier --check \"web/src/**/*.{ts,tsx,css,json}\" \"convex/**/*.{ts,js,json}\" \"site/src/**/*.{ts,astro,md,mdx,css,json}\" \"docs/**/*.{mdx,json}\"",
-    "format": "prettier --write --ignore-unknown \"web/src/**/*.{ts,tsx,css,json}\" \"convex/**/*.{ts,js,json}\" \"site/src/**/*.{ts,astro,md,mdx,css,json}\" \"docs/**/*.{mdx,json}\""
+    "format:check": "biome format .",
+    "format": "biome format --write .",
+    "check": "biome check .",
+    "check:write": "biome check --write ."
   },
   "dependencies": {
-    "convex": "^1.39.1",
+    "convex": "^1.44.0",
     "svix": "^1.95.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.9",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
+    "@testing-library/user-event": "^14.6.5",
     "@types/node": "^25.9.1",
-    "@vitejs/plugin-react": "^6.0.2",
-    "concurrently": "^10.0.1",
+    "@vitejs/plugin-react": "^6.1.0",
+    "concurrently": "^10.0.5",
     "jsdom": "^29.1.1",
-    "mintlify": "^4.2.588",
-    "prettier": "^3.8.3",
-    "prettier-plugin-astro": "^0.14.1",
-    "prettier-plugin-organize-imports": "^4.3.0",
-    "prettier-plugin-tailwindcss": "^0.8.0",
-    "vitest": "^4.1.7"
+    "mintlify": "^4.2.813",
+    "vitest": "^4.1.11"
   }
 }

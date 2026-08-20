@@ -1,0 +1,9 @@
+#!/bin/sh
+
+if ! pnpm format:check; then
+  pnpm format
+  echo "Biome formatted files. Review and stage the changes, then commit again." >&2
+  exit 1
+fi
+
+pnpm check
