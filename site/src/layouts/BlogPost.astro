@@ -1,10 +1,10 @@
 ---
+import { Image } from 'astro:assets';
 import type { CollectionEntry } from 'astro:content';
 import type { ImageMetadata } from 'astro';
-import { Image } from 'astro:assets';
-import BaseLayout from './BaseLayout.astro';
-import TableOfContents from '../components/TableOfContents.astro';
 import BlogPostActions from '../components/BlogPostActions.astro';
+import TableOfContents from '../components/TableOfContents.astro';
+import BaseLayout from './BaseLayout.astro';
 
 interface PostLink {
   id: string;

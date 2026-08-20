@@ -1,8 +1,4 @@
 {
   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=827846
-  "recommendations": [
-    "dbaeumer.vscode-eslint",
-    "esbenp.prettier-vscode",
-    "bradlc.vscode-tailwindcss"
-  ]
+  "recommendations": ["biomejs.biome", "bradlc.vscode-tailwindcss"]
 }

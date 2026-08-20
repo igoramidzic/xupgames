@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
+  merge_group:
 
 jobs:
   quality-check:
@@ -26,16 +27,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check code formatting
-        run: pnpm run format:check
-
-      - name: Run ESLint
-        run: pnpm run lint
+      - name: Run formatting and lint checks
+        run: pnpm check
 
       - name: Run unit tests
         run: pnpm run test:ci
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Build application
-        run: pnpm run build
+      - name: Build web application
+        run: pnpm build:web
+
+      - name: Build marketing site
+        run: pnpm build:site

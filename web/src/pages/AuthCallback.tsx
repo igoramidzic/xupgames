@@ -16,6 +16,8 @@ export default function AuthCallback() {
   useEffect(() => {
     if (!clerkLoaded || !signInLoaded || !signUpLoaded || !signIn || !signUp) return;
 
+    const activeSignIn = signIn;
+    const activeSignUp = signUp;
     let cancelled = false;
 
     async function run() {
@@ -31,15 +33,15 @@ export default function AuthCallback() {
 
       try {
         // If OAuth returned a transferable verification, transfer to sign-up to create the user.
-        if (signIn?.firstFactorVerification?.status === 'transferable') {
-          const result = await signUp!.create({ transfer: true });
+        if (activeSignIn.firstFactorVerification?.status === 'transferable') {
+          const result = await activeSignUp.create({ transfer: true });
           if (result.status === 'complete' && result.createdSessionId) {
             await clerk.setActive({ session: result.createdSessionId });
           }
-        } else if (signIn?.status === 'complete' && signIn.createdSessionId) {
-          await clerk.setActive({ session: signIn.createdSessionId });
-        } else if (signUp?.status === 'complete' && signUp.createdSessionId) {
-          await clerk.setActive({ session: signUp.createdSessionId });
+        } else if (activeSignIn.status === 'complete' && activeSignIn.createdSessionId) {
+          await clerk.setActive({ session: activeSignIn.createdSessionId });
+        } else if (activeSignUp.status === 'complete' && activeSignUp.createdSessionId) {
+          await clerk.setActive({ session: activeSignUp.createdSessionId });
         }
 
         const startTime = Date.now();
