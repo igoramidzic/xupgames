@@ -343,7 +343,6 @@ export default function DrawingCanvas({
   }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
-    event.currentTarget.focus({ preventScroll: true });
     updateCursor(pointFromPointer(event));
     const wantsToPan = tool === 'pan' || spacePanningRef.current || event.button === 1;
     if (wantsToPan && !activeRef.current) {
