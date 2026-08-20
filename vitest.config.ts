@@ -12,6 +12,7 @@ export default defineConfig({
         resolve: {
           alias: {
             '@': path.resolve(__dirname, 'web/src'),
+            '@convex': path.resolve(__dirname, 'convex'),
           },
         },
         test: {
