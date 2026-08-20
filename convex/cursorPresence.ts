@@ -134,11 +134,18 @@ export const list = query({
   returns: v.array(cursorStateValidator),
   handler: async (ctx, args) => {
     const states = await presence.list(ctx, args.roomToken, MAX_PLAYERS + 1);
-    return states.map((state) => ({
-      memberId: state.userId,
-      online: state.online,
-      cursor: parseCursorData(state.data),
-    }));
+    const visibleStates = [];
+    for (const state of states) {
+      const membership = await ctx.db.get('roomMembers', state.userId);
+      if (membership?.isActive) {
+        visibleStates.push({
+          memberId: state.userId,
+          online: state.online,
+          cursor: parseCursorData(state.data),
+        });
+      }
+    }
+    return visibleStates;
   },
 });
 

@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import Admin from './pages/Admin';
 import Home from './pages/Home';
 import Room from './pages/Room';
 
@@ -7,6 +8,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/r/:code" element={<Room />} />
+      <Route path="/admin" element={<Admin />} />
+      <Route path="/admin/:code" element={<Admin />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

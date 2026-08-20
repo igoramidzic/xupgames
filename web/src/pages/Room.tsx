@@ -1,7 +1,7 @@
 import { api } from '@convex/_generated/api';
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
-import { Check, Copy, Crown, DoorOpen, LoaderCircle, LockKeyhole, UsersRound } from 'lucide-react';
+import { Beaker, Check, Copy, Crown, DoorOpen, LoaderCircle, LockKeyhole, UsersRound } from 'lucide-react';
 import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import DrawingCanvas from '@/components/DrawingCanvas';
@@ -355,6 +355,12 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
           <span className={isClosed ? 'room-status room-status-closed' : 'room-status'}>
             <span className="live-dot" /> {isClosed ? 'Closed' : 'Live'}
           </span>
+          {session.isOwner && !isClosed ? (
+            <Link className="room-action" to={`/admin/${session.code}`}>
+              <Beaker aria-hidden="true" />
+              <span>Playtest</span>
+            </Link>
+          ) : null}
           {session.isOwner && !isClosed ? (
             <button
               className="room-action"
