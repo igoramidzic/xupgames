@@ -43,6 +43,7 @@ describe('Home', () => {
 
     await waitFor(() =>
       expect(createRoom).toHaveBeenCalledWith({
+        gameType: 'drawing',
         sessionToken: expect.any(String),
         displayName: 'Ada',
         password: 'secret phrase',

@@ -1,7 +1,7 @@
 import { paginationOptsValidator, paginationResultValidator } from 'convex/server';
 import { v } from 'convex/values';
 import type { Doc, Id } from './_generated/dataModel';
-import { mutation, type QueryCtx, query } from './_generated/server';
+import { type MutationCtx, mutation, type QueryCtx, query } from './_generated/server';
 import {
   fail,
   MAX_POINTS_PER_STROKE,
@@ -64,6 +64,9 @@ async function requireMember(
   if (room === null) {
     fail('ROOM_NOT_FOUND', 'Room not found.');
   }
+  if (room.gameType !== 'drawing') {
+    fail('WRONG_GAME_TYPE', 'This room does not support drawing.');
+  }
   const guest = await findGuestByToken(ctx, sessionToken);
   if (guest === null) {
     fail('NOT_A_MEMBER', 'You are not a member of this room.');
@@ -82,6 +85,39 @@ function requireOpenRoom(room: Doc<'rooms'>): void {
   if (room.status === 'closed') {
     fail('ROOM_CLOSED', 'This room is closed.');
   }
+}
+
+async function findDrawingGameState(
+  ctx: DatabaseReaderContext,
+  roomId: Id<'rooms'>
+): Promise<Doc<'drawingGameStates'> | null> {
+  return await ctx.db
+    .query('drawingGameStates')
+    .withIndex('by_roomId', (index) => index.eq('roomId', roomId))
+    .unique();
+}
+
+async function getOrCreateDrawingGameState(ctx: MutationCtx, room: Doc<'rooms'>): Promise<Doc<'drawingGameStates'>> {
+  const existing = await findDrawingGameState(ctx, room._id);
+  if (existing !== null) {
+    return existing;
+  }
+
+  const newestStroke = await ctx.db
+    .query('drawingStrokes')
+    .withIndex('by_roomId_and_sequence', (index) => index.eq('roomId', room._id))
+    .order('desc')
+    .first();
+  const nextStrokeSequence = (newestStroke?.sequence ?? 0) + 1;
+  const stateId = await ctx.db.insert('drawingGameStates', {
+    roomId: room._id,
+    nextStrokeSequence,
+  });
+  const state = await ctx.db.get('drawingGameStates', stateId);
+  if (state === null) {
+    throw new Error('Drawing game state could not be loaded.');
+  }
+  return state;
 }
 
 export const list = query({
@@ -165,8 +201,9 @@ export const start = mutation({
     requireOpenRoom(room);
 
     const now = Date.now();
-    const sequence = room.nextStrokeSequence;
-    await ctx.db.patch('rooms', room._id, { nextStrokeSequence: sequence + 1 });
+    const drawingState = await getOrCreateDrawingGameState(ctx, room);
+    const sequence = drawingState.nextStrokeSequence;
+    await ctx.db.patch('drawingGameStates', drawingState._id, { nextStrokeSequence: sequence + 1 });
     const strokeId = await ctx.db.insert('drawingStrokes', {
       roomId: room._id,
       authorMemberId: membership._id,

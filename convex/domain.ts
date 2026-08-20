@@ -23,6 +23,7 @@ export type AppErrorCode =
   | 'INVALID_DISPLAY_NAME'
   | 'INVALID_ROOM_CODE'
   | 'ROOM_NOT_FOUND'
+  | 'WRONG_GAME_TYPE'
   | 'ROOM_CLOSED'
   | 'ROOM_FULL'
   | 'INVALID_ROOM_PASSWORD'

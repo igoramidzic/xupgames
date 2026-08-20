@@ -27,6 +27,7 @@ describe('Room join flow', () => {
       return {
         kind: 'room',
         code: 'ABCDEFGH',
+        gameType: 'drawing',
         status: 'open',
         activeMemberCount: 1,
         maxPlayers: 50,

@@ -48,6 +48,7 @@ describe('drawing canvas camera', () => {
   it('assigns a stable visual color to each member', () => {
     expect(cursorColor('member-alpha')).toBe(cursorColor('member-alpha'));
     expect(cursorColor('member-alpha')).toMatch(/^#[0-9a-f]{6}$/);
+    expect(cursorColor('member-alpha', { 'member-alpha': '#ff685b' })).toBe('#ff685b');
   });
 
   it('eases remote cursors toward each new network position', () => {

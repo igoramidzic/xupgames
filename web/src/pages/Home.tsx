@@ -37,6 +37,7 @@ export default function Home() {
     try {
       const guest = saveGuest(displayName);
       const room = await createRoom({
+        gameType: 'drawing',
         ...guest,
         ...(passwordProtected ? { password } : {}),
       });

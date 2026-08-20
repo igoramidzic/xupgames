@@ -78,6 +78,7 @@ type DrawingCanvasProps = {
   sessionToken: string;
   memberId: Id<'roomMembers'>;
   displayName: string;
+  memberColors: Record<string, string>;
   strokes: CanvasStroke[];
   color: string;
   width: number;
@@ -108,6 +109,7 @@ export default function DrawingCanvas({
   sessionToken,
   memberId,
   displayName,
+  memberColors,
   strokes,
   color,
   width,
@@ -605,7 +607,14 @@ export default function DrawingCanvas({
         <div className="remote-cursors" aria-hidden="true">
           {remoteCursors.map((cursor) => {
             const position = cursorScreenPosition(cursor, camera, canvasSize);
-            return <RemoteCursorMarker cursor={cursor} key={cursor.memberId} target={position} />;
+            return (
+              <RemoteCursorMarker
+                color={cursorColor(cursor.memberId, memberColors)}
+                cursor={cursor}
+                key={cursor.memberId}
+                target={position}
+              />
+            );
           })}
         </div>
 
@@ -642,7 +651,15 @@ export default function DrawingCanvas({
   );
 }
 
-function RemoteCursorMarker({ cursor, target }: { cursor: RemoteCursor; target: { x: number; y: number } }) {
+function RemoteCursorMarker({
+  color,
+  cursor,
+  target,
+}: {
+  color: string;
+  cursor: RemoteCursor;
+  target: { x: number; y: number };
+}) {
   const markerRef = useRef<HTMLDivElement>(null);
   const currentRef = useRef(target);
   const targetRef = useRef(target);
@@ -702,7 +719,7 @@ function RemoteCursorMarker({ cursor, target }: { cursor: RemoteCursor; target: 
       ref={markerRef}
       style={
         {
-          '--remote-cursor-color': cursorColor(cursor.memberId),
+          '--remote-cursor-color': color,
           transform: `translate3d(${currentRef.current.x - 3}px, ${currentRef.current.y - 2}px, 0)`,
         } as CSSProperties
       }
@@ -760,7 +777,12 @@ export function cursorInterpolation(elapsedMs: number) {
   return 1 - Math.exp(-Math.max(0, elapsedMs) / 85);
 }
 
-export function cursorColor(memberId: string) {
+export function cursorColor(memberId: string, memberColors: Record<string, string> = {}) {
+  const assignedColor = memberColors[memberId];
+  if (assignedColor !== undefined) {
+    return assignedColor;
+  }
+
   const colors = ['#3155d9', '#e94f45', '#1f9b69', '#7a4ed3', '#c57d11', '#187ca3'];
   let hash = 0;
   for (const character of memberId) {

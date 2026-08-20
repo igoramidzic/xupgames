@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { gameTypeValidator } from './games';
 
 const roomStatus = v.union(v.literal('open'), v.literal('closed'));
 const strokeStatus = v.union(v.literal('drawing'), v.literal('finished'));
@@ -18,12 +19,11 @@ export default defineSchema({
 
   rooms: defineTable({
     code: v.string(),
-    gameType: v.literal('drawing'),
+    gameType: gameTypeValidator,
     status: roomStatus,
     maxPlayers: v.number(),
     activeMemberCount: v.number(),
     ownerGuestId: v.id('guestSessions'),
-    nextStrokeSequence: v.number(),
     passwordHash: v.optional(v.string()),
     passwordSalt: v.optional(v.string()),
     passwordIterations: v.optional(v.number()),
@@ -41,6 +41,11 @@ export default defineSchema({
   })
     .index('by_roomId_and_guestId', ['roomId', 'guestId'])
     .index('by_roomId_and_isActive', ['roomId', 'isActive']),
+
+  drawingGameStates: defineTable({
+    roomId: v.id('rooms'),
+    nextStrokeSequence: v.number(),
+  }).index('by_roomId', ['roomId']),
 
   drawingStrokes: defineTable({
     roomId: v.id('rooms'),

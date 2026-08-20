@@ -242,6 +242,14 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
     () => [...newestStrokes].sort((first, second) => first.sequence - second.sequence),
     [newestStrokes]
   );
+  const memberColors = useMemo(
+    () =>
+      Object.fromEntries(session.activeMembers.map((member, index) => [member.memberId, memberColor(index)])) as Record<
+        string,
+        string
+      >,
+    [session.activeMembers]
+  );
   const [color, setColor] = useState(COLORS[0]);
   const [width, setWidth] = useState(WIDTHS[1]);
   const [copied, setCopied] = useState(false);
@@ -386,6 +394,7 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
               sessionToken={guest.sessionToken}
               memberId={session.currentMember.memberId}
               displayName={session.currentMember.displayName}
+              memberColors={memberColors}
               strokes={strokes}
               color={color}
               width={width}
@@ -465,9 +474,9 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
               </span>
             </div>
             <div className="member-list">
-              {session.activeMembers.map((member, index) => (
+              {session.activeMembers.map((member) => (
                 <div className="member-row" key={member.memberId}>
-                  <span className="member-avatar" style={{ background: memberColor(index) }}>
+                  <span className="member-avatar" style={{ background: memberColors[member.memberId] }}>
                     {Array.from(member.displayName)[0]?.toUpperCase()}
                   </span>
                   <span className="member-name">

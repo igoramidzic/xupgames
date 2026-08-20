@@ -10,6 +10,7 @@ import {
   normalizeRoomPassword,
   validateSessionToken,
 } from './domain';
+import { gameTypeValidator } from './games';
 import { createPasswordCredential, verifyPasswordCredential } from './passwords';
 
 const roomStatusValidator = v.union(v.literal('open'), v.literal('closed'));
@@ -19,6 +20,7 @@ const previewResultValidator = v.union(
   v.object({
     kind: v.literal('room'),
     code: v.string(),
+    gameType: gameTypeValidator,
     status: roomStatusValidator,
     activeMemberCount: v.number(),
     maxPlayers: v.number(),
@@ -49,6 +51,7 @@ const sessionResultValidator = v.union(
     kind: v.literal('session'),
     roomId: v.id('rooms'),
     code: v.string(),
+    gameType: gameTypeValidator,
     status: roomStatusValidator,
     activeMemberCount: v.number(),
     maxPlayers: v.number(),
@@ -150,6 +153,7 @@ export const preview = query({
     return {
       kind: 'room' as const,
       code: room.code,
+      gameType: room.gameType,
       status: room.status,
       activeMemberCount: room.activeMemberCount,
       maxPlayers: room.maxPlayers,
@@ -192,6 +196,7 @@ export const getSession = query({
       kind: 'session' as const,
       roomId: room._id,
       code: room.code,
+      gameType: room.gameType,
       status: room.status,
       activeMemberCount: room.activeMemberCount,
       maxPlayers: room.maxPlayers,
@@ -214,11 +219,17 @@ export const getSession = query({
 });
 
 export const create = mutation({
-  args: { sessionToken: v.string(), displayName: v.string(), password: v.optional(v.string()) },
+  args: {
+    gameType: v.optional(gameTypeValidator),
+    sessionToken: v.string(),
+    displayName: v.string(),
+    password: v.optional(v.string()),
+  },
   returns: v.object({ code: v.string() }),
   handler: async (ctx, args) => {
     const sessionToken = validateSessionToken(args.sessionToken);
     const displayName = normalizeDisplayName(args.displayName);
+    const gameType = args.gameType ?? 'drawing';
     const password = args.password === undefined ? null : normalizeRoomPassword(args.password);
     const passwordCredential = password === null ? null : await createPasswordCredential(password);
     const now = Date.now();
@@ -238,12 +249,11 @@ export const create = mutation({
 
     const roomId = await ctx.db.insert('rooms', {
       code,
-      gameType: 'drawing',
+      gameType,
       status: 'open',
       maxPlayers: MAX_PLAYERS,
       activeMemberCount: 1,
       ownerGuestId: guest._id,
-      nextStrokeSequence: 1,
       ...(passwordCredential === null
         ? {}
         : {
@@ -254,6 +264,18 @@ export const create = mutation({
       createdAt: now,
       closedAt: null,
     });
+    switch (gameType) {
+      case 'drawing':
+        await ctx.db.insert('drawingGameStates', {
+          roomId,
+          nextStrokeSequence: 1,
+        });
+        break;
+      default: {
+        const unsupportedGameType: never = gameType;
+        throw new Error(`Unsupported game type: ${unsupportedGameType}`);
+      }
+    }
     await ctx.db.insert('roomMembers', {
       roomId,
       guestId: guest._id,
