@@ -99,7 +99,7 @@ export function useCursorPresence({
         setRoomToken(tokens.roomToken);
         flushCursorRef.current();
       } catch {
-        // A later heartbeat retries transient failures without interrupting drawing.
+        // A later heartbeat retries transient failures without interrupting gameplay.
       }
     };
 

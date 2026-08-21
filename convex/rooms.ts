@@ -79,7 +79,6 @@ async function syncGameMembership(
   now: number
 ): Promise<void> {
   switch (room.gameType) {
-    case 'drawing':
     case 'trivia':
       return;
     case 'typeRacer':
@@ -254,7 +253,7 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const sessionToken = validateSessionToken(args.sessionToken);
     const displayName = normalizeDisplayName(args.displayName);
-    const gameType = args.gameType ?? 'drawing';
+    const gameType = args.gameType ?? 'trivia';
     const password = args.password === undefined ? null : normalizeRoomPassword(args.password);
     const passwordCredential = password === null ? null : await createPasswordCredential(password);
     const now = Date.now();
@@ -295,14 +294,6 @@ export const create = mutation({
     const roomGame = await createInitialRoomGame(ctx, roomId, gameType, now);
     await ctx.db.patch('rooms', roomId, { currentGameId: roomGame._id });
     switch (gameType) {
-      case 'drawing':
-        await ctx.db.insert('drawingGameStates', {
-          roomId,
-          nextStrokeSequence: 1,
-          firstStrokeSequence: 1,
-          phase: 'active',
-        });
-        break;
       case 'trivia':
         await ctx.db.insert('triviaGameStates', {
           roomId,

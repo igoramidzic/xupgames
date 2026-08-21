@@ -1,29 +1,21 @@
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useMutation, useQuery } from 'convex/react';
-import { BrainCircuit, Check, Gamepad2, Keyboard, LoaderCircle, Palette, Sparkles, Vote } from 'lucide-react';
+import { BrainCircuit, Check, Gamepad2, Keyboard, LoaderCircle, Sparkles, Vote } from 'lucide-react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
 
-type GameType = 'drawing' | 'trivia' | 'typeRacer';
+type GameType = 'trivia' | 'typeRacer';
 
 const GAMES: ReadonlyArray<{
   gameType: GameType;
   name: string;
   description: string;
-  icon: typeof Palette;
+  icon: typeof BrainCircuit;
   color: string;
   tint: string;
 }> = [
-  {
-    gameType: 'drawing',
-    name: 'Drawing',
-    description: 'Open a fresh shared canvas.',
-    icon: Palette,
-    color: '#3155d9',
-    tint: '#edf1ff',
-  },
   {
     gameType: 'trivia',
     name: 'Trivia',
@@ -52,8 +44,6 @@ function gameDefinition(gameType: GameType) {
 
 function replayLabel(gameType: GameType) {
   switch (gameType) {
-    case 'drawing':
-      return 'Draw Again';
     case 'trivia':
       return 'Play Trivia Again';
     case 'typeRacer':
@@ -195,7 +185,7 @@ export default function NextGameVoting({
 
       {votingOpen ? (
         <>
-          <div className="grid grid-cols-3 gap-2.5 max-[620px]:grid-cols-1">
+          <div className="grid grid-cols-2 gap-2.5 max-[620px]:grid-cols-1">
             {orderedOptions.map((gameType) => {
               const game = gameDefinition(gameType);
               const Icon = game.icon;
@@ -294,7 +284,7 @@ export default function NextGameVoting({
             </fieldset>
           ) : null}
           {isOwner ? (
-            <div className="grid grid-cols-3 gap-2.5 max-[620px]:grid-cols-1">
+            <div className="grid grid-cols-2 gap-2.5 max-[620px]:grid-cols-1">
               {orderedGames.map((game) => {
                 const Icon = game.icon;
                 const recommended = poll.recommendedGameType === game.gameType;

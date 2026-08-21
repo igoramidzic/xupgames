@@ -144,14 +144,14 @@ export async function createInitialRoomGame(
   gameType: GameType,
   now: number
 ): Promise<Doc<'roomGames'>> {
-  const status = gameType === 'drawing' ? 'active' : 'lobby';
+  const status = 'lobby';
   const roomGameId = await ctx.db.insert('roomGames', {
     roomId,
     gameType,
     sequence: 1,
     status,
     createdAt: now,
-    startedAt: status === 'active' ? now : null,
+    startedAt: null,
     completedAt: null,
   });
   const roomGame = await ctx.db.get('roomGames', roomGameId);
@@ -237,26 +237,6 @@ export async function completeCurrentRoomGame(
 
 async function prepareGameState(ctx: MutationCtx, room: Doc<'rooms'>, gameType: GameType): Promise<void> {
   switch (gameType) {
-    case 'drawing': {
-      const state = await ctx.db
-        .query('drawingGameStates')
-        .withIndex('by_roomId', (index) => index.eq('roomId', room._id))
-        .unique();
-      if (state === null) {
-        await ctx.db.insert('drawingGameStates', {
-          roomId: room._id,
-          nextStrokeSequence: 1,
-          firstStrokeSequence: 1,
-          phase: 'active',
-        });
-      } else {
-        await ctx.db.patch('drawingGameStates', state._id, {
-          firstStrokeSequence: state.nextStrokeSequence,
-          phase: 'active',
-        });
-      }
-      return;
-    }
     case 'trivia': {
       const state = await ctx.db
         .query('triviaGameStates')
@@ -322,13 +302,6 @@ async function prepareGameState(ctx: MutationCtx, room: Doc<'rooms'>, gameType: 
 
 async function gameStateIsComplete(ctx: DatabaseReaderContext, room: Doc<'rooms'>): Promise<boolean> {
   switch (room.gameType) {
-    case 'drawing': {
-      const state = await ctx.db
-        .query('drawingGameStates')
-        .withIndex('by_roomId', (index) => index.eq('roomId', room._id))
-        .unique();
-      return state?.phase === 'complete';
-    }
     case 'trivia': {
       const state = await ctx.db
         .query('triviaGameStates')
@@ -588,14 +561,14 @@ export const chooseNextGame = mutation({
     }
 
     const now = Date.now();
-    const status = args.gameType === 'drawing' ? 'active' : 'lobby';
+    const status = 'lobby';
     const roomGameId = await ctx.db.insert('roomGames', {
       roomId: room._id,
       gameType: args.gameType,
       sequence: currentRoomGame.sequence + 1,
       status,
       createdAt: now,
-      startedAt: status === 'active' ? now : null,
+      startedAt: null,
       completedAt: null,
     });
     await prepareGameState(ctx, room, args.gameType);

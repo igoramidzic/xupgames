@@ -14,7 +14,7 @@ Convex agent skills for common tasks can be installed by running
 
 ## Multi-game architecture
 
-Xup Games is a platform for multiple games. Drawing is only the first game.
+Xup Games is a platform for multiple games.
 
 - Keep shared infrastructure such as rooms, memberships, identity, access, and presence game-neutral.
 - Put game-specific state and behavior in game-specific tables and modules linked back to the shared room.

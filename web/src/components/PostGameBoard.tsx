@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import NextGameVoting from '@/components/NextGameVoting';
 import { cn } from '@/lib/utils';
 
-type GameType = 'drawing' | 'trivia' | 'typeRacer';
+type GameType = 'trivia' | 'typeRacer';
 
 export default function PostGameBoard({
   eyebrow,

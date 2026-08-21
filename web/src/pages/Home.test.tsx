@@ -25,11 +25,11 @@ describe('Home', () => {
     expect(screen.getByRole('heading', { name: /One link.*Everyone plays\./ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create a room' })).toBeInTheDocument();
     expect(screen.getByLabelText('What should we call you?')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Drawing/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: /Trivia/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /Trivia/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Type racer/ })).toHaveAttribute('aria-pressed', 'false');
 
     const main = screen.getByRole('main');
-    const preview = screen.getByLabelText('A preview of the shared drawing canvas');
+    const preview = screen.getByLabelText('A preview of a trivia round');
     expect(main).toHaveClass('animate-in', 'fade-in', 'slide-in-from-bottom-4', 'duration-500');
     expect(preview).not.toHaveClass('animate-in', 'delay-100');
   });
@@ -42,12 +42,10 @@ describe('Home', () => {
       </MemoryRouter>
     );
 
-    await user.click(screen.getByRole('button', { name: /Trivia/ }));
+    await user.click(screen.getByRole('button', { name: /Type racer/ }));
 
-    const triviaPreview = screen.getByRole('heading', {
-      name: 'Which planet has an axial tilt of roughly 98 degrees?',
-    }).parentElement;
-    expect(triviaPreview).not.toHaveClass('animate-in', 'fade-in', 'slide-in-from-bottom-2', 'duration-300');
+    const typeRacerPreview = screen.getByLabelText('A preview of a multiplayer type race');
+    expect(typeRacerPreview).not.toHaveClass('animate-in', 'fade-in', 'slide-in-from-bottom-2', 'duration-300');
   });
 
   it('creates a trivia room when trivia is selected', async () => {
@@ -110,7 +108,7 @@ describe('Home', () => {
 
     await waitFor(() =>
       expect(createRoom).toHaveBeenCalledWith({
-        gameType: 'drawing',
+        gameType: 'trivia',
         sessionToken: expect.any(String),
         displayName: 'Ada',
         password: 'secret phrase',

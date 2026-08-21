@@ -7,7 +7,6 @@ const roomGameStatus = v.union(v.literal('lobby'), v.literal('active'), v.litera
 const ownershipReason = v.union(v.literal('created'), v.literal('transferred'), v.literal('claimed'));
 const pollStatus = v.union(v.literal('round1'), v.literal('round2'), v.literal('awaitingOwner'), v.literal('closed'));
 const pollRoundStatus = v.union(v.literal('open'), v.literal('closed'));
-const strokeStatus = v.union(v.literal('drawing'), v.literal('finished'));
 const triviaPhase = v.union(
   v.literal('lobby'),
   v.literal('countdown'),
@@ -24,10 +23,6 @@ const playtestStatus = v.union(
   v.literal('stopping'),
   v.literal('stopped')
 );
-const point = v.object({
-  x: v.number(),
-  y: v.number(),
-});
 
 export default defineSchema({
   guestSessions: defineTable({
@@ -79,13 +74,6 @@ export default defineSchema({
     .index('by_roomId_and_guestId', ['roomId', 'guestId'])
     .index('by_roomId_and_isActive', ['roomId', 'isActive']),
 
-  drawingGameStates: defineTable({
-    roomId: v.id('rooms'),
-    nextStrokeSequence: v.number(),
-    firstStrokeSequence: v.optional(v.number()),
-    phase: v.optional(v.union(v.literal('active'), v.literal('complete'))),
-  }).index('by_roomId', ['roomId']),
-
   nextGamePolls: defineTable({
     roomId: v.id('rooms'),
     roomGameId: v.id('roomGames'),
@@ -119,21 +107,6 @@ export default defineSchema({
   })
     .index('by_pollRoundId', ['pollRoundId'])
     .index('by_pollRoundId_and_memberId', ['pollRoundId', 'memberId']),
-
-  drawingStrokes: defineTable({
-    roomId: v.id('rooms'),
-    authorMemberId: v.id('roomMembers'),
-    authorName: v.string(),
-    sequence: v.number(),
-    color: v.string(),
-    width: v.number(),
-    status: strokeStatus,
-    points: v.array(point),
-    pointCount: v.number(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-    finishedAt: v.union(v.number(), v.null()),
-  }).index('by_roomId_and_sequence', ['roomId', 'sequence']),
 
   triviaGameStates: defineTable({
     roomId: v.id('rooms'),
@@ -228,19 +201,6 @@ export default defineSchema({
     .index('by_roomId_and_raceNumber', ['roomId', 'raceNumber'])
     .index('by_roomId_and_memberId', ['roomId', 'memberId']),
 
-  drawingPlaytestBotStates: defineTable({
-    botId: v.id('playtestBots'),
-    roomId: v.id('rooms'),
-    cursor: point,
-    cursorTarget: point,
-    nextCursorTargetAt: v.number(),
-    activeStrokeId: v.union(v.id('drawingStrokes'), v.null()),
-    plannedPoints: v.array(point),
-    nextPointIndex: v.number(),
-    nextActionAt: v.number(),
-    lastTickAt: v.number(),
-  }).index('by_botId', ['botId']),
-
   triviaPlaytestBotStates: defineTable({
     botId: v.id('playtestBots'),
     roomId: v.id('rooms'),
@@ -267,9 +227,7 @@ export default defineSchema({
     requestedBotCount: v.number(),
     provisionedBotCount: v.number(),
     activeBotCount: v.number(),
-    durationMs: v.union(v.number(), v.null()),
     startedAt: v.number(),
-    endsAt: v.union(v.number(), v.null()),
     lastTickAt: v.union(v.number(), v.null()),
     stoppedAt: v.union(v.number(), v.null()),
     stopReason: v.union(v.string(), v.null()),

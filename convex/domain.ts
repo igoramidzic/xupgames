@@ -2,18 +2,14 @@ import { ConvexError } from 'convex/values';
 
 export const MAX_PLAYERS = 50;
 export const ROOM_CODE_LENGTH = 8;
-export const MAX_STROKES_RETURNED = 200;
-export const MAX_POINTS_PER_STROKE = 1024;
-export const MAX_APPEND_POINTS = 64;
 export const MIN_ROOM_PASSWORD_LENGTH = 4;
 export const MAX_ROOM_PASSWORD_LENGTH = 64;
 
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 const ROOM_CODE_PATTERN = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/;
-const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
-export type DrawingPoint = {
+export type NormalizedPoint = {
   x: number;
   y: number;
 };
@@ -38,21 +34,11 @@ export type AppErrorCode =
   | 'NEXT_GAME_NOT_ELIGIBLE'
   | 'NEXT_GAME_INVALID_OPTION'
   | 'NEXT_GAME_NO_VOTES'
-  | 'INVALID_COLOR'
-  | 'INVALID_STROKE_WIDTH'
   | 'INVALID_POINT'
-  | 'INVALID_POINT_BATCH'
-  | 'INVALID_POINT_COUNT'
   | 'INVALID_PRESENCE_SESSION'
   | 'INVALID_PLAYTEST_TARGET'
-  | 'INVALID_PLAYTEST_DURATION'
   | 'PLAYTEST_ALREADY_RUNNING'
   | 'PLAYTEST_NOT_FOUND'
-  | 'STROKE_NOT_FOUND'
-  | 'NOT_STROKE_AUTHOR'
-  | 'STROKE_FINISHED'
-  | 'STROKE_OUT_OF_SYNC'
-  | 'STROKE_POINT_LIMIT'
   | 'TRIVIA_GAME_IN_PROGRESS'
   | 'TRIVIA_GAME_NOT_RUNNING'
   | 'TRIVIA_ANSWER_CLOSED'
@@ -120,21 +106,7 @@ export function generateRoomCode(): string {
   return code;
 }
 
-export function normalizeColor(color: string): string {
-  if (!COLOR_PATTERN.test(color)) {
-    fail('INVALID_COLOR', 'Colors must use the #RRGGBB format.');
-  }
-  return color.toLowerCase();
-}
-
-export function normalizeStrokeWidth(width: number): number {
-  if (!Number.isFinite(width) || width < 1 || width > 40) {
-    fail('INVALID_STROKE_WIDTH', 'Stroke width must be between 1 and 40.');
-  }
-  return Math.round(width * 100) / 100;
-}
-
-export function normalizePoint(point: DrawingPoint): DrawingPoint {
+export function normalizePoint(point: NormalizedPoint): NormalizedPoint {
   if (
     !Number.isFinite(point.x) ||
     !Number.isFinite(point.y) ||
@@ -143,40 +115,11 @@ export function normalizePoint(point: DrawingPoint): DrawingPoint {
     point.y < 0 ||
     point.y > 1
   ) {
-    fail('INVALID_POINT', 'Drawing points must contain finite x/y values between 0 and 1.');
+    fail('INVALID_POINT', 'Cursor coordinates must contain finite x/y values between 0 and 1.');
   }
 
   return {
     x: Math.max(0, Math.round(point.x * 100_000) / 100_000),
     y: Math.max(0, Math.round(point.y * 100_000) / 100_000),
   };
-}
-
-export function normalizePointBatch(points: DrawingPoint[]): DrawingPoint[] {
-  if (points.length < 1 || points.length > MAX_APPEND_POINTS) {
-    fail('INVALID_POINT_BATCH', `Append batches must contain 1-${MAX_APPEND_POINTS} points.`);
-  }
-  return points.map(normalizePoint);
-}
-
-export function validateExpectedPointCount(expectedPointCount: number): number {
-  if (!Number.isInteger(expectedPointCount) || expectedPointCount < 1 || expectedPointCount > MAX_POINTS_PER_STROKE) {
-    fail('INVALID_POINT_COUNT', `Expected point count must be an integer between 1 and ${MAX_POINTS_PER_STROKE}.`);
-  }
-  return expectedPointCount;
-}
-
-export function pointsMatchAt(
-  storedPoints: DrawingPoint[],
-  expectedStart: number,
-  candidatePoints: DrawingPoint[]
-): boolean {
-  if (expectedStart < 0 || expectedStart + candidatePoints.length > storedPoints.length) {
-    return false;
-  }
-
-  return candidatePoints.every((point, index) => {
-    const storedPoint = storedPoints[expectedStart + index];
-    return storedPoint.x === point.x && storedPoint.y === point.y;
-  });
 }

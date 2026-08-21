@@ -34,7 +34,7 @@ describe('playtest admin panel', () => {
       room: {
         roomId: 'room-id',
         code: 'ABCDEFGH',
-        gameType: 'drawing',
+        gameType: 'trivia',
         status: 'open',
         activeMemberCount: 1,
         humanMemberCount: 1,
@@ -44,7 +44,7 @@ describe('playtest admin panel', () => {
     });
   });
 
-  it('starts a bounded run for the selected target room size', async () => {
+  it('starts a run for the selected target room size', async () => {
     mocks.start.mockResolvedValue({ runId: 'run-id' });
     const user = userEvent.setup();
     render(
@@ -65,7 +65,6 @@ describe('playtest admin panel', () => {
         code: 'ABCDEFGH',
         sessionToken: expect.any(String),
         targetActiveMemberCount: 25,
-        durationMs: 120_000,
       })
     );
   });
@@ -84,7 +83,7 @@ describe('playtest admin panel', () => {
       room: {
         roomId: 'room-id',
         code: 'ABCDEFGH',
-        gameType: 'drawing',
+        gameType: 'trivia',
         status: 'open',
         activeMemberCount: 10,
         humanMemberCount: 1,
@@ -92,15 +91,13 @@ describe('playtest admin panel', () => {
       },
       latestRun: {
         runId: 'run-id',
-        gameType: 'drawing',
+        gameType: 'trivia',
         status: 'running',
         isActive: true,
         requestedBotCount: 9,
         provisionedBotCount: 9,
         activeBotCount: 9,
-        durationMs: 120_000,
         startedAt: Date.now(),
-        endsAt: Date.now() + 120_000,
         lastTickAt: Date.now(),
         stoppedAt: null,
         stopReason: null,
@@ -181,9 +178,7 @@ describe('playtest admin panel', () => {
         requestedBotCount: 9,
         provisionedBotCount: 9,
         activeBotCount: 9,
-        durationMs: null,
         startedAt: Date.now(),
-        endsAt: null,
         lastTickAt: Date.now(),
         stoppedAt: null,
         stopReason: null,

@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
 
-export const GAME_TYPES = ['drawing', 'trivia', 'typeRacer'] as const;
+export const GAME_TYPES = ['trivia', 'typeRacer'] as const;
 export type GameType = (typeof GAME_TYPES)[number];
 
 /**
@@ -9,4 +9,4 @@ export type GameType = (typeof GAME_TYPES)[number];
  * Add new games here so shared room infrastructure can identify and route to
  * them without absorbing game-specific state.
  */
-export const gameTypeValidator = v.union(v.literal('drawing'), v.literal('trivia'), v.literal('typeRacer'));
+export const gameTypeValidator = v.union(v.literal('trivia'), v.literal('typeRacer'));

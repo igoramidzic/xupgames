@@ -29,7 +29,7 @@ const basePoll = {
   roundId: 'round-1',
   roundNumber: 1,
   roundStatus: 'open',
-  options: ['drawing', 'trivia', 'typeRacer'],
+  options: ['trivia', 'typeRacer'],
   eligibleVoterCount: 3,
   votesCast: 0,
   isEligible: true,
@@ -39,7 +39,7 @@ const basePoll = {
   chosenGameType: null,
 };
 
-function renderVoting(isOwner = false, currentGameType: 'drawing' | 'trivia' | 'typeRacer' = 'drawing') {
+function renderVoting(isOwner = false, currentGameType: 'trivia' | 'typeRacer' = 'trivia') {
   return render(
     <NextGameVoting
       roomId={'room-1' as never}
@@ -67,20 +67,20 @@ describe('NextGameVoting', () => {
 
     expect(screen.getByText(/Vote to reveal the live count/)).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Final vote count' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Switch to Trivia/ }));
+    await user.click(screen.getByRole('button', { name: /Switch to Type Racer/ }));
 
     await waitFor(() =>
       expect(mocks.castVote).toHaveBeenCalledWith({
         roomId: 'room-1',
         sessionToken: 'a'.repeat(32),
-        gameType: 'trivia',
+        gameType: 'typeRacer',
       })
     );
   });
 
   it('lets only the owner close an open round', async () => {
     const user = userEvent.setup();
-    mocks.poll = { ...basePoll, votesCast: 1, selectedGameType: 'drawing' };
+    mocks.poll = { ...basePoll, votesCast: 1, selectedGameType: 'trivia' };
     renderVoting(true);
 
     await user.click(screen.getByRole('button', { name: 'Close round' }));
@@ -101,15 +101,14 @@ describe('NextGameVoting', () => {
       selectedGameType: 'trivia',
       recommendedGameType: 'trivia',
       tallies: [
-        { gameType: 'drawing', votes: 1, percentage: 33 },
         { gameType: 'trivia', votes: 2, percentage: 67 },
-        { gameType: 'typeRacer', votes: 0, percentage: 0 },
+        { gameType: 'typeRacer', votes: 1, percentage: 33 },
       ],
     };
     renderVoting(true);
 
     expect(screen.getByRole('group', { name: 'Final vote count' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Top voteSwitch to Trivia/ }));
+    await user.click(screen.getByRole('button', { name: /Top votePlay Trivia Again/ }));
     expect(mocks.chooseGame).toHaveBeenCalledWith({
       roomId: 'room-1',
       sessionToken: 'a'.repeat(32),
@@ -123,7 +122,6 @@ describe('NextGameVoting', () => {
 
     const choices = screen.getAllByRole('button');
     expect(choices[0]).toHaveAccessibleName(/Race Again/);
-    expect(screen.getByRole('button', { name: /Switch to Drawing/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Switch to Trivia/ })).toBeInTheDocument();
   });
 });

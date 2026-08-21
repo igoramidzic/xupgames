@@ -13,13 +13,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('convex/react', () => ({
   useMutation: () => mocks.joinRoom,
-  usePaginatedQuery: () => ({ results: [], status: 'Exhausted', loadMore: vi.fn() }),
   useQuery: (...args: unknown[]) => mocks.query(...args),
 }));
 
-vi.mock('@/components/DrawingCanvas', () => ({ default: () => <div>Drawing canvas</div> }));
-vi.mock('@/components/PostGameBoard', () => ({ default: () => <div>Next game ballot</div> }));
-vi.mock('@/lib/useRoomPresence', () => ({ useRoomPresence: () => ({ onlineByMemberId: new Map() }) }));
+vi.mock('@/components/TriviaRoom', () => ({ default: () => <div>Trivia room</div> }));
 vi.mock('sonner', () => ({ toast: { success: mocks.toastSuccess } }));
 
 describe('Room join flow', () => {
@@ -34,7 +31,7 @@ describe('Room join flow', () => {
       return {
         kind: 'room',
         code: 'ABCDEFGH',
-        gameType: 'drawing',
+        gameType: 'trivia',
         status: 'open',
         activeMemberCount: 1,
         maxPlayers: 50,
@@ -58,7 +55,7 @@ describe('Room join flow', () => {
     expect(screen.getByText('Password protected')).toBeInTheDocument();
     await user.type(screen.getByLabelText('Your name'), 'Grace');
     await user.type(screen.getByLabelText('Room password'), 'secret phrase');
-    await user.click(screen.getByRole('button', { name: 'Join the canvas' }));
+    await user.click(screen.getByRole('button', { name: 'Join the quiz' }));
 
     await waitFor(() =>
       expect(mocks.joinRoom).toHaveBeenCalledWith({
@@ -70,7 +67,7 @@ describe('Room join flow', () => {
     );
   });
 
-  it('notifies a transferred owner and explains that leaving keeps the room open', async () => {
+  it('notifies a transferred owner', async () => {
     window.sessionStorage.clear();
     saveGuest('Ada');
     mocks.toastSuccess.mockReset();
@@ -79,7 +76,7 @@ describe('Room join flow', () => {
       .mockReturnValueOnce({
         kind: 'room',
         code: 'ABCDEFGH',
-        gameType: 'drawing',
+        gameType: 'trivia',
         status: 'open',
         activeMemberCount: 2,
         maxPlayers: 50,
@@ -90,7 +87,7 @@ describe('Room join flow', () => {
         kind: 'session',
         roomId: 'room-1',
         code: 'ABCDEFGH',
-        gameType: 'drawing',
+        gameType: 'trivia',
         currentGameId: 'room-game-1',
         status: 'open',
         activeMemberCount: 2,
@@ -123,9 +120,7 @@ describe('Room join flow', () => {
             leftAt: null,
           },
         ],
-      })
-      .mockReturnValueOnce({ phase: 'active' });
-    const user = userEvent.setup();
+      });
 
     render(
       <MemoryRouter initialEntries={['/r/ABCDEFGH']}>
@@ -141,7 +136,5 @@ describe('Room join flow', () => {
         expect.objectContaining({ description: expect.stringContaining('previous owner left') })
       )
     );
-    await user.click(screen.getByRole('button', { name: 'Leave' }));
-    expect(screen.getByText('The room stays open. Ownership will pass to the next active player.')).toBeInTheDocument();
   });
 });

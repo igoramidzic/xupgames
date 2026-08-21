@@ -1,15 +1,6 @@
 import { api } from '@convex/_generated/api';
 import { useMutation } from 'convex/react';
-import {
-  ArrowRight,
-  BrainCircuit,
-  Keyboard,
-  LoaderCircle,
-  LockKeyhole,
-  PencilLine,
-  Timer,
-  UsersRound,
-} from 'lucide-react';
+import { ArrowRight, BrainCircuit, Keyboard, LoaderCircle, LockKeyhole, Timer, UsersRound } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { readGuest, saveGuest, validateDisplayName } from '@/lib/guest';
@@ -19,7 +10,7 @@ import { cn } from '@/lib/utils';
 export default function Home() {
   const navigate = useNavigate();
   const createRoom = useMutation(api.rooms.create);
-  const [gameType, setGameType] = useState<'drawing' | 'trivia' | 'typeRacer'>('drawing');
+  const [gameType, setGameType] = useState<'trivia' | 'typeRacer'>('trivia');
   const [displayName, setDisplayName] = useState(() => readGuest()?.displayName ?? '');
   const [passwordProtected, setPasswordProtected] = useState(false);
   const [password, setPassword] = useState('');
@@ -83,7 +74,7 @@ export default function Home() {
             <span className="block text-[#3155d9]"> Everyone plays.</span>
           </h1>
           <p className="mt-8 max-w-135 text-[clamp(17px,1.4vw,20px)] leading-[1.58] text-[#59647b] max-[620px]:mt-6 max-[620px]:text-[17px]">
-            Open a shared canvas, a ten-question trivia sprint, or a live type race. No accounts or installs.
+            Open a ten-question trivia sprint or a live type race. No accounts or installs.
           </p>
 
           <form
@@ -94,23 +85,6 @@ export default function Home() {
               <legend className="col-span-full mb-2.5 ml-0.5 p-0 text-[13px] font-[720] text-[#323e58]">
                 Choose a game
               </legend>
-              <button
-                type="button"
-                className="flex min-h-17 min-w-0 cursor-pointer items-center gap-2.75 rounded-[13px_10px_14px_11px] border-[1.5px] border-[#c6d0df] bg-[#f9fbfd] p-3 text-left text-[#38445d] transition-[border-color,background,transform] duration-150 hover:-translate-y-px hover:border-[#9fadc2] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/25%)] data-[selected=true]:border-[#3155d9] data-[selected=true]:bg-[#eef2ff] data-[selected=true]:shadow-[0_0_0_3px_rgb(49_85_217/10%)]"
-                data-selected={gameType === 'drawing'}
-                aria-pressed={gameType === 'drawing'}
-                onClick={() => setGameType('drawing')}
-              >
-                <span className="grid size-8.5 shrink-0 place-items-center rounded-[9px_7px_10px_8px] bg-[#dfe6ff] text-[#3155d9]">
-                  <PencilLine className="size-4.25" aria-hidden="true" />
-                </span>
-                <span className="grid min-w-0">
-                  <strong className="font-display text-sm font-[780] text-[#17203a]">Drawing</strong>
-                  <small className="overflow-hidden text-[10px] font-[580] text-ellipsis whitespace-nowrap text-[#748097]">
-                    One canvas, total chaos
-                  </small>
-                </span>
-              </button>
               <button
                 type="button"
                 className="flex min-h-17 min-w-0 cursor-pointer items-center gap-2.75 rounded-[13px_10px_14px_11px] border-[1.5px] border-[#c6d0df] bg-[#f9fbfd] p-3 text-left text-[#38445d] transition-[border-color,background,transform] duration-150 hover:-translate-y-px hover:border-[#9fadc2] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/25%)] data-[selected=true]:border-[#3155d9] data-[selected=true]:bg-[#eef2ff] data-[selected=true]:shadow-[0_0_0_3px_rgb(49_85_217/10%)]"
@@ -237,58 +211,12 @@ export default function Home() {
 
         <section
           className="relative mx-auto w-[min(100%,760px)] [perspective:1200px] max-[1040px]:mb-16 max-[1040px]:w-[min(92%,700px)] max-[620px]:w-[94%]"
-          aria-label={
-            gameType === 'drawing'
-              ? 'A preview of the shared drawing canvas'
-              : gameType === 'trivia'
-                ? 'A preview of a trivia round'
-                : 'A preview of a multiplayer type race'
-          }
+          aria-label={gameType === 'trivia' ? 'A preview of a trivia round' : 'A preview of a multiplayer type race'}
         >
           <div className="absolute -top-5.5 left-10.5 z-3 -rotate-4 bg-[rgb(49_85_217/92%)] px-7.5 pt-3.25 pb-2.75 font-display text-[13px] font-extrabold tracking-[0.12em] text-white [clip-path:polygon(7px_0,calc(100%-7px)_0,100%_7px,calc(100%-2px)_calc(100%-6px),calc(100%-7px)_100%,6px_100%,0_calc(100%-7px),2px_6px)] [filter:drop-shadow(0_8px_9px_rgb(49_85_217/22%))] max-[620px]:left-5">
             ROOM F7K2P
           </div>
-          {gameType === 'drawing' ? (
-            <div className="relative aspect-[1.24] rotate-[1.6deg] overflow-hidden rounded-[28px_18px_32px_20px] border border-[#c9d2e0] bg-white shadow-[0_35px_80px_rgb(38_56_96/18%),16px_20px_0_#dce4f1]">
-              <div className="absolute inset-0 bg-[linear-gradient(#dfe5ef_1px,transparent_1px),linear-gradient(90deg,#dfe5ef_1px,transparent_1px)] bg-size-[32px_32px] opacity-48 [mask-image:linear-gradient(to_bottom_right,#000_15%,transparent_88%)]" />
-              <svg
-                className="absolute inset-[1%_0_0] size-full"
-                viewBox="0 0 720 560"
-                role="img"
-                aria-label="Overlapping colorful lines"
-              >
-                <path
-                  className="fill-none stroke-[#ff685b] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:26]"
-                  d="M50 370 C 150 165, 310 490, 430 250 S 610 190, 675 75"
-                />
-                <path
-                  className="fill-none stroke-[#3155d9] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:19]"
-                  d="M75 155 C 180 105, 185 415, 345 330 S 500 105, 650 330"
-                />
-                <path
-                  className="fill-none stroke-[#f3cb42] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:32]"
-                  d="M130 445 C 205 330, 345 185, 595 390"
-                />
-                <path
-                  className="fill-none stroke-[#35b87f] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:15]"
-                  d="M215 70 C 325 175, 445 80, 555 195"
-                />
-              </svg>
-              <div className="absolute top-[19%] right-[12%] flex -rotate-[1.6deg] items-center gap-1.75 rounded-full border border-[rgb(23_32_58/13%)] bg-[rgb(255_255_255/92%)] py-1.75 pr-2.5 pl-1.75 text-[11px] font-[720] text-[#26324c] shadow-[0_8px_20px_rgb(23_32_58/10%)] max-[620px]:scale-86">
-                <span className="size-5 rounded-full bg-[#ff685b]" /> Maya
-              </div>
-              <div className="absolute right-[28%] bottom-[20%] flex -rotate-[1.6deg] items-center gap-1.75 rounded-full border border-[rgb(23_32_58/13%)] bg-[rgb(255_255_255/92%)] py-1.75 pr-2.5 pl-1.75 text-[11px] font-[720] text-[#26324c] shadow-[0_8px_20px_rgb(23_32_58/10%)] max-[620px]:scale-86">
-                <span className="size-5 rounded-full bg-[#f3cb42]" /> Theo
-              </div>
-              <div className="absolute top-[45%] left-[10%] flex -rotate-[1.6deg] items-center gap-1.75 rounded-full border border-[rgb(23_32_58/13%)] bg-[rgb(255_255_255/92%)] py-1.75 pr-2.5 pl-1.75 text-[11px] font-[720] text-[#26324c] shadow-[0_8px_20px_rgb(23_32_58/10%)] max-[620px]:scale-86">
-                <span className="size-5 rounded-full bg-[#3155d9]" /> You
-              </div>
-              <div className="absolute right-6 bottom-5 flex items-center gap-2.25 rounded-[10px] bg-[#17203a] px-3 py-2.25 text-[13px] font-[620] text-white">
-                <span className="size-2 shrink-0 rounded-full bg-[#35b87f] shadow-[0_0_0_4px_rgb(53_184_127/13%)]" /> 3
-                drawing now
-              </div>
-            </div>
-          ) : gameType === 'trivia' ? (
+          {gameType === 'trivia' ? (
             <div className="grid aspect-[1.24] rotate-[-1.2deg] grid-cols-[minmax(0,1fr)_168px] grid-rows-[auto_auto_minmax(0,1fr)] gap-x-6 overflow-hidden rounded-[28px_18px_32px_20px] border border-[#142747] bg-[#f8fbff] p-[clamp(28px,4vw,52px)] font-trivia text-[#10213d] shadow-[0_35px_80px_rgb(11_28_56/22%),16px_20px_0_#132746] max-[520px]:grid-cols-1 max-[520px]:px-6 max-[520px]:py-8">
               <div className="col-start-1 col-end-2 flex items-center justify-between border-b border-[#cfd9e8] pb-3.25 text-[10px] font-[760] tracking-[0.1em] text-[#52647e] max-[520px]:col-start-1 max-[520px]:col-end-2">
                 <span>QUESTION 7 / 10</span>

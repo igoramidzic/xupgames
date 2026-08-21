@@ -1,18 +1,8 @@
 import { api } from '@convex/_generated/api';
 import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
-import {
-  ArrowRight,
-  Bot,
-  CircleStop,
-  ExternalLink,
-  Gamepad2,
-  LoaderCircle,
-  Play,
-  Timer,
-  UsersRound,
-} from 'lucide-react';
-import { type FormEvent, useEffect, useState } from 'react';
+import { ArrowRight, Bot, CircleStop, ExternalLink, Gamepad2, LoaderCircle, Play, UsersRound } from 'lucide-react';
+import { type FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { readGuest } from '@/lib/guest';
 import { userFacingError } from '@/lib/userFacingError';
@@ -23,12 +13,6 @@ type PlaytestRoom = Extract<InspectResult, { kind: 'room' }>;
 
 const ROOM_CODE_PATTERN = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/;
 const TARGETS = [10, 25, 50] as const;
-const DURATIONS = [
-  { value: 60_000, label: '1 min' },
-  { value: 120_000, label: '2 min' },
-  { value: 300_000, label: '5 min' },
-] as const;
-
 export default function Admin() {
   const params = useParams();
   const code = (params.code ?? '').trim().toUpperCase();
@@ -212,22 +196,11 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
   const startPlaytest = useMutation(api.playtests.start);
   const stopPlaytest = useMutation(api.playtests.stop);
   const [target, setTarget] = useState<(typeof TARGETS)[number]>(10);
-  const [durationMs, setDurationMs] = useState<(typeof DURATIONS)[number]['value']>(120_000);
   const [pending, setPending] = useState<'start' | 'stop' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
   const run = panel.latestRun;
   const isRunActive = run?.isActive ?? false;
-  const isDurationBound = panel.room.gameType === 'drawing';
   const adapterCopy = gameAdapterCopy(panel.room.gameType);
-
-  useEffect(() => {
-    if (!isRunActive || !isDurationBound) {
-      return;
-    }
-    const interval = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(interval);
-  }, [isDurationBound, isRunActive]);
 
   async function handleStart() {
     setPending('start');
@@ -237,7 +210,6 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
         code: panel.room.code,
         sessionToken,
         targetActiveMemberCount: target,
-        ...(isDurationBound ? { durationMs } : {}),
       });
     } catch (error) {
       setNotice(userFacingError(error, 'The playtest could not start.'));
@@ -261,8 +233,6 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
     }
   }
 
-  const remainingSeconds =
-    run?.isActive && run.endsAt !== null ? Math.max(0, Math.ceil((run.endsAt - now) / 1_000)) : 0;
   const targetUnavailable = target <= panel.room.activeMemberCount;
   const canStart = panel.room.status === 'open' && !isRunActive && !targetUnavailable;
   const statusLabel = run ? run.status[0].toUpperCase() + run.status.slice(1) : 'Ready';
@@ -363,15 +333,11 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
                 </span>
               </div>
               <div className="flex items-center gap-2.75 px-3.5 pt-5 pb-0.5 max-[620px]:gap-1.75 max-[620px]:px-2 max-[620px]:pt-3.75">
-                {isDurationBound ? (
-                  <Timer className="size-4.5 text-[#3155d9] max-[620px]:hidden" aria-hidden="true" />
-                ) : (
-                  <Bot className="size-4.5 text-[#3155d9] max-[620px]:hidden" aria-hidden="true" />
-                )}
+                <Bot className="size-4.5 text-[#3155d9] max-[620px]:hidden" aria-hidden="true" />
                 <span className="flex flex-col text-[10px] font-bold tracking-[0.04em] text-[#7a8497] uppercase">
-                  {isDurationBound ? 'Time left' : 'Players stay'}
+                  Players stay
                   <strong className="mt-0.75 text-lg tracking-[-0.02em] text-[#17203a] normal-case max-[620px]:text-[15px]">
-                    {isDurationBound ? (isRunActive ? formatDuration(remainingSeconds) : '—') : 'Until you remove them'}
+                    Until you remove them
                   </strong>
                 </span>
               </div>
@@ -410,25 +376,6 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
               </div>
             </fieldset>
 
-            {isDurationBound ? (
-              <fieldset className="mt-6.25 min-w-0 border-0 p-0" disabled={isRunActive || pending !== null}>
-                <legend className="mb-2.25 text-[11px] font-[730] text-[#4f5b72]">Run for</legend>
-                <div className="grid grid-cols-3 gap-1.5 rounded-[10px] border border-[#c8d2e0] bg-[#eef2f7] p-1.25">
-                  {DURATIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className="flex h-9.5 min-w-0 cursor-pointer flex-col items-center justify-center rounded-[7px] border border-transparent bg-transparent text-xs font-bold text-[#69758b] data-[selected=true]:border-[#bdc7d8] data-[selected=true]:bg-white data-[selected=true]:text-[#3155d9] data-[selected=true]:shadow-[0_2px_4px_rgb(23_32_58/9%)] disabled:cursor-not-allowed disabled:opacity-[.38]"
-                      data-selected={durationMs === option.value}
-                      onClick={() => setDurationMs(option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-            ) : null}
-
             <div className="my-6 flex items-start gap-3 rounded-[9px_13px_8px_12px] border border-dashed border-[#bdc8d8] bg-[#f7f9fc] p-3.5">
               <span className="grid size-7.5 shrink-0 -rotate-3 place-items-center rounded-[8px_6px_9px_7px] bg-[#dfe6fb] text-[#3155d9]">
                 <Bot className="size-4" aria-hidden="true" />
@@ -451,13 +398,7 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
                 ) : (
                   <CircleStop aria-hidden="true" />
                 )}
-                {run.status === 'stopping'
-                  ? !isDurationBound
-                    ? 'Removing players…'
-                    : 'Removing bots…'
-                  : !isDurationBound
-                    ? 'Remove players'
-                    : 'Stop playtest'}
+                {run.status === 'stopping' ? 'Removing players…' : 'Remove players'}
               </button>
             ) : (
               <button
@@ -545,19 +486,8 @@ function SeatMap({ panel, target }: { panel: PlaytestRoom; target: number }) {
   );
 }
 
-function formatDuration(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  const remainder = seconds % 60;
-  return `${minutes}:${String(remainder).padStart(2, '0')}`;
-}
-
 function gameAdapterCopy(gameType: PlaytestRoom['room']['gameType']) {
   switch (gameType) {
-    case 'drawing':
-      return {
-        label: 'Drawing adapter',
-        description: 'Bots roam independently, then draw loops, spirals, waves, and zigzags point by point.',
-      };
     case 'trivia':
       return {
         label: 'Trivia answer adapter',
