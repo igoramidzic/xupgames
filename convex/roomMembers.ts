@@ -20,6 +20,26 @@ export async function listActiveRoomMembers(
   return activeMembers;
 }
 
+export async function listActiveHumanRoomMembers(
+  ctx: DatabaseReaderContext,
+  roomId: Id<'rooms'>
+): Promise<Doc<'roomMembers'>[]> {
+  const members = await listActiveRoomMembers(ctx, roomId);
+  const humanFlags = await Promise.all(
+    members.map(async (member) => {
+      if (member.memberKind !== undefined) {
+        return member.memberKind === 'player';
+      }
+      const legacyBot = await ctx.db
+        .query('playtestBots')
+        .withIndex('by_memberId', (index) => index.eq('memberId', member._id))
+        .first();
+      return legacyBot === null;
+    })
+  );
+  return members.filter((_, index) => humanFlags[index]);
+}
+
 export async function listRoomMembersForDisplay(
   ctx: DatabaseReaderContext,
   roomId: Id<'rooms'>

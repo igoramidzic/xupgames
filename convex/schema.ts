@@ -3,6 +3,10 @@ import { v } from 'convex/values';
 import { gameTypeValidator } from './games';
 
 const roomStatus = v.union(v.literal('open'), v.literal('closed'));
+const roomGameStatus = v.union(v.literal('lobby'), v.literal('active'), v.literal('complete'));
+const ownershipReason = v.union(v.literal('created'), v.literal('transferred'), v.literal('claimed'));
+const pollStatus = v.union(v.literal('round1'), v.literal('round2'), v.literal('awaitingOwner'), v.literal('closed'));
+const pollRoundStatus = v.union(v.literal('open'), v.literal('closed'));
 const strokeStatus = v.union(v.literal('drawing'), v.literal('finished'));
 const triviaPhase = v.union(
   v.literal('lobby'),
@@ -36,10 +40,14 @@ export default defineSchema({
   rooms: defineTable({
     code: v.string(),
     gameType: gameTypeValidator,
+    currentGameId: v.optional(v.id('roomGames')),
     status: roomStatus,
     maxPlayers: v.number(),
     activeMemberCount: v.number(),
-    ownerGuestId: v.id('guestSessions'),
+    ownerGuestId: v.union(v.id('guestSessions'), v.null()),
+    ownershipVersion: v.optional(v.number()),
+    ownershipReason: v.optional(ownershipReason),
+    ownerChangedAt: v.optional(v.number()),
     passwordHash: v.optional(v.string()),
     passwordSalt: v.optional(v.string()),
     passwordIterations: v.optional(v.number()),
@@ -47,10 +55,23 @@ export default defineSchema({
     closedAt: v.union(v.number(), v.null()),
   }).index('by_code', ['code']),
 
+  roomGames: defineTable({
+    roomId: v.id('rooms'),
+    gameType: gameTypeValidator,
+    sequence: v.number(),
+    status: roomGameStatus,
+    createdAt: v.number(),
+    startedAt: v.union(v.number(), v.null()),
+    completedAt: v.union(v.number(), v.null()),
+  })
+    .index('by_roomId_and_sequence', ['roomId', 'sequence'])
+    .index('by_roomId_and_status', ['roomId', 'status']),
+
   roomMembers: defineTable({
     roomId: v.id('rooms'),
     guestId: v.id('guestSessions'),
     displayName: v.string(),
+    memberKind: v.optional(v.union(v.literal('player'), v.literal('playtestBot'))),
     isActive: v.boolean(),
     joinedAt: v.number(),
     leftAt: v.union(v.number(), v.null()),
@@ -61,7 +82,43 @@ export default defineSchema({
   drawingGameStates: defineTable({
     roomId: v.id('rooms'),
     nextStrokeSequence: v.number(),
+    firstStrokeSequence: v.optional(v.number()),
+    phase: v.optional(v.union(v.literal('active'), v.literal('complete'))),
   }).index('by_roomId', ['roomId']),
+
+  nextGamePolls: defineTable({
+    roomId: v.id('rooms'),
+    roomGameId: v.id('roomGames'),
+    status: pollStatus,
+    currentRoundId: v.union(v.id('nextGamePollRounds'), v.null()),
+    recommendedGameType: v.union(gameTypeValidator, v.null()),
+    chosenGameType: v.union(gameTypeValidator, v.null()),
+    createdAt: v.number(),
+    resolvedAt: v.union(v.number(), v.null()),
+    closedAt: v.union(v.number(), v.null()),
+  })
+    .index('by_roomGameId', ['roomGameId'])
+    .index('by_roomId_and_status', ['roomId', 'status']),
+
+  nextGamePollRounds: defineTable({
+    pollId: v.id('nextGamePolls'),
+    roundNumber: v.number(),
+    status: pollRoundStatus,
+    options: v.array(gameTypeValidator),
+    eligibleMemberIds: v.array(v.id('roomMembers')),
+    openedAt: v.number(),
+    closedAt: v.union(v.number(), v.null()),
+  }).index('by_pollId_and_roundNumber', ['pollId', 'roundNumber']),
+
+  nextGameVotes: defineTable({
+    pollRoundId: v.id('nextGamePollRounds'),
+    memberId: v.id('roomMembers'),
+    gameType: gameTypeValidator,
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_pollRoundId', ['pollRoundId'])
+    .index('by_pollRoundId_and_memberId', ['pollRoundId', 'memberId']),
 
   drawingStrokes: defineTable({
     roomId: v.id('rooms'),
@@ -235,5 +292,6 @@ export default defineSchema({
     leftAt: v.union(v.number(), v.null()),
   })
     .index('by_runId_and_botNumber', ['runId', 'botNumber'])
-    .index('by_runId_and_isActive', ['runId', 'isActive']),
+    .index('by_runId_and_isActive', ['runId', 'isActive'])
+    .index('by_memberId', ['memberId']),
 });

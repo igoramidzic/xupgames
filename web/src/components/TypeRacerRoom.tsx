@@ -13,13 +13,13 @@ import {
   LoaderCircle,
   LockKeyhole,
   Play,
-  RotateCcw,
   Timer,
   Trophy,
   UsersRound,
 } from 'lucide-react';
 import { type CSSProperties, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import PostGameBoard from '@/components/PostGameBoard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -431,6 +431,26 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
               onStart={handleStart}
               onCopy={copyRoomLink}
             />
+          ) : game.phase === 'complete' ? (
+            <PostGameBoard
+              eyebrow={`Race ${game.raceNumber} · Photo finish`}
+              title={winner ? `${winner.displayName} wins.` : 'Race complete.'}
+              detail={
+                winner
+                  ? `${formatWpm(winner.wpm)} WPM · ${formatAccuracy(winner.accuracy)} accuracy · ${formatFinishTime(winner.finishTimeMs)}`
+                  : 'The final standings are locked in.'
+              }
+              icon={Trophy}
+              accent="#e54f50"
+              accentTint="#ffd65a"
+              roomId={session.roomId}
+              currentGameId={session.currentGameId}
+              currentGameType={session.gameType}
+              sessionToken={guest.sessionToken}
+              isOwner={session.isOwner}
+              isClosed={isClosed}
+              closedMessage="This room is closed. The final standings stay here to view."
+            />
           ) : (
             <div className="relative overflow-hidden rounded-[14px_26px_16px_24px] border border-[#9faed5] bg-white shadow-[7px_8px_0_#c7d3ef]">
               <div className="flex min-h-16 items-center justify-between gap-4 border-b border-[#d9e0f2] bg-[#f9fbff] px-6 py-3 max-[620px]:px-4">
@@ -451,28 +471,6 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
                   <Stat label="ACCURACY" value={formatAccuracy(localRacer?.accuracy ?? 100)} />
                 </div>
               </div>
-
-              {game.phase === 'complete' ? (
-                <div className="flex items-center justify-between gap-4 border-b border-[#d8b440] bg-[#fff3bd] px-6 py-4 max-[620px]:items-start max-[620px]:px-4">
-                  <div>
-                    <p className="m-0 text-[9px] font-[850] tracking-[0.14em] text-[#81620c] uppercase">Photo finish</p>
-                    <h1 className="mt-1 mb-0 font-display text-[clamp(25px,4vw,42px)] leading-none font-[850] tracking-[-0.045em]">
-                      {winner ? `${winner.displayName} wins at ${formatWpm(winner.wpm)} WPM.` : 'Race complete.'}
-                    </h1>
-                  </div>
-                  {session.isOwner && !isClosed ? (
-                    <button
-                      className="inline-flex h-11 shrink-0 cursor-pointer items-center gap-2 rounded-[7px_11px_8px_10px] border border-[#27183f] bg-[#ff5c57] px-4 text-xs font-[820] text-white shadow-[3px_3px_0_#27183f] hover:-translate-y-px focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(255_92_87/35%)] disabled:opacity-65 [&_svg]:size-4"
-                      type="button"
-                      onClick={handleStart}
-                      disabled={starting}
-                    >
-                      {starting ? <LoaderCircle className="animate-spin" /> : <RotateCcw aria-hidden="true" />}
-                      <span className="max-[520px]:hidden">Race again</span>
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
 
               <div
                 className={cn(
@@ -520,7 +518,7 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
                   </div>
                 ) : null}
 
-                {currentPlayer?.status === 'finished' && game.phase !== 'complete' ? (
+                {currentPlayer?.status === 'finished' ? (
                   <div className="absolute inset-x-5 bottom-5 z-20 flex items-center justify-center gap-2 rounded-xl border border-[#82c7a8] bg-[#e4f8ef] px-4 py-3 text-xs font-[760] text-[#176b49] shadow-lg">
                     <Check className="size-4" aria-hidden="true" /> Finished in{' '}
                     {formatFinishTime(currentPlayer.finishTimeMs)}. The field has 15 seconds to follow.
@@ -544,9 +542,7 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
                       ? inputFocused
                         ? 'Typing is live. Keep your eyes on the line.'
                         : 'Tap the passage to keep typing.'
-                      : game.phase === 'complete'
-                        ? 'Speed decides the winner; accuracy breaks close calls.'
-                        : 'Wait for the countdown.'}
+                      : 'Wait for the countdown.'}
                 </span>
                 <span className="shrink-0 font-mono text-[11px] tabular-nums">
                   {correctChars}/{passage.length}
@@ -836,11 +832,11 @@ function TypeRacerActionDialog({
   onConfirm: () => void;
 }) {
   const isClosing = action === 'close';
-  const title = isClosing ? 'Close this race room?' : ownerIsLeaving ? 'Leave and close the room?' : 'Leave this race?';
+  const title = isClosing ? 'Close this race room?' : 'Leave this race?';
   const detail = isClosing
     ? 'Typing stops for everyone, but the latest standings remain visible.'
     : ownerIsLeaving
-      ? 'You created this room, so leaving closes it for every racer.'
+      ? 'The room stays open. Ownership will pass to the next active player.'
       : 'You can rejoin from this browser while the room remains open.';
   return (
     <AlertDialog open onOpenChange={(open) => !open && onCancel()}>
@@ -863,7 +859,7 @@ function TypeRacerActionDialog({
               className="min-h-11 cursor-pointer rounded-[9px_13px_10px_12px] border border-[#ba393e] bg-[#ff5c57] text-xs font-[760] text-white shadow-[3px_3px_0_#27183f] hover:bg-[#ed4d4f]"
               onClick={onConfirm}
             >
-              {isClosing ? 'Close room' : ownerIsLeaving ? 'Leave & close' : 'Leave race'}
+              {isClosing ? 'Close room' : 'Leave race'}
             </AlertDialogAction>
           </div>
         </div>

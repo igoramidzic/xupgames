@@ -14,6 +14,7 @@ import {
   validateExpectedPointCount,
   validateSessionToken,
 } from './domain';
+import { completeCurrentRoomGame } from './roomGames';
 
 const pointValidator = v.object({ x: v.number(), y: v.number() });
 const strokeStatusValidator = v.union(v.literal('drawing'), v.literal('finished'));
@@ -29,6 +30,9 @@ const strokeValidator = v.object({
   status: strokeStatusValidator,
   points: v.array(pointValidator),
   pointCount: v.number(),
+});
+const drawingGameValidator = v.object({
+  phase: v.union(v.literal('active'), v.literal('complete')),
 });
 
 type DatabaseReaderContext = Pick<QueryCtx, 'db'>;
@@ -87,6 +91,12 @@ function requireOpenRoom(room: Doc<'rooms'>): void {
   }
 }
 
+function requireActiveDrawing(state: Doc<'drawingGameStates'>): void {
+  if (state.phase === 'complete') {
+    fail('ROOM_GAME_NOT_COMPLETE', 'The drawing is finished. Choose what the room should play next.');
+  }
+}
+
 async function findDrawingGameState(
   ctx: DatabaseReaderContext,
   roomId: Id<'rooms'>
@@ -112,6 +122,8 @@ async function getOrCreateDrawingGameState(ctx: MutationCtx, room: Doc<'rooms'>)
   const stateId = await ctx.db.insert('drawingGameStates', {
     roomId: room._id,
     nextStrokeSequence,
+    firstStrokeSequence: nextStrokeSequence,
+    phase: 'active',
   });
   const state = await ctx.db.get('drawingGameStates', stateId);
   if (state === null) {
@@ -126,9 +138,15 @@ export const list = query({
   handler: async (ctx, args) => {
     const sessionToken = validateSessionToken(args.sessionToken);
     await requireMember(ctx, args.roomId, sessionToken, false);
+    const state = await findDrawingGameState(ctx, args.roomId);
+    if (state === null) {
+      throw new Error('Drawing game state is missing.');
+    }
     const newestFirst = await ctx.db
       .query('drawingStrokes')
-      .withIndex('by_roomId_and_sequence', (index) => index.eq('roomId', args.roomId))
+      .withIndex('by_roomId_and_sequence', (index) =>
+        index.eq('roomId', args.roomId).gte('sequence', state.firstStrokeSequence ?? 1)
+      )
       .order('desc')
       .take(MAX_STROKES_RETURNED);
 
@@ -158,9 +176,15 @@ export const listPage = query({
   handler: async (ctx, args) => {
     const sessionToken = validateSessionToken(args.sessionToken);
     await requireMember(ctx, args.roomId, sessionToken, false);
+    const state = await findDrawingGameState(ctx, args.roomId);
+    if (state === null) {
+      throw new Error('Drawing game state is missing.');
+    }
     const result = await ctx.db
       .query('drawingStrokes')
-      .withIndex('by_roomId_and_sequence', (index) => index.eq('roomId', args.roomId))
+      .withIndex('by_roomId_and_sequence', (index) =>
+        index.eq('roomId', args.roomId).gte('sequence', state.firstStrokeSequence ?? 1)
+      )
       .order('desc')
       .paginate(args.paginationOpts);
 
@@ -202,6 +226,7 @@ export const start = mutation({
 
     const now = Date.now();
     const drawingState = await getOrCreateDrawingGameState(ctx, room);
+    requireActiveDrawing(drawingState);
     const sequence = drawingState.nextStrokeSequence;
     await ctx.db.patch('drawingGameStates', drawingState._id, { nextStrokeSequence: sequence + 1 });
     const strokeId = await ctx.db.insert('drawingStrokes', {
@@ -240,6 +265,14 @@ export const append = mutation({
     }
     const { room, membership } = await requireMember(ctx, stroke.roomId, sessionToken, true);
     requireOpenRoom(room);
+    const drawingState = await findDrawingGameState(ctx, room._id);
+    if (drawingState === null) {
+      throw new Error('Drawing game state is missing.');
+    }
+    requireActiveDrawing(drawingState);
+    if (stroke.sequence < (drawingState.firstStrokeSequence ?? 1)) {
+      fail('STALE_ROOM_GAME', 'This stroke belongs to an earlier drawing.');
+    }
     if (membership._id !== stroke.authorMemberId) {
       fail('NOT_STROKE_AUTHOR', 'Only the stroke author can append points.');
     }
@@ -281,6 +314,14 @@ export const finish = mutation({
     }
     const { room, membership } = await requireMember(ctx, stroke.roomId, sessionToken, true);
     requireOpenRoom(room);
+    const drawingState = await findDrawingGameState(ctx, room._id);
+    if (drawingState === null) {
+      throw new Error('Drawing game state is missing.');
+    }
+    requireActiveDrawing(drawingState);
+    if (stroke.sequence < (drawingState.firstStrokeSequence ?? 1)) {
+      fail('STALE_ROOM_GAME', 'This stroke belongs to an earlier drawing.');
+    }
     if (membership._id !== stroke.authorMemberId) {
       fail('NOT_STROKE_AUTHOR', 'Only the stroke author can finish this stroke.');
     }
@@ -294,6 +335,44 @@ export const finish = mutation({
       updatedAt: now,
       finishedAt: now,
     });
+    return null;
+  },
+});
+
+export const getGame = query({
+  args: { roomId: v.id('rooms'), sessionToken: v.string() },
+  returns: drawingGameValidator,
+  handler: async (ctx, args) => {
+    const sessionToken = validateSessionToken(args.sessionToken);
+    await requireMember(ctx, args.roomId, sessionToken, false);
+    const state = await findDrawingGameState(ctx, args.roomId);
+    if (state === null) {
+      throw new Error('Drawing game state is missing.');
+    }
+    return { phase: state.phase ?? 'active' };
+  },
+});
+
+export const endGame = mutation({
+  args: { roomId: v.id('rooms'), sessionToken: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const sessionToken = validateSessionToken(args.sessionToken);
+    const { room, membership } = await requireMember(ctx, args.roomId, sessionToken, true);
+    requireOpenRoom(room);
+    if (membership.guestId !== room.ownerGuestId) {
+      fail('NOT_ROOM_OWNER', 'Only the room owner can finish the drawing.');
+    }
+    const state = await findDrawingGameState(ctx, room._id);
+    if (state === null) {
+      throw new Error('Drawing game state is missing.');
+    }
+    if (state.phase === 'complete') {
+      return null;
+    }
+    const now = Date.now();
+    await ctx.db.patch('drawingGameStates', state._id, { phase: 'complete' });
+    await completeCurrentRoomGame(ctx, room, 'drawing', now);
     return null;
   },
 });

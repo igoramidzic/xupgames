@@ -12,10 +12,12 @@ import {
 } from './domain';
 import { gameTypeValidator } from './games';
 import { createPasswordCredential, verifyPasswordCredential } from './passwords';
-import { listRoomMembersForDisplay } from './roomMembers';
+import { createInitialRoomGame } from './roomGames';
+import { listActiveHumanRoomMembers, listRoomMembersForDisplay } from './roomMembers';
 import { enrollTypeRacerMemberInActiveRace } from './typeRacer';
 
 const roomStatusValidator = v.union(v.literal('open'), v.literal('closed'));
+const ownershipReasonValidator = v.union(v.literal('created'), v.literal('transferred'), v.literal('claimed'));
 
 const previewResultValidator = v.union(
   v.object({ kind: v.literal('not_found') }),
@@ -26,7 +28,7 @@ const previewResultValidator = v.union(
     status: roomStatusValidator,
     activeMemberCount: v.number(),
     maxPlayers: v.number(),
-    ownerName: v.string(),
+    ownerName: v.union(v.string(), v.null()),
     isPasswordProtected: v.boolean(),
   })
 );
@@ -56,10 +58,13 @@ const sessionResultValidator = v.union(
     roomId: v.id('rooms'),
     code: v.string(),
     gameType: gameTypeValidator,
+    currentGameId: v.union(v.id('roomGames'), v.null()),
     status: roomStatusValidator,
     activeMemberCount: v.number(),
     maxPlayers: v.number(),
     isOwner: v.boolean(),
+    ownershipVersion: v.number(),
+    ownershipReason: ownershipReasonValidator,
     currentMember: currentMemberValidator,
     members: v.array(memberValidator),
   })
@@ -169,10 +174,7 @@ export const preview = query({
       return { kind: 'not_found' as const };
     }
 
-    const ownerMembership = await findMembership(ctx, room._id, room.ownerGuestId);
-    if (ownerMembership === null) {
-      throw new Error('Room owner membership is missing.');
-    }
+    const ownerMembership = room.ownerGuestId === null ? null : await findMembership(ctx, room._id, room.ownerGuestId);
 
     return {
       kind: 'room' as const,
@@ -181,7 +183,7 @@ export const preview = query({
       status: room.status,
       activeMemberCount: room.activeMemberCount,
       maxPlayers: room.maxPlayers,
-      ownerName: ownerMembership.displayName,
+      ownerName: ownerMembership?.displayName ?? null,
       isPasswordProtected: getRoomPasswordCredential(room) !== null,
     };
   },
@@ -215,10 +217,13 @@ export const getSession = query({
       roomId: room._id,
       code: room.code,
       gameType: room.gameType,
+      currentGameId: room.currentGameId ?? null,
       status: room.status,
       activeMemberCount: room.activeMemberCount,
       maxPlayers: room.maxPlayers,
       isOwner: room.ownerGuestId === guest._id,
+      ownershipVersion: room.ownershipVersion ?? 0,
+      ownershipReason: room.ownershipReason ?? 'created',
       currentMember: {
         memberId: membership._id,
         displayName: membership.displayName,
@@ -274,6 +279,9 @@ export const create = mutation({
       maxPlayers: MAX_PLAYERS,
       activeMemberCount: 1,
       ownerGuestId: guest._id,
+      ownershipVersion: 0,
+      ownershipReason: 'created',
+      ownerChangedAt: now,
       ...(passwordCredential === null
         ? {}
         : {
@@ -284,11 +292,15 @@ export const create = mutation({
       createdAt: now,
       closedAt: null,
     });
+    const roomGame = await createInitialRoomGame(ctx, roomId, gameType, now);
+    await ctx.db.patch('rooms', roomId, { currentGameId: roomGame._id });
     switch (gameType) {
       case 'drawing':
         await ctx.db.insert('drawingGameStates', {
           roomId,
           nextStrokeSequence: 1,
+          firstStrokeSequence: 1,
+          phase: 'active',
         });
         break;
       case 'trivia':
@@ -330,6 +342,7 @@ export const create = mutation({
       roomId,
       guestId: guest._id,
       displayName,
+      memberKind: 'player',
       isActive: true,
       joinedAt: now,
       leftAt: null,
@@ -373,6 +386,14 @@ export const join = mutation({
       if (existingMembership.displayName !== displayName) {
         await ctx.db.patch('roomMembers', existingMembership._id, { displayName });
       }
+      if (room.ownerGuestId === null && existingMembership.memberKind !== 'playtestBot') {
+        await ctx.db.patch('rooms', room._id, {
+          ownerGuestId: guest._id,
+          ownershipVersion: (room.ownershipVersion ?? 0) + 1,
+          ownershipReason: 'claimed',
+          ownerChangedAt: now,
+        });
+      }
       await syncGameMembership(ctx, room, { ...existingMembership, displayName }, now);
       return { code: room.code };
     }
@@ -393,15 +414,26 @@ export const join = mutation({
         roomId: room._id,
         guestId: guest._id,
         displayName,
+        memberKind: 'player',
         isActive: true,
         joinedAt: now,
         leftAt: null,
       });
       membership = { _id: memberId, displayName };
     }
-    await ctx.db.patch('rooms', room._id, {
-      activeMemberCount: room.activeMemberCount + 1,
-    });
+    await ctx.db.patch(
+      'rooms',
+      room._id,
+      room.ownerGuestId === null
+        ? {
+            activeMemberCount: room.activeMemberCount + 1,
+            ownerGuestId: guest._id,
+            ownershipVersion: (room.ownershipVersion ?? 0) + 1,
+            ownershipReason: 'claimed',
+            ownerChangedAt: now,
+          }
+        : { activeMemberCount: room.activeMemberCount + 1 }
+    );
     await syncGameMembership(ctx, room, membership, now);
 
     return { code: room.code };
@@ -430,10 +462,20 @@ export const leave = mutation({
     const now = Date.now();
     await ctx.db.patch('roomMembers', membership._id, { isActive: false, leftAt: now });
     const ownerIsLeaving = room.ownerGuestId === guest._id;
+    const successor = ownerIsLeaving
+      ? ((await listActiveHumanRoomMembers(ctx, room._id)).find((candidate) => candidate._id !== membership._id) ??
+        null)
+      : null;
     await ctx.db.patch('rooms', room._id, {
       activeMemberCount: Math.max(0, room.activeMemberCount - 1),
-      status: ownerIsLeaving ? 'closed' : room.status,
-      closedAt: ownerIsLeaving && room.status === 'open' ? now : room.closedAt,
+      ...(ownerIsLeaving
+        ? {
+            ownerGuestId: successor?.guestId ?? null,
+            ownershipVersion: (room.ownershipVersion ?? 0) + 1,
+            ownershipReason: 'transferred' as const,
+            ownerChangedAt: now,
+          }
+        : {}),
     });
     return null;
   },

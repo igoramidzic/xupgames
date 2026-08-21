@@ -6,7 +6,6 @@ import {
   BrainCircuit,
   Check,
   Copy,
-  Crown,
   DoorOpen,
   Flame,
   LoaderCircle,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import PostGameBoard from '@/components/PostGameBoard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -369,10 +369,8 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
             <CompletePanel
               leaderboard={game.leaderboard}
               gameNumber={game.gameNumber}
-              isOwner={session.isOwner}
-              isClosed={isClosed}
-              starting={starting}
-              onStart={handleStart}
+              session={session}
+              sessionToken={guest.sessionToken}
             />
           ) : null}
         </section>
@@ -798,66 +796,59 @@ function QuestionContentTransition({
 function CompletePanel({
   leaderboard,
   gameNumber,
-  isOwner,
-  isClosed,
-  starting,
-  onStart,
+  session,
+  sessionToken,
 }: {
   leaderboard: GameView['leaderboard'];
   gameNumber: number;
-  isOwner: boolean;
-  isClosed: boolean;
-  starting: boolean;
-  onStart: () => void;
+  session: ActiveSession;
+  sessionToken: string;
 }) {
   const eligibleLeaderboard = leaderboard
     .filter((entry) => entry.isActive)
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
   const winner = eligibleLeaderboard[0];
   return (
-    <div className="relative flex h-[clamp(640px,calc(100dvh-112px),768px)] max-h-192 min-h-0 flex-col items-center justify-center overflow-hidden rounded-[24px_10px_26px_12px] border border-[#aebfd0] bg-[rgb(249_252_255/96%)] p-[clamp(50px,7vw,100px)] text-center shadow-[8px_9px_0_#ccdae6] max-[760px]:min-h-150 max-[760px]:px-6 max-[760px]:py-8.5">
-      <div className="mb-7 grid size-17.5 -rotate-4 place-items-center rounded-[22px_10px_23px_11px] border border-[#10213d] bg-[#ffda55] shadow-[5px_5px_0_#10213d]">
-        <Trophy className="size-8.5" aria-hidden="true" />
-      </div>
-      <p className="mb-4.5 text-[11px] font-[850] tracking-[0.15em] text-[#087fa7]">GAME {gameNumber} · FINAL</p>
-      <h1 className="m-0 max-w-187.5 font-trivia text-[clamp(58px,8vw,106px)] leading-[0.78] font-[820] tracking-[-0.075em] text-[#10213d] [font-stretch:condensed]">
-        {winner ? `${winner.displayName} takes it.` : 'That’s the game.'}
-      </h1>
-      {winner ? (
-        <p className="my-6.25 inline-flex items-center gap-2 text-[13px] font-[750] text-[#536980]">
-          <Crown className="size-4.25 text-[#b38900]" aria-hidden="true" /> {formatPoints(winner.totalPoints)} points ·{' '}
-          {winner.correctAnswers} correct
-        </p>
-      ) : null}
-      <div className="my-4.5 mb-9 flex w-[min(100%,590px)] items-end justify-center gap-2.25">
-        {eligibleLeaderboard.slice(0, 3).map((entry) => (
-          <div
-            className="order-3 flex min-h-27.5 w-[31%] flex-col items-center justify-center rounded-[12px_6px_13px_7px] border border-[#b9c8d6] bg-[#edf4f8] px-2 py-4 data-[place='1']:order-2 data-[place='1']:min-h-37.5 data-[place='1']:border-[#c9a21f] data-[place='1']:bg-[#fff3bd] data-[place='2']:order-1"
-            key={entry.memberId}
-            data-place={entry.rank}
-          >
-            <span className="mb-2 grid size-7 place-items-center rounded-full bg-[#10213d] text-[10px] font-[850] text-white">
-              {entry.rank}
-            </span>
-            <strong className="max-w-full overflow-hidden text-xs text-ellipsis whitespace-nowrap text-[#22384f]">
-              {entry.displayName}
-            </strong>
-            <small className="mt-0.75 text-[10px] text-[#74869a]">{formatPoints(entry.totalPoints)}</small>
-          </div>
-        ))}
-      </div>
-      {isOwner && !isClosed ? (
-        <button
-          className="inline-flex h-13.5 min-w-47.5 cursor-pointer items-center justify-center gap-2.5 rounded-[12px_6px_13px_7px] border border-[#10213d] bg-[#ffda55] px-6 text-sm font-[820] text-[#10213d] shadow-[5px_5px_0_#10213d] transition-[transform,box-shadow] duration-150 enabled:hover:-translate-y-0.5 enabled:hover:shadow-[7px_7px_0_#10213d] enabled:active:translate-0.75 enabled:active:shadow-[2px_2px_0_#10213d] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(18_168_212/32%)] disabled:cursor-wait disabled:opacity-65 motion-reduce:transition-none [&_svg]:size-4.5"
-          type="button"
-          onClick={onStart}
-          disabled={starting}
-        >
-          {starting ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Play aria-hidden="true" />}
-          {starting ? 'Building game…' : 'Play another 10'}
-        </button>
-      ) : null}
-    </div>
+    <PostGameBoard
+      eyebrow={`Game ${gameNumber} · Final`}
+      title={winner ? `${winner.displayName} takes it.` : 'That’s the game.'}
+      detail={
+        winner
+          ? `${formatPoints(winner.totalPoints)} points · ${winner.correctAnswers} correct`
+          : 'The final scores are in.'
+      }
+      icon={Trophy}
+      accent="#087fa7"
+      accentTint="#ffda55"
+      roomId={session.roomId}
+      currentGameId={session.currentGameId}
+      currentGameType={session.gameType}
+      sessionToken={sessionToken}
+      isOwner={session.isOwner}
+      isClosed={session.status === 'closed'}
+      closedMessage="This room is closed. The final scoreboard stays here to view."
+      summary={
+        eligibleLeaderboard.length > 0 ? (
+          <ol className="m-0 flex w-full list-none items-end justify-center gap-2.25 p-0" aria-label="Final podium">
+            {eligibleLeaderboard.slice(0, 3).map((entry) => (
+              <li
+                className="order-3 flex min-h-20 w-[31%] flex-col items-center justify-center rounded-[12px_6px_13px_7px] border border-[#b9c8d6] bg-[#edf4f8] px-2 py-3 text-center data-[place='1']:order-2 data-[place='1']:min-h-24 data-[place='1']:border-[#c9a21f] data-[place='1']:bg-[#fff3bd] data-[place='2']:order-1"
+                key={entry.memberId}
+                data-place={entry.rank}
+              >
+                <span className="mb-1.5 grid size-6 place-items-center rounded-full bg-[#10213d] text-[9px] font-[850] text-white">
+                  {entry.rank}
+                </span>
+                <strong className="max-w-full overflow-hidden text-xs text-ellipsis whitespace-nowrap text-[#22384f]">
+                  {entry.displayName}
+                </strong>
+                <small className="mt-0.75 text-[10px] text-[#74869a]">{formatPoints(entry.totalPoints)}</small>
+              </li>
+            ))}
+          </ol>
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -873,15 +864,11 @@ function TriviaActionDialog({
   onConfirm: () => void;
 }) {
   const isClosing = action === 'close';
-  const title = isClosing
-    ? 'Close this trivia room?'
-    : ownerIsLeaving
-      ? 'Leave and close the room?'
-      : 'Leave this room?';
+  const title = isClosing ? 'Close this trivia room?' : 'Leave this room?';
   const detail = isClosing
     ? 'The current game stops accepting answers, but the final standings remain visible.'
     : ownerIsLeaving
-      ? 'You created this room, so leaving closes it for everyone.'
+      ? 'The room stays open. Ownership will pass to the next active player.'
       : 'You can rejoin from this browser later while the room remains open.';
   return (
     <AlertDialog open onOpenChange={(open) => !open && onCancel()}>
@@ -909,7 +896,7 @@ function TriviaActionDialog({
               className="min-h-11 cursor-pointer rounded-[11px_9px_12px_10px] border border-[#d84d42] bg-[#ff685b] px-4 text-xs font-[760] text-white shadow-[3px_3px_0_#17203a] transition-[transform,box-shadow,background] duration-150 hover:-translate-y-px hover:bg-[#f55b50] hover:shadow-[4px_4px_0_#17203a] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/28%)] motion-reduce:transition-none"
               onClick={onConfirm}
             >
-              {isClosing ? 'Close room' : ownerIsLeaving ? 'Leave & close' : 'Leave room'}
+              {isClosing ? 'Close room' : 'Leave room'}
             </AlertDialogAction>
           </div>
         </div>

@@ -150,6 +150,8 @@ async function getOrCreateDrawingGameState(ctx: MutationCtx, room: Doc<'rooms'>)
   const drawingStateId = await ctx.db.insert('drawingGameStates', {
     roomId: room._id,
     nextStrokeSequence: (newestStroke?.sequence ?? 0) + 1,
+    firstStrokeSequence: (newestStroke?.sequence ?? 0) + 1,
+    phase: 'active',
   });
   const drawingState = await ctx.db.get('drawingGameStates', drawingStateId);
   if (drawingState === null) {

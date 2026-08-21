@@ -3,6 +3,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, type QueryCtx, query } from './_generated/server';
 import { fail, MAX_PLAYERS, validateSessionToken } from './domain';
+import { activateCurrentRoomGame, completeCurrentRoomGame } from './roomGames';
 import { listActiveRoomMembers, listRoomMembersForDisplay } from './roomMembers';
 import { findTriviaGameState, findTriviaRound, recordTriviaAnswer, revealTriviaQuestion } from './triviaEngine';
 import { TRIVIA_QUESTIONS, type TriviaQuestion } from './triviaQuestions';
@@ -278,9 +279,13 @@ export const startGame = mutation({
     if (state.phase === 'countdown' || state.phase === 'question' || state.phase === 'reveal') {
       fail('TRIVIA_GAME_IN_PROGRESS', 'A trivia game is already in progress.');
     }
+    if (state.phase === 'complete') {
+      fail('STALE_ROOM_GAME', 'Finish the next-game vote before playing trivia again.');
+    }
 
     const gameNumber = state.gameNumber + 1;
     const now = Date.now();
+    await activateCurrentRoomGame(ctx, room, 'trivia', now);
     const participants = await listActiveRoomMembers(ctx, room._id);
     for (const participant of participants) {
       await ctx.db.insert('triviaScores', {
@@ -430,11 +435,16 @@ export const finishGame = internalMutation({
     ) {
       return null;
     }
+    const now = Date.now();
     await ctx.db.patch('triviaGameStates', state._id, {
       phase: 'complete',
-      phaseStartedAt: Date.now(),
+      phaseStartedAt: now,
       phaseEndsAt: null,
     });
+    const room = await ctx.db.get('rooms', state.roomId);
+    if (room !== null && room.status !== 'closed') {
+      await completeCurrentRoomGame(ctx, room, 'trivia', now);
+    }
     return null;
   },
 });

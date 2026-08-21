@@ -28,6 +28,16 @@ vi.mock('@/lib/useRoomPresence', () => ({
   useRoomPresence: () => ({ onlineByMemberId: mocks.onlineByMemberId }),
 }));
 
+vi.mock('@/components/PostGameBoard', () => ({
+  default: ({ title, currentGameType }: { title: string; currentGameType: string }) => (
+    <section>
+      <h1>{title}</h1>
+      <button type="button">{currentGameType === 'typeRacer' ? 'Race Again' : 'Play Again'}</button>
+      <div>Next game ballot</div>
+    </section>
+  ),
+}));
+
 vi.mock('@/lib/environment', () => ({ isLocalhost: () => false }));
 
 const guest = { sessionToken: 'a'.repeat(32), displayName: 'Ada' };
@@ -36,10 +46,13 @@ const session = {
   roomId: 'room-1',
   code: 'ABCDEFGH',
   gameType: 'typeRacer' as const,
+  currentGameId: 'room-game-1',
   status: 'open' as const,
   activeMemberCount: 1,
   maxPlayers: 50,
   isOwner: true,
+  ownershipVersion: 0,
+  ownershipReason: 'created' as const,
   currentMember: { memberId: 'member-1', displayName: 'Ada', isActive: true, joinedAt: 1, leftAt: null },
   members: [
     {
@@ -109,7 +122,7 @@ describe('TypeRacerRoom', () => {
     expect(mocks.startRace).toHaveBeenCalledWith({ roomId: 'room-1', sessionToken: guest.sessionToken });
   });
 
-  it('re-enables the race action after a successful start', async () => {
+  it('replaces the finished race surface with an immediately visible replay ballot', async () => {
     mocks.game = {
       raceNumber: 0,
       phase: 'lobby',
@@ -166,7 +179,9 @@ describe('TypeRacerRoom', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('button', { name: 'Race again' })).toBeEnabled();
+    expect(screen.getByText('Next game ballot')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Race Again' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Type the passage')).not.toBeInTheDocument();
   });
 
   it('shows wrong letters and requires backtracking', async () => {

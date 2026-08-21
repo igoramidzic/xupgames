@@ -1,10 +1,24 @@
 import { api } from '@convex/_generated/api';
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
-import { Beaker, Check, Copy, Crown, DoorOpen, LoaderCircle, LockKeyhole, UsersRound, WifiOff } from 'lucide-react';
+import {
+  Beaker,
+  Check,
+  Copy,
+  Crown,
+  DoorOpen,
+  Flag,
+  LoaderCircle,
+  LockKeyhole,
+  Palette,
+  UsersRound,
+  WifiOff,
+} from 'lucide-react';
 import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import DrawingCanvas from '@/components/DrawingCanvas';
+import PostGameBoard from '@/components/PostGameBoard';
 import TriviaRoom from '@/components/TriviaRoom';
 import TypeRacerRoom from '@/components/TypeRacerRoom';
 import {
@@ -52,16 +66,35 @@ export default function Room() {
   }
 
   if (guest && session?.kind === 'session' && session.currentMember.isActive) {
-    if (session.gameType === 'trivia') {
-      return <TriviaRoom guest={guest} session={session} />;
-    }
-    if (session.gameType === 'typeRacer') {
-      return <TypeRacerRoom guest={guest} session={session} />;
-    }
-    return <CanvasRoom guest={guest} session={session} />;
+    return <ActiveRoom guest={guest} session={session} />;
   }
 
   return <JoinRoom preview={preview} code={code} guest={guest} onJoined={setGuest} />;
+}
+
+function ActiveRoom({ guest, session }: { guest: GuestIdentity; session: ActiveSession }) {
+  useEffect(() => {
+    if (!session.isOwner || session.ownershipReason === 'created') {
+      return;
+    }
+    const toastKey = `xup-owner-toast:${session.roomId}:${session.ownershipVersion}`;
+    if (window.sessionStorage.getItem(toastKey) !== null) {
+      return;
+    }
+    window.sessionStorage.setItem(toastKey, 'shown');
+    toast.success("You're the room owner now", {
+      description: 'The previous owner left. You can close the room and choose what everyone plays next.',
+      duration: 7_000,
+    });
+  }, [session.isOwner, session.ownershipReason, session.ownershipVersion, session.roomId]);
+
+  if (session.gameType === 'trivia') {
+    return <TriviaRoom guest={guest} session={session} />;
+  }
+  if (session.gameType === 'typeRacer') {
+    return <TypeRacerRoom guest={guest} session={session} />;
+  }
+  return <CanvasRoom guest={guest} session={session} />;
 }
 
 function RoomLoading() {
@@ -198,7 +231,9 @@ function JoinRoom({
                 : isTypeRacer
                   ? 'The type race is finished'
                   : 'The drawing is finished'
-              : `${preview.ownerName} invited you`}
+              : preview.ownerName
+                ? `${preview.ownerName} invited you`
+                : 'This room is waiting for an owner'}
           </p>
           <h1 className="m-0 font-display text-[clamp(40px,6vw,58px)] leading-[0.98] font-[820] tracking-[-0.055em] text-[#17203a]">
             {isClosed
@@ -332,6 +367,8 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
   const navigate = useNavigate();
   const leaveRoom = useMutation(api.rooms.leave);
   const closeRoom = useMutation(api.rooms.close);
+  const endDrawing = useMutation(api.drawing.endGame);
+  const game = useQuery(api.drawing.getGame, { roomId: session.roomId, sessionToken: guest.sessionToken });
   const { onlineByMemberId } = useRoomPresence({ roomId: session.roomId, sessionToken: guest.sessionToken });
   const {
     results: newestStrokes,
@@ -361,8 +398,10 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
   const [notice, setNotice] = useState<string | null>(null);
   const [membersExpanded, setMembersExpanded] = useState(false);
   const [confirmation, setConfirmation] = useState<'leave' | 'close' | null>(null);
+  const [endingGame, setEndingGame] = useState(false);
   const membersPanelRef = useRef<HTMLElement>(null);
   const isClosed = session.status === 'closed';
+  const isGameComplete = game?.phase === 'complete';
 
   useEffect(() => {
     if (!copied) {
@@ -440,6 +479,18 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
     }
   }
 
+  async function handleEndGame() {
+    setEndingGame(true);
+    setNotice(null);
+    try {
+      await endDrawing({ roomId: session.roomId, sessionToken: guest.sessionToken });
+    } catch (endError) {
+      setNotice(userFacingError(endError, 'The drawing could not be finished.'));
+    } finally {
+      setEndingGame(false);
+    }
+  }
+
   return (
     <div className="h-dvh min-h-screen overflow-hidden bg-[#edf2fa] max-[760px]:h-auto max-[760px]:min-h-dvh max-[760px]:overflow-visible">
       <header className="grid h-19 grid-cols-[1fr_auto_1fr] items-center border-b border-[#ccd5e4] bg-[rgb(248_250_253/92%)] px-5.5 backdrop-blur-[14px] max-[760px]:sticky max-[760px]:top-0 max-[760px]:z-6 max-[760px]:h-17 max-[760px]:grid-cols-[auto_1fr_auto] max-[760px]:px-3">
@@ -488,6 +539,17 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
               <span className="max-[760px]:hidden">Playtest</span>
             </Link>
           ) : null}
+          {session.isOwner && !isClosed && !isGameComplete ? (
+            <button
+              className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.75 rounded-[9px] border border-[#d5b029] bg-[#f8d755] px-3 text-xs font-[740] text-[#17203a] shadow-[0_3px_0_#b99517] transition-transform enabled:hover:-translate-y-px focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(49_85_217/30%)] disabled:cursor-wait disabled:opacity-60 max-[760px]:w-8.5 max-[760px]:px-0 [&_svg]:size-3.75"
+              type="button"
+              onClick={handleEndGame}
+              disabled={endingGame}
+            >
+              {endingGame ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Flag aria-hidden="true" />}
+              <span className="max-[760px]:hidden">Finish drawing</span>
+            </button>
+          ) : null}
           {session.isOwner && !isClosed ? (
             <button
               className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.75 rounded-[9px] border border-[#c9d2e0] bg-white px-3 text-xs font-[680] text-[#4b5770] transition-[border-color,color,background] duration-150 enabled:hover:border-[#abb7ca] enabled:hover:bg-[#f7f9fc] enabled:hover:text-[#17203a] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(49_85_217/30%)] disabled:cursor-wait disabled:opacity-[.58] motion-reduce:transition-none max-[760px]:w-8.5 max-[760px]:px-0 [&_svg]:size-3.75"
@@ -517,7 +579,24 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
 
       <main className="grid h-[calc(100dvh-76px)] grid-cols-[minmax(0,1fr)_250px] gap-4 p-4 max-[920px]:relative max-[920px]:grid-cols-[minmax(0,1fr)_54px] max-[760px]:h-auto max-[760px]:grid-cols-1 max-[760px]:p-2.5">
         <section className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] max-[760px]:h-[calc(100dvh-88px)] max-[760px]:min-h-120">
-          {strokeHistoryStatus === 'LoadingFirstPage' ? (
+          {isGameComplete ? (
+            <PostGameBoard
+              eyebrow="Canvas complete"
+              title="Draw again or switch games."
+              detail="The finished canvas stays with this room while everyone votes."
+              icon={Palette}
+              accent="#3155d9"
+              accentTint="#f3cb42"
+              roomId={session.roomId}
+              currentGameId={session.currentGameId}
+              currentGameType={session.gameType}
+              sessionToken={guest.sessionToken}
+              isOwner={session.isOwner}
+              isClosed={isClosed}
+              closedMessage="This room is closed. The finished canvas stays here to view."
+              className="row-span-2 h-full min-h-0"
+            />
+          ) : strokeHistoryStatus === 'LoadingFirstPage' ? (
             <div className="relative flex min-h-0 items-center justify-center gap-2.25 overflow-hidden rounded-[24px_17px_26px_19px] border border-[#cbd4e1] bg-[#e7ecf5] text-[13px] text-[#7b879c] shadow-[8px_9px_0_#dce4f0] [&_svg]:size-4.5">
               <LoaderCircle className="animate-spin" aria-hidden="true" /> Loading every mark…
             </div>
@@ -548,7 +627,7 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
                           onClick={() => setColor(option)}
                           aria-label={`Use ${option} ink`}
                           aria-pressed={color === option}
-                          disabled={isClosed}
+                          disabled={isClosed || isGameComplete}
                         />
                       ))}
                     </div>
@@ -568,7 +647,7 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
                           onClick={() => setWidth(option)}
                           aria-label={`Use ${option} pixel brush`}
                           aria-pressed={width === option}
-                          disabled={isClosed}
+                          disabled={isClosed || isGameComplete}
                         >
                           <span style={{ width: option, height: option }} />
                         </button>
@@ -578,7 +657,7 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
                   <p className="mr-0.5 text-[11px] text-[#8490a5] max-[920px]:hidden">Hold Space to move</p>
                 </>
               }
-              disabled={isClosed}
+              disabled={isClosed || isGameComplete}
               onError={setNotice}
             />
           )}
@@ -758,13 +837,13 @@ function RoomActionDialog({
   onConfirm: () => void;
 }) {
   const isClosing = action === 'close';
-  const title = isClosing ? 'Close this room?' : ownerIsLeaving ? 'Leave and close the room?' : 'Leave this room?';
+  const title = isClosing ? 'Close this room?' : 'Leave this room?';
   const detail = isClosing
     ? 'The drawing stays visible, but nobody will be able to add another mark.'
     : ownerIsLeaving
-      ? 'You created this room, so leaving will close it for everyone. The drawing will become read only.'
+      ? 'The room stays open. Ownership will pass to the next active player.'
       : 'You can rejoin from this browser later, as long as the room is still open.';
-  const confirmLabel = isClosing ? 'Close room' : ownerIsLeaving ? 'Leave & close' : 'Leave room';
+  const confirmLabel = isClosing ? 'Close room' : 'Leave room';
 
   return (
     <AlertDialog open onOpenChange={(open) => !open && onCancel()}>
@@ -786,7 +865,7 @@ function RoomActionDialog({
           </AlertDialogDescription>
           <div className="grid grid-cols-2 gap-2.5 max-[520px]:grid-cols-1">
             <AlertDialogCancel className="min-h-11 cursor-pointer rounded-[11px_9px_12px_10px] border border-[#c7d0de] bg-[#f5f7fb] px-4 text-xs font-[760] text-[#4d5a72] transition-[transform,box-shadow,background] duration-150 hover:-translate-y-px hover:bg-[#e9eef6] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/28%)] motion-reduce:transition-none max-[520px]:order-2">
-              Keep drawing
+              Stay in room
             </AlertDialogCancel>
             <AlertDialogAction
               className="min-h-11 cursor-pointer rounded-[11px_9px_12px_10px] border border-[#d84d42] bg-[#ff685b] px-4 text-xs font-[760] text-white shadow-[3px_3px_0_#17203a] transition-[transform,box-shadow,background] duration-150 hover:-translate-y-px hover:bg-[#f55b50] hover:shadow-[4px_4px_0_#17203a] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/28%)] motion-reduce:transition-none"

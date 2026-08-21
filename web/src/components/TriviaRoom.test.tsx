@@ -28,16 +28,28 @@ vi.mock('@/lib/useRoomPresence', () => ({
   useRoomPresence: () => ({ onlineByMemberId: mocks.onlineByMemberId }),
 }));
 
+vi.mock('@/components/PostGameBoard', () => ({
+  default: ({ title }: { title: string }) => (
+    <section>
+      <h1>{title}</h1>
+      <div>Next game ballot</div>
+    </section>
+  ),
+}));
+
 const guest = { sessionToken: 'a'.repeat(32), displayName: 'Ada' };
 const session = {
   kind: 'session' as const,
   roomId: 'room-id' as never,
   code: 'ABCDEFGH',
   gameType: 'trivia' as const,
+  currentGameId: 'room-game-id' as never,
   status: 'open' as const,
   activeMemberCount: 2,
   maxPlayers: 50,
   isOwner: true,
+  ownershipVersion: 0,
+  ownershipReason: 'created' as const,
   currentMember: {
     memberId: 'member-ada' as never,
     displayName: 'Ada',

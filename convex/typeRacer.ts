@@ -3,6 +3,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from './_generated/server';
 import { fail, MAX_PLAYERS, validateSessionToken } from './domain';
+import { activateCurrentRoomGame, completeCurrentRoomGame } from './roomGames';
 import { listActiveRoomMembers } from './roomMembers';
 import { chooseTypeRacerPassage } from './typeRacerPassages';
 import { calculateTypeRacerAccuracy, calculateTypeRacerWpm, compareTypeRacerProgress } from './typeRacerScoring';
@@ -282,6 +283,9 @@ export async function recordTypeRacerProgress(
       );
       void scheduledId;
     }
+    if (allFinished) {
+      await completeCurrentRoomGame(ctx, room, 'typeRacer', now);
+    }
   }
 
   return { kind: 'accepted', wpm, accuracy, finished: isFinished };
@@ -400,10 +404,14 @@ export const startRace = mutation({
     if (state.phase === 'countdown' || state.phase === 'racing') {
       fail('TYPE_RACER_IN_PROGRESS', 'A type race is already in progress.');
     }
+    if (state.phase === 'complete') {
+      fail('STALE_ROOM_GAME', 'Finish the next-game vote before starting another race.');
+    }
 
     const participants = await listActiveRoomMembers(ctx, room._id);
     const passage = chooseTypeRacerPassage(state.passageId);
     const now = Date.now();
+    await activateCurrentRoomGame(ctx, room, 'typeRacer', now);
     const startsAt = now + TYPE_RACER_COUNTDOWN_MS;
     const raceNumber = state.raceNumber + 1;
     for (const participant of participants) {
@@ -542,11 +550,16 @@ export const finalizeRace = internalMutation({
     ) {
       return null;
     }
+    const now = Date.now();
     await ctx.db.patch('typeRacerGameStates', state._id, {
       phase: 'complete',
-      phaseStartedAt: Date.now(),
+      phaseStartedAt: now,
       phaseEndsAt: null,
     });
+    const room = await ctx.db.get('rooms', state.roomId);
+    if (room !== null && room.status !== 'closed') {
+      await completeCurrentRoomGame(ctx, room, 'typeRacer', now);
+    }
     return null;
   },
 });

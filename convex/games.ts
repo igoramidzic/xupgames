@@ -1,5 +1,8 @@
 import { v } from 'convex/values';
 
+export const GAME_TYPES = ['drawing', 'trivia', 'typeRacer'] as const;
+export type GameType = (typeof GAME_TYPES)[number];
+
 /**
  * The games currently supported by the platform.
  *

@@ -101,6 +101,17 @@ async function requireRoomOwner(
   }
 }
 
+async function currentRoomGameIsComplete(ctx: Pick<MutationCtx, 'db'>, room: Doc<'rooms'>): Promise<boolean> {
+  if (room.currentGameId === undefined) {
+    return false;
+  }
+  const roomGame = await ctx.db.get('roomGames', room.currentGameId);
+  if (roomGame === null || roomGame.roomId !== room._id) {
+    throw new Error('The room current-game pointer is invalid.');
+  }
+  return roomGame.status === 'complete';
+}
+
 async function beginStopping(ctx: MutationCtx, run: Doc<'playtestRuns'>, reason: string): Promise<void> {
   if (!run.isActive || run.status === 'stopping') {
     return;
@@ -177,6 +188,9 @@ export const start = mutation({
     await requireRoomOwner(ctx, room, args.sessionToken);
     if (room.status === 'closed') {
       fail('ROOM_CLOSED', 'Open a new room before starting a playtest.');
+    }
+    if (await currentRoomGameIsComplete(ctx, room)) {
+      fail('ROOM_GAME_NOT_COMPLETE', 'Choose the next game before starting a playtest.');
     }
     if (
       !Number.isInteger(args.targetActiveMemberCount) ||
@@ -263,6 +277,14 @@ export const provision = internalMutation({
       await beginStopping(ctx, run, 'The room closed.');
       return null;
     }
+    if (room.gameType !== run.gameType) {
+      await beginStopping(ctx, run, 'The room changed games.');
+      return null;
+    }
+    if (await currentRoomGameIsComplete(ctx, room)) {
+      await beginStopping(ctx, run, 'The game finished.');
+      return null;
+    }
 
     const remaining = run.requestedBotCount - run.provisionedBotCount;
     const availableSeats = Math.max(0, room.maxPlayers - room.activeMemberCount);
@@ -302,6 +324,7 @@ export const provision = internalMutation({
         roomId: room._id,
         guestId,
         displayName,
+        memberKind: 'playtestBot',
         isActive: true,
         joinedAt: now,
         leftAt: null,
@@ -360,6 +383,14 @@ export const tick = internalMutation({
     const room = await ctx.db.get('rooms', run.roomId);
     if (room === null || room.status === 'closed') {
       await beginStopping(ctx, run, 'The room closed.');
+      return null;
+    }
+    if (room.gameType !== run.gameType) {
+      await beginStopping(ctx, run, 'The room changed games.');
+      return null;
+    }
+    if (await currentRoomGameIsComplete(ctx, room)) {
+      await beginStopping(ctx, run, 'The game finished.');
       return null;
     }
     const now = Date.now();
