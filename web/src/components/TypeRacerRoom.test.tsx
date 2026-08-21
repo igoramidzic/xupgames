@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -36,6 +36,7 @@ vi.mock('@/components/PostGameBoard', () => ({
       <div>Next game ballot</div>
     </section>
   ),
+  PostGamePodium: () => <ol aria-label="Final podium" />,
 }));
 
 vi.mock('@/lib/environment', () => ({ isLocalhost: () => false }));
@@ -79,8 +80,8 @@ function racer() {
     wpm: 0,
     accuracy: 100,
     startedAt: Date.now() - 1_000,
-    finishedAt: null,
-    finishTimeMs: null,
+    finishedAt: null as number | null,
+    finishTimeMs: null as number | null,
     isCurrentPlayer: true,
     isActive: true,
   };
@@ -163,66 +164,52 @@ describe('TypeRacerRoom', () => {
     expect(mocks.startRace).toHaveBeenCalledWith({ roomId: 'room-1', sessionToken: guest.sessionToken });
   });
 
-  it('replaces the finished race surface with an immediately visible replay ballot', async () => {
-    mocks.game = {
-      raceNumber: 0,
-      phase: 'lobby',
-      phaseStartedAt: null,
-      startsAt: null,
-      phaseEndsAt: null,
-      participantCount: 0,
-      finishedCount: 0,
-      winnerMemberId: null,
-      passage: null,
-      racers: [{ ...racer(), status: 'waiting', totalChars: 0 }],
-      currentPlayer: { ...racer(), status: 'waiting', totalChars: 0 },
-    };
-    const user = userEvent.setup();
-    const view = render(
-      <MemoryRouter>
-        <TypeRacerRoom guest={guest} session={session as never} />
-      </MemoryRouter>
-    );
+  it('fades the finished race before showing the round-over board', () => {
+    vi.useFakeTimers();
+    try {
+      const current = racer();
+      mocks.game = activeRace([current]);
+      const view = render(
+        <MemoryRouter>
+          <TypeRacerRoom guest={guest} session={session as never} />
+        </MemoryRouter>
+      );
 
-    await user.click(screen.getByRole('button', { name: 'Start the countdown' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Start the countdown' })).toBeEnabled());
+      expect(screen.getByLabelText('Type the passage')).toBeInTheDocument();
 
-    const current = {
-      ...racer(),
-      status: 'finished',
-      wpm: 72,
-      accuracy: 95,
-      finishTimeMs: 12_345,
-      finishedAt: Date.now(),
-    };
-    mocks.game = {
-      raceNumber: 1,
-      phase: 'complete',
-      phaseStartedAt: Date.now() - 12_345,
-      startsAt: Date.now() - 12_345,
-      phaseEndsAt: Date.now(),
-      participantCount: 1,
-      finishedCount: 1,
-      winnerMemberId: 'member-1',
-      passage: {
-        id: 'ishmael',
-        text: 'Call me Ishmael.',
-        title: 'Moby-Dick',
-        author: 'Herman Melville',
-        kind: 'phrase',
-      },
-      racers: [current],
-      currentPlayer: current,
-    };
-    view.rerender(
-      <MemoryRouter>
-        <TypeRacerRoom guest={guest} session={session as never} />
-      </MemoryRouter>
-    );
+      const finished = {
+        ...current,
+        status: 'finished',
+        progress: 1,
+        correctChars: 16,
+        typedChars: 16,
+        wpm: 72,
+        accuracy: 95,
+        finishTimeMs: 12_345,
+        finishedAt: Date.now(),
+      };
+      mocks.game = activeRace([finished], 'complete');
+      view.rerender(
+        <MemoryRouter>
+          <TypeRacerRoom guest={guest} session={session as never} />
+        </MemoryRouter>
+      );
 
-    expect(screen.getByText('Next game ballot')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Race Again' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Type the passage')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Type the passage')).toBeInTheDocument();
+      expect(screen.queryByText('Next game ballot')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Type the passage').closest('[data-transition]')).toHaveAttribute(
+        'data-transition',
+        'game-out'
+      );
+
+      act(() => vi.advanceTimersByTime(280));
+
+      expect(screen.getByText('Next game ballot')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Race Again' })).toBeInTheDocument();
+      expect(screen.queryByLabelText('Type the passage')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows wrong letters and requires backtracking', async () => {

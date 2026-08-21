@@ -17,9 +17,10 @@ import {
   UsersRound,
   X,
 } from 'lucide-react';
-import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import PostGameBoard from '@/components/PostGameBoard';
+import GameSurfaceTransition from '@/components/GameSurfaceTransition';
+import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { isLocalhost } from '@/lib/environment';
 import type { GuestIdentity } from '@/lib/guest';
@@ -44,7 +46,6 @@ const ANSWER_LABELS = ['A', 'B', 'C', 'D'];
 const ANSWER_DURATION_MS = 15_000;
 const COUNTDOWN_DURATION_MS = 3_000;
 const REVEAL_DURATION_MS = 7_000;
-const QUESTION_FADE_OUT_MS = 260;
 
 function useClock(enabled: boolean) {
   const [now, setNow] = useState(Date.now());
@@ -227,15 +228,17 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
           <span className="max-[760px]:hidden">Xup Trivia</span>
         </Link>
 
-        <button
-          className="inline-flex h-9 -rotate-1 cursor-pointer items-center gap-2 rounded-[7px_3px] border border-[#10213d] bg-[#ffda55] px-4 text-[10px] font-[820] tracking-[0.12em] text-[#10213d] shadow-[3px_3px_0_#10213d] hover:-translate-y-px focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(18_168_212/32%)] max-[760px]:w-fit max-[760px]:justify-self-center max-[760px]:px-2.5 max-[760px]:text-[8px] [&_svg]:size-3.25"
+        <Button
+          className="-rotate-1 px-4 text-[10px] tracking-[0.12em] max-[760px]:w-fit max-[760px]:justify-self-center max-[760px]:px-2.5 max-[760px]:text-[8px] [&_svg]:size-3.25"
+          variant="trivia-code"
+          size="sm"
           type="button"
           onClick={copyRoomLink}
           aria-label="Copy room link"
         >
           <span>ROOM {session.code}</span>
           {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-        </button>
+        </Button>
 
         <div className="flex items-center justify-end gap-2">
           <span className="mr-1 inline-flex items-center gap-2 text-xs font-bold text-[#4d5a72] max-[760px]:hidden">
@@ -250,83 +253,89 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
             {isClosed ? 'Closed' : 'Live'}
           </span>
           {session.isOwner && !isClosed && isLocalhost() ? (
-            <Link
-              className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.75 rounded-[9px] border border-[#c9d2e0] bg-white px-3 text-xs font-[680] text-[#4b5770] transition-[border-color,color,background] duration-150 hover:border-[#abb7ca] hover:bg-[#f7f9fc] hover:text-[#17203a] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(49_85_217/30%)] motion-reduce:transition-none max-[760px]:w-8.5 max-[760px]:px-0 [&_svg]:size-3.75"
-              to={`/admin/${session.code}`}
-            >
-              <Beaker aria-hidden="true" />
-              <span className="max-[760px]:hidden">Playtest</span>
-            </Link>
+            <Button asChild variant="paper" size="sm" className="max-[760px]:w-8.5 max-[760px]:px-0 [&_svg]:size-3.75">
+              <Link to={`/admin/${session.code}`}>
+                <Beaker aria-hidden="true" />
+                <span className="max-[760px]:hidden">Playtest</span>
+              </Link>
+            </Button>
           ) : null}
           {session.isOwner && !isClosed ? (
-            <button
-              className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.75 rounded-[9px] border border-[#c9d2e0] bg-white px-3 text-xs font-[680] text-[#4b5770] transition-[border-color,color,background] duration-150 hover:border-[#abb7ca] hover:bg-[#f7f9fc] hover:text-[#17203a] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(49_85_217/30%)] motion-reduce:transition-none max-[760px]:w-8.5 max-[760px]:px-0 [&_svg]:size-3.75"
+            <Button
+              variant="paper"
+              size="sm"
+              className="max-[760px]:w-8.5 max-[760px]:px-0 [&_svg]:size-3.75"
               type="button"
               onClick={() => setConfirmation('close')}
             >
               <LockKeyhole aria-hidden="true" />
               <span className="max-[760px]:hidden">Close room</span>
-            </button>
+            </Button>
           ) : null}
-          <button
-            className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.75 rounded-[9px] border border-[#c9d2e0] bg-white px-3 text-xs font-[680] text-[#4b5770] transition-[border-color,color,background] duration-150 enabled:hover:border-[#abb7ca] enabled:hover:bg-[#f7f9fc] enabled:hover:text-[#17203a] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(49_85_217/30%)] disabled:cursor-wait disabled:opacity-[.58] motion-reduce:transition-none max-[760px]:w-8.5 max-[760px]:px-0 [&_svg]:size-3.75"
+          <Button
+            variant="paper"
+            size="sm"
+            className="disabled:opacity-[.58] max-[760px]:w-8.5 max-[760px]:px-0 [&_svg]:size-3.75"
             type="button"
             onClick={() => setConfirmation('leave')}
             disabled={actionPending !== null}
           >
             {actionPending === 'leave' ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <DoorOpen />}
             <span className="max-[760px]:hidden">Leave</span>
-          </button>
+          </Button>
         </div>
       </header>
 
       <main className="mx-auto grid min-h-[calc(100dvh-76px)] w-full max-w-345 grid-cols-[minmax(0,1fr)_300px] gap-4.5 p-4.5 [--trivia-question-min-height:clamp(560px,calc(100dvh-230px),720px)] max-[980px]:grid-cols-[minmax(0,1fr)_240px] max-[760px]:min-h-[calc(100dvh-68px)] max-[760px]:grid-cols-1 max-[760px]:p-2.25 max-[760px]:[--trivia-question-min-height:clamp(590px,calc(100dvh-180px),680px)]">
         <section className="grid min-h-0 min-w-0 place-items-stretch content-start" aria-live="polite">
-          {game.phase === 'lobby' ? (
-            <LobbyPanel
-              isOwner={session.isOwner}
-              ownerName={ownerName}
-              playerCount={session.activeMemberCount}
-              starting={starting}
-              isClosed={isClosed}
-              onStart={handleStart}
-              onCopy={copyRoomLink}
-            />
-          ) : null}
+          <GameSurfaceTransition
+            showResults={game.phase === 'complete'}
+            results={
+              <CompletePanel
+                leaderboard={game.leaderboard}
+                gameNumber={game.gameNumber}
+                session={session}
+                sessionToken={guest.sessionToken}
+              />
+            }
+          >
+            {game.phase === 'lobby' ? (
+              <LobbyPanel
+                isOwner={session.isOwner}
+                ownerName={ownerName}
+                playerCount={session.activeMemberCount}
+                starting={starting}
+                isClosed={isClosed}
+                onStart={handleStart}
+                onCopy={copyRoomLink}
+              />
+            ) : null}
 
-          {game.phase === 'countdown' ? (
-            <div className="relative flex h-[clamp(640px,calc(100dvh-112px),768px)] max-h-192 min-h-0 flex-col items-center justify-center overflow-hidden rounded-[24px_10px_26px_12px] border border-[#aebfd0] bg-[#10213d] p-[clamp(50px,7vw,100px)] text-center text-white shadow-[8px_9px_0_#ccdae6] max-[760px]:min-h-150 max-[760px]:px-6 max-[760px]:py-8.5">
-              <p className="m-0 text-[11px] font-extrabold tracking-[0.16em] text-[#67c9e8] uppercase">
-                Game {game.gameNumber}
-              </p>
-              <strong className="mt-4 mb-1.5 text-[clamp(150px,24vw,310px)] leading-[0.78] font-[850] tracking-[-0.1em] text-[#ffda55] tabular-nums [text-shadow:9px_9px_0_rgb(0_0_0/24%)]">
-                {Math.max(1, Math.ceil(remainingMs / 1_000))}
-              </strong>
-              <h1 className="mt-6.5 mb-2 text-[clamp(24px,4vw,48px)] tracking-[-0.04em]">
-                Eyes up. First question incoming.
-              </h1>
-              <span className="text-[13px] text-[#9eb2c9]">Fast and right beats merely right.</span>
-            </div>
-          ) : null}
+            {game.phase === 'countdown' ? (
+              <div className="relative flex h-[clamp(640px,calc(100dvh-112px),768px)] max-h-192 min-h-0 flex-col items-center justify-center overflow-hidden rounded-[24px_10px_26px_12px] border border-[#aebfd0] bg-[#10213d] p-[clamp(50px,7vw,100px)] text-center text-white shadow-[8px_9px_0_#ccdae6] max-[760px]:min-h-150 max-[760px]:px-6 max-[760px]:py-8.5">
+                <p className="m-0 text-[11px] font-extrabold tracking-[0.16em] text-[#67c9e8] uppercase">
+                  Game {game.gameNumber}
+                </p>
+                <strong className="mt-4 mb-1.5 text-[clamp(150px,24vw,310px)] leading-[0.78] font-[850] tracking-[-0.1em] text-[#ffda55] tabular-nums [text-shadow:9px_9px_0_rgb(0_0_0/24%)]">
+                  {Math.max(1, Math.ceil(remainingMs / 1_000))}
+                </strong>
+                <h1 className="mt-6.5 mb-2 text-[clamp(24px,4vw,48px)] tracking-[-0.04em]">
+                  Eyes up. First question incoming.
+                </h1>
+                <span className="text-[13px] text-[#9eb2c9]">Fast and right beats merely right.</span>
+              </div>
+            ) : null}
 
-          {game.phase === 'question' || game.phase === 'reveal' ? (
-            <QuestionPanel
-              game={game}
-              remainingMs={remainingMs}
-              timeProgress={timeProgress}
-              selectedOption={selectedOption}
-              onAnswer={handleAnswer}
-            />
-          ) : null}
-
-          {game.phase === 'complete' ? (
-            <CompletePanel
-              leaderboard={game.leaderboard}
-              gameNumber={game.gameNumber}
-              session={session}
-              sessionToken={guest.sessionToken}
-            />
-          ) : null}
+            {game.phase === 'question' || game.phase === 'reveal' ? (
+              <QuestionPanel
+                game={game}
+                remainingMs={remainingMs}
+                timeProgress={timeProgress}
+                selectedOption={selectedOption}
+                onAnswer={handleAnswer}
+              />
+            ) : null}
+          </GameSurfaceTransition>
         </section>
 
         <aside className="flex h-[max(680px,calc(100dvh-112px))] min-h-0 flex-col self-start overflow-hidden rounded-[15px_7px_17px_9px] border border-[#aebfd0] bg-[rgb(250_252_254/96%)] shadow-[5px_6px_0_#ccdae6] max-[760px]:h-107.5 max-[760px]:min-h-107.5">
@@ -412,8 +421,9 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
       </main>
 
       {notice ? (
-        <button
-          className="fixed right-5.5 bottom-5.5 z-10 flex max-w-[min(440px,calc(100vw-44px))] cursor-pointer items-center gap-4 rounded-[10px] border-0 bg-[#17203a] py-3.25 pr-3.5 pl-4 text-left text-xs text-white shadow-[0_14px_34px_rgb(23_32_58/25%)]"
+        <Button
+          className="fixed right-5.5 bottom-5.5 z-10 max-w-[min(440px,calc(100vw-44px))] gap-4 py-3.25 pr-3.5 pl-4 text-xs"
+          variant="notice"
           type="button"
           onClick={() => setNotice(null)}
           aria-label="Dismiss message"
@@ -422,7 +432,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
           <span className="text-xl leading-none" aria-hidden="true">
             ×
           </span>
-        </button>
+        </Button>
       ) : null}
 
       {confirmation ? (
@@ -493,28 +503,31 @@ function LobbyPanel({
           <LockKeyhole aria-hidden="true" /> This room is closed.
         </p>
       ) : isOwner ? (
-        <button
-          className="inline-flex h-13.5 min-w-47.5 cursor-pointer items-center justify-center gap-2.5 rounded-[12px_6px_13px_7px] border border-[#10213d] bg-[#ffda55] px-6 text-sm font-[820] text-[#10213d] shadow-[5px_5px_0_#10213d] transition-[transform,box-shadow] duration-150 enabled:hover:-translate-y-0.5 enabled:hover:shadow-[7px_7px_0_#10213d] enabled:active:translate-0.75 enabled:active:shadow-[2px_2px_0_#10213d] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(18_168_212/32%)] disabled:cursor-wait disabled:opacity-65 motion-reduce:transition-none [&_svg]:size-4.5"
+        <Button
+          className="h-13.5 min-w-47.5 disabled:cursor-wait disabled:opacity-65"
+          variant="trivia-primary"
+          size="xl"
           type="button"
           onClick={onStart}
           disabled={starting}
         >
           {starting ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Play aria-hidden="true" />}
           {starting ? 'Building game…' : 'Start the game'}
-        </button>
+        </Button>
       ) : (
         <p className="m-0 inline-flex items-center gap-2.25 rounded-[10px_6px_11px_7px] border border-[#c2cfdb] bg-[#eef4f8] px-4.25 py-3.5 text-xs font-bold text-[#53677c] [&_svg]:size-4">
           <LoaderCircle className="animate-spin" aria-hidden="true" /> Waiting for {ownerName} to start
         </p>
       )}
       {!isClosed ? (
-        <button
-          className="mt-4.5 ml-0.75 cursor-pointer border-0 border-b border-[#698097] bg-transparent px-0 py-1.25 text-[11px] font-[720] text-[#51677e] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(18_168_212/32%)]"
+        <Button
+          className="mt-4.5 ml-0.75 h-9 px-3 text-[11px] font-[720] text-[#51677e] focus-visible:outline-[rgb(18_168_212/32%)]"
+          variant="paper"
           type="button"
           onClick={onCopy}
         >
           Copy invite link
-        </button>
+        </Button>
       ) : null}
     </div>
   );
@@ -563,7 +576,7 @@ function QuestionPanel({
         data-answer-result={answerResult}
       >
         <div className="trivia-question-card relative z-1 flex min-h-[calc(var(--trivia-question-min-height)-16px)] flex-col rounded-[19px_6px_21px_8px] bg-[#fafdff] p-[clamp(30px,4cqw,58px)] max-[980px]:p-8.5 max-[760px]:px-4.5 max-[760px]:py-7">
-          <QuestionContentTransition
+          <QuestionContent
             round={round}
             isReveal={isReveal}
             selectedOption={selectedOption}
@@ -600,17 +613,7 @@ function QuestionPanel({
 }
 
 type QuestionRound = NonNullable<GameView['round']>;
-type QuestionContentSnapshot = {
-  round: QuestionRound;
-  isReveal: boolean;
-  selectedOption: number | null;
-  phase: GameView['phase'];
-  remainingMs: number;
-  timeProgress: number;
-  totalQuestions: number;
-};
-
-function QuestionContentTransition({
+function QuestionContent({
   round,
   isReveal,
   selectedOption,
@@ -619,80 +622,37 @@ function QuestionContentTransition({
   timeProgress,
   totalQuestions,
   onAnswer,
-}: QuestionContentSnapshot & { onAnswer: (index: number) => void }) {
-  const snapshot = useMemo(
-    () => ({ round, isReveal, selectedOption, phase, remainingMs, timeProgress, totalQuestions }),
-    [round, isReveal, selectedOption, phase, remainingMs, timeProgress, totalQuestions]
-  );
-  const latestSnapshotRef = useRef<QuestionContentSnapshot>(snapshot);
-  latestSnapshotRef.current = snapshot;
-  const displayedRoundIdRef = useRef(round.roundId);
-  const [displayed, setDisplayed] = useState<QuestionContentSnapshot>(latestSnapshotRef.current);
-  const [transitionPhase, setTransitionPhase] = useState<'visible' | 'out' | 'in'>('visible');
-  const visibleSnapshotRef = useRef(snapshot);
-
-  if (transitionPhase === 'visible' && displayedRoundIdRef.current === round.roundId) {
-    visibleSnapshotRef.current = snapshot;
-  }
-
-  useLayoutEffect(() => {
-    if (displayedRoundIdRef.current === round.roundId) {
-      return;
-    }
-
-    setDisplayed(visibleSnapshotRef.current);
-    setTransitionPhase('out');
-    let firstFrame = 0;
-    let secondFrame = 0;
-    const swapTimer = window.setTimeout(() => {
-      const nextSnapshot = latestSnapshotRef.current;
-      displayedRoundIdRef.current = nextSnapshot.round.roundId;
-      setDisplayed(nextSnapshot);
-      setTransitionPhase('in');
-      firstFrame = window.requestAnimationFrame(() => {
-        secondFrame = window.requestAnimationFrame(() => {
-          setTransitionPhase('visible');
-        });
-      });
-    }, QUESTION_FADE_OUT_MS);
-
-    return () => {
-      window.clearTimeout(swapTimer);
-      window.cancelAnimationFrame(firstFrame);
-      window.cancelAnimationFrame(secondFrame);
-    };
-  }, [round.roundId]);
-
-  const activeSnapshot =
-    transitionPhase === 'visible' && displayedRoundIdRef.current === round.roundId
-      ? snapshot
-      : transitionPhase === 'visible'
-        ? visibleSnapshotRef.current
-        : displayed;
-  const timerSeconds = Math.max(0, Math.ceil(activeSnapshot.remainingMs / 1_000));
-  const displayedSeconds = activeSnapshot.isReveal
+}: {
+  round: QuestionRound;
+  isReveal: boolean;
+  selectedOption: number | null;
+  phase: GameView['phase'];
+  remainingMs: number;
+  timeProgress: number;
+  totalQuestions: number;
+  onAnswer: (index: number) => void;
+}) {
+  const timerSeconds = Math.max(0, Math.ceil(remainingMs / 1_000));
+  const displayedSeconds = isReveal
     ? Math.min(REVEAL_DURATION_MS / 1_000, timerSeconds)
     : Math.min(ANSWER_DURATION_MS / 1_000, timerSeconds);
-  const timerStyle = { '--round-progress': `${activeSnapshot.timeProgress * 360}deg` } as CSSProperties;
-  const timerLabel = activeSnapshot.isReveal
-    ? `${activeSnapshot.round.questionNumber >= activeSnapshot.totalQuestions ? 'Final results' : 'Next question'} in ${displayedSeconds} seconds`
+  const timerStyle = { '--round-progress': `${timeProgress * 360}deg` } as CSSProperties;
+  const timerLabel = isReveal
+    ? `${round.questionNumber >= totalQuestions ? 'Final results' : 'Next question'} in ${displayedSeconds} seconds`
     : `${displayedSeconds} seconds left to answer`;
   const totalAnswerCount = Math.max(
     1,
-    (activeSnapshot.round.optionAnswerCounts ?? []).reduce((total, count) => total + count, 0)
+    (round.optionAnswerCounts ?? []).reduce((total, count) => total + count, 0)
   );
 
   return (
-    <div
-      className="trivia-question-content flex min-h-0 flex-1 flex-col opacity-100 transition-opacity duration-300 ease-out data-[transition=out]:opacity-0 data-[transition=out]:duration-[260ms] data-[transition=out]:ease-in data-[transition=in]:opacity-0 data-[transition=in]:transition-none motion-reduce:opacity-100 motion-reduce:transition-none"
-      data-transition={transitionPhase}
-    >
+    <div className="trivia-question-content flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-19 basis-19 items-start justify-end max-[760px]:min-h-17 max-[760px]:basis-17">
         <strong
-          key={`${activeSnapshot.round.roundId}:${activeSnapshot.phase}`}
+          key={`${round.roundId}:${phase}`}
           className="trivia-round-timer grid size-18 shrink-0 place-items-center rounded-full bg-[conic-gradient(from_-90deg,var(--timer-color)_var(--round-progress),#cbd9e5_0)] p-1.25 shadow-[0_3px_0_var(--timer-shadow)] [--timer-color:#12a8d4] [--timer-shadow:#9acfe0] transition-[--round-progress] duration-100 data-[phase=reveal]:[--timer-color:#16855c] data-[phase=reveal]:[--timer-shadow:#a8c8ba] data-[urgent=true]:[--timer-color:#d7433d] data-[urgent=true]:[--timer-shadow:#e8b2ae] before:col-start-1 before:row-start-1 before:size-15 before:rounded-full before:bg-[#fafdff] before:content-[''] motion-reduce:transition-none max-[760px]:size-16 max-[760px]:basis-16 max-[760px]:before:size-13"
-          data-phase={activeSnapshot.isReveal ? 'reveal' : 'question'}
-          data-urgent={!activeSnapshot.isReveal && activeSnapshot.remainingMs <= 5_000}
+          data-phase={isReveal ? 'reveal' : 'question'}
+          data-urgent={!isReveal && remainingMs <= 5_000}
           style={timerStyle}
           role="timer"
           aria-label={timerLabel}
@@ -703,24 +663,25 @@ function QuestionContentTransition({
         </strong>
       </div>
       <h1 className="m-0 max-w-245 text-[clamp(32px,4.4cqw,58px)] leading-[1.02] font-[790] tracking-[-0.055em] text-[#10213d] [font-stretch:condensed] max-[760px]:text-[clamp(30px,8.5vw,46px)]">
-        {activeSnapshot.round.prompt}
+        {round.prompt}
       </h1>
       <div className="mt-auto mb-6 grid grid-cols-2 gap-3 pt-[clamp(28px,4cqw,48px)] max-[760px]:grid-cols-1 max-[760px]:gap-2 max-[760px]:pt-6">
-        {activeSnapshot.round.options.map((option, index) => {
-          const isSelected = activeSnapshot.selectedOption === index;
-          const isCorrect = activeSnapshot.isReveal && activeSnapshot.round.correctOptionIndex === index;
-          const isIncorrectSelection = activeSnapshot.isReveal && isSelected && !isCorrect;
-          const answerCount = activeSnapshot.round.optionAnswerCounts?.[index] ?? 0;
+        {round.options.map((option, index) => {
+          const isSelected = selectedOption === index;
+          const isCorrect = isReveal && round.correctOptionIndex === index;
+          const isIncorrectSelection = isReveal && isSelected && !isCorrect;
+          const answerCount = round.optionAnswerCounts?.[index] ?? 0;
           return (
-            <button
+            <Button
               key={option}
+              variant="answer"
               type="button"
-              className="relative grid min-h-20.5 cursor-pointer grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-3.5 overflow-hidden rounded-[14px_7px_15px_8px] border-[1.5px] border-[#bbc9d8] bg-white py-3 pr-4 pl-3 text-left text-[#31465f] shadow-[0_5px_0_#d6e0e9] transition-[transform,border-color,background] duration-150 enabled:hover:-translate-y-0.5 enabled:hover:border-[#5e7c98] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(18_168_212/32%)] data-[selected=true]:border-[#d2a411] data-[selected=true]:bg-[#fff4c7] data-[selected=true]:shadow-[0_5px_0_#d2a411] data-[correct=true]:border-[#16855c] data-[correct=true]:bg-[#e3f8ef] data-[correct=true]:shadow-[0_5px_0_#42b884] data-[incorrect=true]:border-[#ce4942] data-[incorrect=true]:bg-[#fff0ee] data-[incorrect=true]:shadow-[0_5px_0_#e46d64] disabled:cursor-default max-[760px]:min-h-16.25 max-[760px]:grid-cols-[38px_minmax(0,1fr)_auto]"
-              data-selected={isSelected && !activeSnapshot.isReveal}
+              className="relative grid min-h-20.5 grid-cols-[46px_minmax(0,1fr)_auto] gap-3.5 overflow-hidden py-3 pr-4 pl-3 disabled:cursor-default max-[760px]:min-h-16.25 max-[760px]:grid-cols-[38px_minmax(0,1fr)_auto]"
+              data-selected={isSelected && !isReveal}
               data-correct={isCorrect}
               data-incorrect={isIncorrectSelection}
               onClick={() => onAnswer(index)}
-              disabled={activeSnapshot.phase !== 'question' || activeSnapshot.selectedOption !== null}
+              disabled={phase !== 'question' || selectedOption !== null}
             >
               <span className="relative z-1 grid size-11.5 place-items-center rounded-[12px_6px_13px_7px] bg-[#10213d] text-base font-[850] text-white max-[760px]:size-9.5">
                 {ANSWER_LABELS[index]}
@@ -728,7 +689,7 @@ function QuestionContentTransition({
               <span className="relative z-1 text-[clamp(14px,1.5vw,18px)] leading-tight font-[720] max-[760px]:text-sm">
                 {option}
               </span>
-              {activeSnapshot.isReveal ? (
+              {isReveal ? (
                 <span className="trivia-answer-result relative z-1 grid size-11 overflow-hidden place-items-center rounded-full bg-[#edf2f6] shadow-[inset_0_0_0_1px_#dbe5ed]">
                   <span
                     className="absolute right-0 bottom-0 left-0 h-[var(--answer-share)] max-h-full rounded-b-full bg-[rgb(18_168_212/32%)] transition-[height] duration-200"
@@ -739,7 +700,7 @@ function QuestionContentTransition({
               ) : isSelected ? (
                 <Check className="relative z-1 size-5 text-[#8c6c00]" aria-label="Answer locked" />
               ) : null}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -782,25 +743,15 @@ function CompletePanel({
       isClosed={session.status === 'closed'}
       closedMessage="This room is closed. The final scoreboard stays here to view."
       summary={
-        eligibleLeaderboard.length > 0 ? (
-          <ol className="m-0 flex w-full list-none items-end justify-center gap-2.25 p-0" aria-label="Final podium">
-            {eligibleLeaderboard.slice(0, 3).map((entry) => (
-              <li
-                className="order-3 flex min-h-20 w-[31%] flex-col items-center justify-center rounded-[12px_6px_13px_7px] border border-[#b9c8d6] bg-[#edf4f8] px-2 py-3 text-center data-[place='1']:order-2 data-[place='1']:min-h-24 data-[place='1']:border-[#c9a21f] data-[place='1']:bg-[#fff3bd] data-[place='2']:order-1"
-                key={entry.memberId}
-                data-place={entry.rank}
-              >
-                <span className="mb-1.5 grid size-6 place-items-center rounded-full bg-[#10213d] text-[9px] font-[850] text-white">
-                  {entry.rank}
-                </span>
-                <strong className="max-w-full overflow-hidden text-xs text-ellipsis whitespace-nowrap text-[#22384f]">
-                  {entry.displayName}
-                </strong>
-                <small className="mt-0.75 text-[10px] text-[#74869a]">{formatPoints(entry.totalPoints)}</small>
-              </li>
-            ))}
-          </ol>
-        ) : undefined
+        <PostGamePodium
+          label="Final podium"
+          entries={eligibleLeaderboard.slice(0, 3).map((entry) => ({
+            id: entry.memberId,
+            place: entry.rank,
+            name: entry.displayName,
+            result: `${formatPoints(entry.totalPoints)} points`,
+          }))}
+        />
       }
     />
   );
@@ -843,13 +794,10 @@ function TriviaActionDialog({
             <p className="mx-auto mt-3.5 mb-6.5 max-w-85 text-[13px] leading-[1.55] text-[#657087]">{detail}</p>
           </AlertDialogDescription>
           <div className="grid grid-cols-2 gap-2.5 max-[520px]:grid-cols-1">
-            <AlertDialogCancel className="min-h-11 cursor-pointer rounded-[11px_9px_12px_10px] border border-[#c7d0de] bg-[#f5f7fb] px-4 text-xs font-[760] text-[#4d5a72] transition-[transform,box-shadow,background] duration-150 hover:-translate-y-px hover:bg-[#e9eef6] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/28%)] motion-reduce:transition-none max-[520px]:order-2">
+            <AlertDialogCancel variant="paper" className="min-h-11 text-xs font-[760] max-[520px]:order-2">
               Stay in the game
             </AlertDialogCancel>
-            <AlertDialogAction
-              className="min-h-11 cursor-pointer rounded-[11px_9px_12px_10px] border border-[#d84d42] bg-[#ff685b] px-4 text-xs font-[760] text-white shadow-[3px_3px_0_#17203a] transition-[transform,box-shadow,background] duration-150 hover:-translate-y-px hover:bg-[#f55b50] hover:shadow-[4px_4px_0_#17203a] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/28%)] motion-reduce:transition-none"
-              onClick={onConfirm}
-            >
+            <AlertDialogAction variant="destructive" className="min-h-11 text-xs" onClick={onConfirm}>
               {isClosing ? 'Close room' : 'Leave room'}
             </AlertDialogAction>
           </div>

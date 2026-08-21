@@ -3,6 +3,7 @@ import { useMutation } from 'convex/react';
 import { ArrowRight, BrainCircuit, Keyboard, LoaderCircle, LockKeyhole, Timer, UsersRound } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { readGuest, saveGuest, validateDisplayName } from '@/lib/guest';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
@@ -81,9 +82,10 @@ export default function Home() {
               <legend className="col-span-full mb-2.5 ml-0.5 p-0 text-[13px] font-[720] text-[#323e58]">
                 Choose a game
               </legend>
-              <button
+              <Button
                 type="button"
-                className="flex min-h-17 min-w-0 cursor-pointer items-center gap-2.75 rounded-[13px_10px_14px_11px] border-[1.5px] border-[#c6d0df] bg-[#f9fbfd] p-3 text-left text-[#38445d] transition-[border-color,background,transform] duration-150 hover:-translate-y-px hover:border-[#9fadc2] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/25%)] data-[selected=true]:border-[#3155d9] data-[selected=true]:bg-[#eef2ff] data-[selected=true]:shadow-[0_0_0_3px_rgb(49_85_217/10%)]"
+                variant="choice"
+                className="min-h-17 min-w-0 justify-start gap-2.75 p-3"
                 data-selected={gameType === 'typeRacer'}
                 aria-pressed={gameType === 'typeRacer'}
                 onClick={() => setGameType('typeRacer')}
@@ -97,10 +99,11 @@ export default function Home() {
                     Every letter moves you
                   </small>
                 </span>
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="flex min-h-17 min-w-0 cursor-pointer items-center gap-2.75 rounded-[13px_10px_14px_11px] border-[1.5px] border-[#c6d0df] bg-[#f9fbfd] p-3 text-left text-[#38445d] transition-[border-color,background,transform] duration-150 hover:-translate-y-px hover:border-[#9fadc2] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/25%)] data-[selected=true]:border-[#3155d9] data-[selected=true]:bg-[#eef2ff] data-[selected=true]:shadow-[0_0_0_3px_rgb(49_85_217/10%)]"
+                variant="choice"
+                className="min-h-17 min-w-0 justify-start gap-2.75 p-3"
                 data-selected={gameType === 'trivia'}
                 aria-pressed={gameType === 'trivia'}
                 onClick={() => setGameType('trivia')}
@@ -114,7 +117,7 @@ export default function Home() {
                     Fast answers score more
                   </small>
                 </span>
-              </button>
+              </Button>
             </fieldset>
             <label className="mb-2.5 ml-0.5 block text-[13px] font-[720] text-[#323e58]" htmlFor="display-name">
               What should we call you?
@@ -132,8 +135,10 @@ export default function Home() {
                 aria-describedby={error ? 'create-error' : 'create-hint'}
                 aria-invalid={Boolean(error)}
               />
-              <button
-                className="inline-flex h-13 min-w-40 cursor-pointer items-center justify-center gap-2.25 rounded-[12px_9px_13px_10px] border-0 bg-[#3155d9] px-4.5 text-sm font-[760] text-white shadow-[0_5px_0_#1838aa] transition-[transform,background,box-shadow] duration-150 enabled:hover:-translate-y-px enabled:hover:bg-[#2549cc] enabled:active:translate-y-[3px] enabled:active:shadow-[0_2px_0_#1838aa] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(49_85_217/30%)] disabled:cursor-wait disabled:opacity-72 motion-reduce:transition-none max-[620px]:w-full [&_svg]:size-4.25"
+              <Button
+                className="min-w-40 max-[620px]:w-full"
+                variant="brand"
+                size="lg"
                 type="submit"
                 disabled={isCreating}
               >
@@ -143,7 +148,7 @@ export default function Home() {
                   <ArrowRight aria-hidden="true" />
                 )}
                 {isCreating ? 'Opening…' : 'Create a room'}
-              </button>
+              </Button>
             </div>
             <label
               className="mt-4 ml-0.5 flex w-fit cursor-pointer items-center gap-2 text-[13px] font-[720] text-[#323e58]"

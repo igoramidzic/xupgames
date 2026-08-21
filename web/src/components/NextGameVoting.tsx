@@ -3,8 +3,8 @@ import type { Id } from '@convex/_generated/dataModel';
 import { useMutation, useQuery } from 'convex/react';
 import { BrainCircuit, Check, Gamepad2, Keyboard, LoaderCircle, Sparkles, Vote } from 'lucide-react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { userFacingError } from '@/lib/userFacingError';
-import { cn } from '@/lib/utils';
 
 type GameType = 'trivia' | 'typeRacer';
 
@@ -193,8 +193,9 @@ export default function NextGameVoting({
               const isReplay = gameType === currentGameType;
               const tally = poll.tallies?.find((candidate) => candidate.gameType === gameType);
               return (
-                <button
-                  className="relative min-h-28 cursor-pointer overflow-hidden rounded-[14px_9px_15px_10px] border-[1.5px] border-[#c8d2e1] bg-[var(--game-tint)] p-3.5 text-left shadow-[0_4px_0_#d7deea] transition-[transform,border-color,box-shadow] enabled:hover:-translate-y-0.5 enabled:hover:border-[var(--game-color)] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(49_85_217/30%)] data-[selected=true]:border-[var(--game-color)] data-[selected=true]:shadow-[0_4px_0_var(--game-color)] disabled:cursor-default disabled:opacity-60 motion-reduce:transition-none"
+                <Button
+                  variant="game-choice"
+                  className="relative min-h-28 flex-col items-stretch justify-start gap-0 overflow-hidden p-3.5 disabled:cursor-default disabled:opacity-60"
                   type="button"
                   key={gameType}
                   style={{ '--game-color': game.color, '--game-tint': game.tint } as CSSProperties}
@@ -225,7 +226,7 @@ export default function NextGameVoting({
                     {isReplay ? `Keep playing ${game.name}.` : game.description}
                     {tally ? <b className="text-[#34415b] tabular-nums">{tally.votes}</b> : null}
                   </span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -238,15 +239,16 @@ export default function NextGameVoting({
                   : 'This runoff produces a recommendation; the owner still decides.'}
             </p>
             {isOwner ? (
-              <button
-                className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-[10px_7px_11px_8px] border border-[#17203a] bg-[#f3cb42] px-4 text-xs font-[800] text-[#17203a] shadow-[3px_3px_0_#17203a] enabled:hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-3.75"
+              <Button
+                variant="sunny"
+                className="h-10 shrink-0 text-xs [&_svg]:size-3.75"
                 type="button"
                 onClick={handleCloseRound}
                 disabled={poll.votesCast === 0 || pendingAction !== null}
               >
                 {pendingAction === 'close-round' ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
                 Close round
-              </button>
+              </Button>
             ) : null}
           </div>
         </>
@@ -290,13 +292,12 @@ export default function NextGameVoting({
                 const recommended = poll.recommendedGameType === game.gameType;
                 const isReplay = game.gameType === currentGameType;
                 return (
-                  <button
-                    className={cn(
-                      'min-h-22 cursor-pointer rounded-[13px_8px_14px_9px] border border-[#c5cfdd] bg-white p-3 text-left shadow-[0_4px_0_#d7deea] transition-transform enabled:hover:-translate-y-0.5 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(49_85_217/30%)] disabled:cursor-wait disabled:opacity-60',
-                      recommended && 'border-[#35a675] bg-[#ecf9f2] shadow-[0_4px_0_#35a675]'
-                    )}
+                  <Button
+                    variant="decision"
+                    className="min-h-22 flex-col items-stretch justify-start gap-0 p-3 disabled:cursor-wait disabled:opacity-60"
                     type="button"
                     key={game.gameType}
+                    data-recommended={recommended}
                     onClick={() => handleChoose(game.gameType)}
                     disabled={currentGameId === null || pendingAction !== null}
                   >
@@ -314,7 +315,7 @@ export default function NextGameVoting({
                       {isReplay ? replayLabel(game.gameType) : `Switch to ${game.name}`}
                     </strong>
                     <span className="mt-0.5 block text-[10px] text-[#6b768a]">{game.description}</span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>

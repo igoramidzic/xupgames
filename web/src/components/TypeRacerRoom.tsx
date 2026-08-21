@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import PostGameBoard from '@/components/PostGameBoard';
+import GameSurfaceTransition from '@/components/GameSurfaceTransition';
+import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { isLocalhost } from '@/lib/environment';
 import type { GuestIdentity } from '@/lib/guest';
 import { getRoomMembers } from '@/lib/roomSession';
@@ -454,176 +456,205 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
           <span className="max-[760px]:hidden">Xup Type</span>
         </Link>
 
-        <button
-          className="inline-flex h-9 -rotate-1 cursor-pointer items-center gap-2 rounded-[5px_9px_6px_8px] border border-[#27183f] bg-[#ffd65a] px-4 text-[10px] font-[850] tracking-[0.13em] text-[#27183f] shadow-[3px_3px_0_#27183f] transition-transform hover:-translate-y-px focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(255_92_87/35%)] max-[760px]:w-fit max-[760px]:justify-self-center max-[760px]:px-2.5 max-[760px]:text-[8px] [&_svg]:size-3.25"
+        <Button
+          className="-rotate-1 px-4 text-[10px] tracking-[0.13em] max-[760px]:w-fit max-[760px]:justify-self-center max-[760px]:px-2.5 max-[760px]:text-[8px] [&_svg]:size-3.25"
+          variant="type-code"
+          size="sm"
           type="button"
           onClick={copyRoomLink}
           aria-label="Copy room link"
         >
           ROOM {session.code} {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-        </button>
+        </Button>
 
         <div className="flex items-center justify-end gap-2">
           {session.isOwner && !isClosed && isLocalhost() ? (
-            <Link
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#b8c5e6] bg-white px-3 text-xs font-[680] text-[#5c5470] no-underline hover:border-[#8fa0cf] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(255_92_87/30%)] max-[760px]:w-9 max-[760px]:justify-center max-[760px]:px-0 [&_svg]:size-3.75"
-              to={`/admin/${session.code}`}
+            <Button
+              asChild
+              variant="type-paper"
+              size="sm"
+              className="no-underline max-[760px]:w-9 max-[760px]:px-0 [&_svg]:size-3.75"
             >
-              <Beaker aria-hidden="true" /> <span className="max-[760px]:hidden">Playtest</span>
-            </Link>
+              <Link to={`/admin/${session.code}`}>
+                <Beaker aria-hidden="true" /> <span className="max-[760px]:hidden">Playtest</span>
+              </Link>
+            </Button>
           ) : null}
           {session.isOwner && !isClosed ? (
-            <button
-              className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#b8c5e6] bg-white px-3 text-xs font-[680] text-[#5c5470] hover:border-[#8fa0cf] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(255_92_87/30%)] max-[760px]:w-9 max-[760px]:justify-center max-[760px]:px-0 [&_svg]:size-3.75"
+            <Button
+              variant="type-paper"
+              size="sm"
+              className="max-[760px]:w-9 max-[760px]:px-0 [&_svg]:size-3.75"
               type="button"
               onClick={() => setConfirmation('close')}
             >
               <LockKeyhole aria-hidden="true" /> <span className="max-[760px]:hidden">Close</span>
-            </button>
+            </Button>
           ) : null}
-          <button
-            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#b8c5e6] bg-white px-3 text-xs font-[680] text-[#5c5470] hover:border-[#8fa0cf] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(255_92_87/30%)] disabled:opacity-55 max-[760px]:w-9 max-[760px]:justify-center max-[760px]:px-0 [&_svg]:size-3.75"
+          <Button
+            variant="type-paper"
+            size="sm"
+            className="disabled:opacity-55 max-[760px]:w-9 max-[760px]:px-0 [&_svg]:size-3.75"
             type="button"
             onClick={() => setConfirmation('leave')}
             disabled={actionPending !== null}
           >
             {actionPending === 'leave' ? <LoaderCircle className="animate-spin" /> : <DoorOpen aria-hidden="true" />}
             <span className="max-[760px]:hidden">Leave</span>
-          </button>
+          </Button>
         </div>
       </header>
 
       <main className="mx-auto grid w-full max-w-360 grid-cols-[minmax(0,1fr)_390px] gap-4 p-4 max-[1060px]:grid-cols-[minmax(0,1fr)_330px] max-[820px]:grid-cols-1 max-[620px]:p-2.5">
         <section className="min-w-0">
-          {game.phase === 'lobby' ? (
-            <LobbyPanel
-              isOwner={session.isOwner}
-              isClosed={isClosed}
-              ownerName={ownerName}
-              playerCount={session.activeMemberCount}
-              starting={starting}
-              onStart={handleStart}
-              onCopy={copyRoomLink}
-            />
-          ) : game.phase === 'complete' ? (
-            <PostGameBoard
-              eyebrow={`Race ${game.raceNumber} · Photo finish`}
-              title={winner ? `${winner.displayName} wins.` : 'Race complete.'}
-              detail={
-                winner
-                  ? `${formatWpm(winner.wpm)} WPM · ${formatAccuracy(winner.accuracy)} accuracy · ${formatFinishTime(winner.finishTimeMs)}`
-                  : 'The final standings are locked in.'
-              }
-              icon={Trophy}
-              accent="#e54f50"
-              accentTint="#ffd65a"
-              roomId={session.roomId}
-              currentGameId={session.currentGameId}
-              currentGameType={session.gameType}
-              sessionToken={guest.sessionToken}
-              isOwner={session.isOwner}
-              isClosed={isClosed}
-              closedMessage="This room is closed. The final standings stay here to view."
-            />
-          ) : (
-            <div className="relative overflow-hidden rounded-[14px_26px_16px_24px] border border-[#9faed5] bg-white shadow-[7px_8px_0_#c7d3ef]">
-              <div className="flex min-h-16 items-center justify-between gap-4 border-b border-[#d9e0f2] bg-[#f9fbff] px-6 py-3 max-[620px]:px-4">
-                <div className="min-w-0">
-                  <p className="m-0 text-[9px] font-[820] tracking-[0.13em] text-[#766d89] uppercase">
-                    {game.passage?.kind ?? 'Passage'} · Race {game.raceNumber}
-                  </p>
-                  <p className="mt-1 mb-0 truncate text-xs font-[720] text-[#3c3152]" id="passage-source">
-                    {game.passage?.title} <span className="font-[520] text-[#817991]">by {game.passage?.author}</span>
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-5">
-                  <Stat
-                    label="WPM"
-                    value={String(formatWpm(localRacer?.wpm ?? 0))}
-                    icon={<Gauge aria-hidden="true" />}
+          <GameSurfaceTransition
+            showResults={game.phase === 'complete'}
+            results={
+              <PostGameBoard
+                eyebrow={`Race ${game.raceNumber} · Photo finish`}
+                title={winner ? `${winner.displayName} wins.` : 'Race complete.'}
+                detail={
+                  winner
+                    ? `${formatWpm(winner.wpm)} WPM · ${formatAccuracy(winner.accuracy)} accuracy · ${formatFinishTime(winner.finishTimeMs)}`
+                    : 'The final standings are locked in.'
+                }
+                icon={Trophy}
+                accent="#e54f50"
+                accentTint="#ffd65a"
+                roomId={session.roomId}
+                currentGameId={session.currentGameId}
+                currentGameType={session.gameType}
+                sessionToken={guest.sessionToken}
+                isOwner={session.isOwner}
+                isClosed={isClosed}
+                closedMessage="This room is closed. The final standings stay here to view."
+                summary={
+                  <PostGamePodium
+                    label="Final podium"
+                    entries={game.racers
+                      .filter((racer) => racer.isActive)
+                      .slice(0, 3)
+                      .map((racer, index) => ({
+                        id: racer.memberId,
+                        place: index + 1,
+                        name: racer.displayName,
+                        result: `${formatWpm(racer.wpm)} WPM · ${formatFinishTime(racer.finishTimeMs)}`,
+                      }))}
                   />
-                  <Stat label="ACCURACY" value={formatAccuracy(localRacer?.accuracy ?? 100)} />
+                }
+              />
+            }
+          >
+            {game.phase === 'lobby' ? (
+              <LobbyPanel
+                isOwner={session.isOwner}
+                isClosed={isClosed}
+                ownerName={ownerName}
+                playerCount={session.activeMemberCount}
+                starting={starting}
+                onStart={handleStart}
+                onCopy={copyRoomLink}
+              />
+            ) : game.phase === 'complete' ? null : (
+              <div className="relative overflow-hidden rounded-[14px_26px_16px_24px] border border-[#9faed5] bg-white shadow-[7px_8px_0_#c7d3ef]">
+                <div className="flex min-h-16 items-center justify-between gap-4 border-b border-[#d9e0f2] bg-[#f9fbff] px-6 py-3 max-[620px]:px-4">
+                  <div className="min-w-0">
+                    <p className="m-0 text-[9px] font-[820] tracking-[0.13em] text-[#766d89] uppercase">
+                      {game.passage?.kind ?? 'Passage'} · Race {game.raceNumber}
+                    </p>
+                    <p className="mt-1 mb-0 truncate text-xs font-[720] text-[#3c3152]" id="passage-source">
+                      {game.passage?.title} <span className="font-[520] text-[#817991]">by {game.passage?.author}</span>
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-5">
+                    <Stat
+                      label="WPM"
+                      value={String(formatWpm(localRacer?.wpm ?? 0))}
+                      icon={<Gauge aria-hidden="true" />}
+                    />
+                    <Stat label="ACCURACY" value={formatAccuracy(localRacer?.accuracy ?? 100)} />
+                  </div>
+                </div>
+
+                <div
+                  className={cn(
+                    'relative min-h-[clamp(420px,calc(100dvh-245px),650px)] px-[clamp(22px,5vw,72px)] py-[clamp(42px,7vw,84px)]',
+                    inputFocused && isTypingEnabled && 'ring-3 ring-inset ring-[#ff5c57]/25'
+                  )}
+                >
+                  <Passage text={passage} alignment={inputAlignment} showCaret={isTypingEnabled} />
+                  <textarea
+                    ref={inputRef}
+                    className="absolute inset-0 z-10 size-full cursor-text resize-none opacity-0 disabled:cursor-default"
+                    aria-label="Type the passage"
+                    aria-describedby="passage-source typing-guidance"
+                    value={typing.text}
+                    onChange={(event) => handleTyping(event.target.value)}
+                    onFocus={() => setInputFocused(true)}
+                    onBlur={() => setInputFocused(false)}
+                    onPaste={(event) => {
+                      event.preventDefault();
+                      setNotice('Pasting is off for races. Type the passage to move.');
+                    }}
+                    onSelect={(event) => {
+                      if (event.currentTarget.selectionEnd !== typing.text.length) {
+                        event.currentTarget.setSelectionRange(typing.text.length, typing.text.length);
+                      }
+                    }}
+                    autoCapitalize="off"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    disabled={!isTypingEnabled}
+                  />
+
+                  {effectivePhase === 'countdown' ? (
+                    <div className="absolute inset-0 z-20 grid place-items-center bg-[rgb(39_24_63/84%)] text-center text-white backdrop-blur-[3px]">
+                      <div>
+                        <p className="mb-3 text-[10px] font-[850] tracking-[0.18em] text-[#b9c9ff] uppercase">
+                          Hands on the keys
+                        </p>
+                        <strong className="block font-display text-[clamp(150px,26vw,300px)] leading-[0.72] tracking-[-0.1em] text-[#ffd65a] tabular-nums [text-shadow:8px_8px_0_rgb(0_0_0/22%)]">
+                          {countdown}
+                        </strong>
+                        <span className="mt-8 block text-sm text-[#d8ddf1]">The full passage unlocks at zero.</span>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {currentPlayer?.status === 'finished' ? (
+                    <div className="absolute inset-x-5 bottom-5 z-20 flex items-center justify-center gap-2 rounded-xl border border-[#82c7a8] bg-[#e4f8ef] px-4 py-3 text-xs font-[760] text-[#176b49] shadow-lg">
+                      <Check className="size-4" aria-hidden="true" /> Finished in{' '}
+                      {formatFinishTime(currentPlayer.finishTimeMs)}. The field has 15 seconds to follow.
+                    </div>
+                  ) : null}
+                </div>
+
+                <div
+                  className={cn(
+                    'flex min-h-14 items-center justify-between gap-4 border-t border-[#d9e0f2] bg-[#f9fbff] px-6 py-3 text-xs max-[620px]:px-4',
+                    hasTypingError ? 'text-[#ba383d]' : 'text-[#6f667f]'
+                  )}
+                  id="typing-guidance"
+                  aria-live="polite"
+                >
+                  <span className="inline-flex items-center gap-2 font-[680]">
+                    <Keyboard className="size-4" aria-hidden="true" />
+                    {hasTypingError
+                      ? 'Backspace to the first red letter.'
+                      : isTypingEnabled
+                        ? inputFocused
+                          ? 'Typing is live. Keep your eyes on the line.'
+                          : 'Tap the passage to keep typing.'
+                        : 'Wait for the countdown.'}
+                  </span>
+                  <span className="shrink-0 font-mono text-[11px] tabular-nums">
+                    {correctChars}/{passage.length}
+                  </span>
                 </div>
               </div>
-
-              <div
-                className={cn(
-                  'relative min-h-[clamp(420px,calc(100dvh-245px),650px)] px-[clamp(22px,5vw,72px)] py-[clamp(42px,7vw,84px)]',
-                  inputFocused && isTypingEnabled && 'ring-3 ring-inset ring-[#ff5c57]/25'
-                )}
-              >
-                <Passage text={passage} alignment={inputAlignment} showCaret={isTypingEnabled} />
-                <textarea
-                  ref={inputRef}
-                  className="absolute inset-0 z-10 size-full cursor-text resize-none opacity-0 disabled:cursor-default"
-                  aria-label="Type the passage"
-                  aria-describedby="passage-source typing-guidance"
-                  value={typing.text}
-                  onChange={(event) => handleTyping(event.target.value)}
-                  onFocus={() => setInputFocused(true)}
-                  onBlur={() => setInputFocused(false)}
-                  onPaste={(event) => {
-                    event.preventDefault();
-                    setNotice('Pasting is off for races. Type the passage to move.');
-                  }}
-                  onSelect={(event) => {
-                    if (event.currentTarget.selectionEnd !== typing.text.length) {
-                      event.currentTarget.setSelectionRange(typing.text.length, typing.text.length);
-                    }
-                  }}
-                  autoCapitalize="off"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  disabled={!isTypingEnabled}
-                />
-
-                {effectivePhase === 'countdown' ? (
-                  <div className="absolute inset-0 z-20 grid place-items-center bg-[rgb(39_24_63/84%)] text-center text-white backdrop-blur-[3px]">
-                    <div>
-                      <p className="mb-3 text-[10px] font-[850] tracking-[0.18em] text-[#b9c9ff] uppercase">
-                        Hands on the keys
-                      </p>
-                      <strong className="block font-display text-[clamp(150px,26vw,300px)] leading-[0.72] tracking-[-0.1em] text-[#ffd65a] tabular-nums [text-shadow:8px_8px_0_rgb(0_0_0/22%)]">
-                        {countdown}
-                      </strong>
-                      <span className="mt-8 block text-sm text-[#d8ddf1]">The full passage unlocks at zero.</span>
-                    </div>
-                  </div>
-                ) : null}
-
-                {currentPlayer?.status === 'finished' ? (
-                  <div className="absolute inset-x-5 bottom-5 z-20 flex items-center justify-center gap-2 rounded-xl border border-[#82c7a8] bg-[#e4f8ef] px-4 py-3 text-xs font-[760] text-[#176b49] shadow-lg">
-                    <Check className="size-4" aria-hidden="true" /> Finished in{' '}
-                    {formatFinishTime(currentPlayer.finishTimeMs)}. The field has 15 seconds to follow.
-                  </div>
-                ) : null}
-              </div>
-
-              <div
-                className={cn(
-                  'flex min-h-14 items-center justify-between gap-4 border-t border-[#d9e0f2] bg-[#f9fbff] px-6 py-3 text-xs max-[620px]:px-4',
-                  hasTypingError ? 'text-[#ba383d]' : 'text-[#6f667f]'
-                )}
-                id="typing-guidance"
-                aria-live="polite"
-              >
-                <span className="inline-flex items-center gap-2 font-[680]">
-                  <Keyboard className="size-4" aria-hidden="true" />
-                  {hasTypingError
-                    ? 'Backspace to the first red letter.'
-                    : isTypingEnabled
-                      ? inputFocused
-                        ? 'Typing is live. Keep your eyes on the line.'
-                        : 'Tap the passage to keep typing.'
-                      : 'Wait for the countdown.'}
-                </span>
-                <span className="shrink-0 font-mono text-[11px] tabular-nums">
-                  {correctChars}/{passage.length}
-                </span>
-              </div>
-            </div>
-          )}
+            )}
+          </GameSurfaceTransition>
           {notice ? (
             <p
               className="mt-4 rounded-xl border border-[#e9a5a7] bg-[#fff1f1] px-4 py-3 text-xs font-[650] text-[#a83239]"
@@ -766,27 +797,30 @@ function LobbyPanel({
       </p>
       <div className="mt-9 flex flex-wrap items-center gap-3">
         {isOwner && !isClosed ? (
-          <button
-            className="inline-flex h-14 cursor-pointer items-center gap-2.5 rounded-[8px_14px_9px_13px] border border-[#27183f] bg-[#ff5c57] px-6 text-sm font-[830] text-white shadow-[5px_5px_0_#27183f] transition-[transform,box-shadow] enabled:hover:-translate-y-0.5 enabled:hover:shadow-[7px_7px_0_#27183f] enabled:active:translate-y-1 enabled:active:shadow-[2px_2px_0_#27183f] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(255_92_87/35%)] disabled:opacity-65 [&_svg]:size-4.5"
+          <Button
+            variant="type-primary"
+            size="xl"
+            className="disabled:opacity-65"
             type="button"
             onClick={onStart}
             disabled={starting}
           >
             {starting ? <LoaderCircle className="animate-spin" /> : <Play aria-hidden="true" />}
             {starting ? 'Setting the passage…' : 'Start the countdown'}
-          </button>
+          </Button>
         ) : (
           <span className="inline-flex h-13 items-center gap-2 rounded-[8px_13px_9px_12px] border border-[#c3cce3] bg-[#f4f7ff] px-5 text-xs font-[720] text-[#5e5670]">
             <Timer className="size-4" aria-hidden="true" /> Waiting for {ownerName}
           </span>
         )}
-        <button
-          className="inline-flex h-13 cursor-pointer items-center gap-2 rounded-[8px_13px_9px_12px] border border-[#b8c5e6] bg-white px-5 text-xs font-[720] text-[#5e5670] hover:border-[#8597ca] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(79_110_232/28%)] [&_svg]:size-4"
+        <Button
+          className="h-13 px-5 text-xs font-[720] focus-visible:outline-[rgb(79_110_232/28%)] [&_svg]:size-4"
+          variant="type-paper"
           type="button"
           onClick={onCopy}
         >
           <Copy aria-hidden="true" /> Invite racers
-        </button>
+        </Button>
       </div>
       <div className="mt-12 flex items-center gap-4 border-t border-[#dce3f3] pt-6 text-xs text-[#746c84]">
         <span className="grid size-10 place-items-center rounded-full bg-[#e7ecff] text-[#4f6ee8]">
@@ -943,13 +977,10 @@ function TypeRacerActionDialog({
             <p className="mx-auto mt-3 mb-6 max-w-84 text-[13px] leading-[1.55] text-[#6c647d]">{detail}</p>
           </AlertDialogDescription>
           <div className="grid grid-cols-2 gap-2.5 max-[520px]:grid-cols-1">
-            <AlertDialogCancel className="min-h-11 cursor-pointer rounded-[9px_13px_10px_12px] border border-[#c7cce0] bg-[#f5f7fc] text-xs font-[760] text-[#5e5670] hover:bg-[#e9edf7] max-[520px]:order-2">
+            <AlertDialogCancel variant="type-paper" className="min-h-11 text-xs font-[760] max-[520px]:order-2">
               Stay in the race
             </AlertDialogCancel>
-            <AlertDialogAction
-              className="min-h-11 cursor-pointer rounded-[9px_13px_10px_12px] border border-[#ba393e] bg-[#ff5c57] text-xs font-[760] text-white shadow-[3px_3px_0_#27183f] hover:bg-[#ed4d4f]"
-              onClick={onConfirm}
-            >
+            <AlertDialogAction variant="type-destructive" className="min-h-11 text-xs" onClick={onConfirm}>
               {isClosing ? 'Close room' : 'Leave race'}
             </AlertDialogAction>
           </div>

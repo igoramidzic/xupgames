@@ -4,6 +4,7 @@ import type { FunctionReturnType } from 'convex/server';
 import { ArrowRight, Bot, CircleStop, ExternalLink, Gamepad2, LoaderCircle, Play, UsersRound } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { readGuest } from '@/lib/guest';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
@@ -103,13 +104,14 @@ function AdminRoomPicker({ initialCode = '' }: { initialCode?: string }) {
               value={code}
               onChange={(event) => setCode(event.target.value.toUpperCase())}
             />
-            <button
-              className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.75 rounded-lg border border-[#2748bd] bg-[#3155d9] px-3.5 text-[11px] font-[740] text-white disabled:cursor-not-allowed disabled:opacity-45 [&_svg]:size-3.5"
+            <Button
+              className="text-[11px] disabled:opacity-45 [&_svg]:size-3.5"
+              variant="brand"
               type="submit"
               disabled={!ROOM_CODE_PATTERN.test(normalizedCode)}
             >
               Open controls <ArrowRight aria-hidden="true" />
-            </button>
+            </Button>
           </div>
         </form>
       </main>
@@ -161,12 +163,11 @@ function AdminGate({
         <p className="mx-auto mt-4 mb-6 text-[13px] leading-[1.55] text-[#667187]">{detail}</p>
         <div className="flex items-center justify-center gap-3.5">
           {code ? (
-            <Link
-              className="inline-flex h-11 items-center justify-center gap-1.75 rounded-lg border border-[#2748bd] bg-[#3155d9] px-3.5 text-[11px] font-[740] text-white no-underline [&_svg]:size-3.5"
-              to={`/r/${code}`}
-            >
-              Open room <ArrowRight aria-hidden="true" />
-            </Link>
+            <Button asChild variant="brand" className="text-[11px] no-underline [&_svg]:size-3.5">
+              <Link to={`/r/${code}`}>
+                Open room <ArrowRight aria-hidden="true" />
+              </Link>
+            </Button>
           ) : null}
           <Link className="text-[11px] font-bold text-[#526079]" to="/admin">
             Try another code
@@ -360,18 +361,19 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
               <legend className="mb-2.25 text-[11px] font-[730] text-[#4f5b72]">Target room size</legend>
               <div className="grid grid-cols-3 gap-1.5 rounded-[10px] border border-[#c8d2e0] bg-[#eef2f7] p-1.25">
                 {TARGETS.map((option) => (
-                  <button
+                  <Button
                     key={option}
+                    variant="tab"
                     type="button"
                     aria-label={`${option} seats`}
-                    className="flex h-11.25 min-w-0 cursor-pointer flex-col items-center justify-center rounded-[7px] border border-transparent bg-transparent text-xs font-bold text-[#69758b] data-[selected=true]:border-[#bdc7d8] data-[selected=true]:bg-white data-[selected=true]:text-[#3155d9] data-[selected=true]:shadow-[0_2px_4px_rgb(23_32_58/9%)] disabled:cursor-not-allowed disabled:opacity-[.38] [&_strong]:font-display [&_strong]:text-[17px] [&_strong]:leading-none [&_span]:mt-0.5 [&_span]:text-[9px] [&_span]:font-[650]"
+                    className="h-11.25 min-w-0 flex-col text-xs disabled:opacity-[.38] [&_strong]:font-display [&_strong]:text-[17px] [&_strong]:leading-none [&_span]:mt-0.5 [&_span]:text-[9px] [&_span]:font-[650]"
                     data-selected={target === option}
                     disabled={option <= panel.room.activeMemberCount}
                     onClick={() => setTarget(option)}
                   >
                     <strong>{option}</strong>
                     <span>seats</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
             </fieldset>
@@ -387,8 +389,9 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
             </div>
 
             {isRunActive && run ? (
-              <button
-                className="flex h-12 w-full cursor-pointer items-center justify-center gap-2.25 rounded-[9px] border border-[#d7544b] bg-[#fff3f1] text-[13px] font-[760] text-[#b73c34] shadow-[0_4px_0_#e5b0ab] transition-none enabled:hover:bg-[#ffe9e6] enabled:active:translate-y-1 enabled:active:shadow-none disabled:cursor-not-allowed disabled:opacity-52 [&_svg]:size-4.25"
+              <Button
+                className="h-12 w-full text-[13px] disabled:opacity-52 [&_svg]:size-4.25"
+                variant="destructive-soft"
                 type="button"
                 onClick={handleStop}
                 disabled={pending !== null}
@@ -399,10 +402,11 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
                   <CircleStop aria-hidden="true" />
                 )}
                 {run.status === 'stopping' ? 'Removing players…' : 'Remove players'}
-              </button>
+              </Button>
             ) : (
-              <button
-                className="flex h-12 w-full cursor-pointer items-center justify-center gap-2.25 rounded-[9px] border border-[#2748bd] bg-[#3155d9] text-[13px] font-[760] text-white shadow-[0_4px_0_#1f3b9e] transition-none enabled:hover:bg-[#294bc5] enabled:active:translate-y-1 enabled:active:shadow-none disabled:cursor-not-allowed disabled:opacity-52 [&_svg]:size-4.25"
+              <Button
+                className="h-12 w-full text-[13px] disabled:opacity-52 [&_svg]:size-4.25"
+                variant="brand-compact"
                 type="button"
                 onClick={handleStart}
                 disabled={!canStart || pending !== null}
@@ -413,7 +417,7 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
                   <Play aria-hidden="true" />
                 )}
                 {targetUnavailable ? 'Choose a larger target' : `Fill to ${target} players`}
-              </button>
+              </Button>
             )}
 
             {run ? (

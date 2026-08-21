@@ -122,6 +122,12 @@ describe('NextGameVoting', () => {
 
     const choices = screen.getAllByRole('button');
     expect(choices[0]).toHaveAccessibleName(/Race Again/);
-    expect(screen.getByRole('button', { name: /Switch to Trivia/ })).toBeInTheDocument();
+    expect(choices[0]).toHaveClass('flex-col', 'items-stretch', 'justify-start', 'gap-0');
+    expect(screen.getByRole('button', { name: /Switch to Trivia/ })).toHaveClass(
+      'flex-col',
+      'items-stretch',
+      'justify-start',
+      'gap-0'
+    );
   });
 });

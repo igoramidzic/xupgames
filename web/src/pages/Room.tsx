@@ -7,6 +7,7 @@ import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import TriviaRoom from '@/components/TriviaRoom';
 import TypeRacerRoom from '@/components/TypeRacerRoom';
+import { Button } from '@/components/ui/button';
 import { type GuestIdentity, readGuest, saveGuest, validateDisplayName } from '@/lib/guest';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
@@ -108,12 +109,9 @@ function RoomUnavailable({ title, detail }: { title: string; detail: string }) {
         {title}
       </h1>
       <p className="mt-4.5 mb-7 max-w-112.5 leading-[1.55] text-[#657087]">{detail}</p>
-      <Link
-        className="inline-flex h-13 min-w-40 cursor-pointer items-center justify-center gap-2.25 rounded-[12px_9px_13px_10px] bg-[#3155d9] px-4.5 text-sm font-[760] text-white no-underline shadow-[0_5px_0_#1838aa] transition-[transform,background,box-shadow] duration-150 hover:-translate-y-px hover:bg-[#2549cc] active:translate-y-[3px] active:shadow-[0_2px_0_#1838aa] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(49_85_217/30%)] motion-reduce:transition-none"
-        to="/"
-      >
-        Make a new room
-      </Link>
+      <Button asChild variant="brand" size="lg" className="min-w-40 no-underline">
+        <Link to="/">Make a new room</Link>
+      </Button>
     </main>
   );
 }
@@ -287,8 +285,10 @@ function JoinRoom({
                   />
                 </>
               ) : null}
-              <button
-                className="mt-3 inline-flex h-13 w-full min-w-40 cursor-pointer items-center justify-center gap-2.25 rounded-[12px_9px_13px_10px] bg-[#3155d9] px-4.5 text-sm font-[760] text-white shadow-[0_5px_0_#1838aa] transition-[transform,background,box-shadow] duration-150 enabled:hover:-translate-y-px enabled:hover:bg-[#2549cc] enabled:active:translate-y-[3px] enabled:active:shadow-[0_2px_0_#1838aa] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(49_85_217/30%)] disabled:cursor-wait disabled:opacity-[.72] motion-reduce:transition-none [&_svg]:size-4.25"
+              <Button
+                className="mt-3 w-full min-w-40 disabled:cursor-wait disabled:opacity-[.72]"
+                variant="brand"
+                size="lg"
                 type="submit"
                 disabled={joining}
               >
@@ -302,7 +302,7 @@ function JoinRoom({
                     : isTypeRacer
                       ? 'Join the race'
                       : 'Join the quiz'}
-              </button>
+              </Button>
               {error ? (
                 <p
                   className="mt-2.5 ml-0.5 min-h-4.5 text-xs leading-[1.45] font-[650] text-[#b72934]"

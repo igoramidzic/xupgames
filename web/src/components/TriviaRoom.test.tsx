@@ -35,6 +35,7 @@ vi.mock('@/components/PostGameBoard', () => ({
       <div>Next game ballot</div>
     </section>
   ),
+  PostGamePodium: () => <ol aria-label="Final podium" />,
 }));
 
 const guest = { sessionToken: 'a'.repeat(32), displayName: 'Ada' };
@@ -193,6 +194,9 @@ describe('TriviaRoom', () => {
     );
     expect(screen.getByRole('button', { name: /A\s*Tantalum/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /B\s*Tungsten/ })).toBeDisabled();
+    for (const answer of document.querySelectorAll('[data-variant="answer"]')) {
+      expect(answer).toHaveClass('disabled:opacity-100');
+    }
   });
 
   it('does not count the open question in the score denominator', () => {
@@ -255,22 +259,84 @@ describe('TriviaRoom', () => {
     expect(document.querySelector('.trivia-question-stage')).toHaveAttribute('data-answer-result', 'incorrect');
   });
 
-  it('fades only after the next question arrives and swaps while fully hidden', () => {
+  it('swaps to the next question without fading the answers', () => {
+    const revealGame = {
+      gameNumber: 1,
+      phase: 'reveal',
+      currentQuestionNumber: 1,
+      totalQuestions: 10,
+      phaseStartedAt: Date.now() - 7_000,
+      phaseEndsAt: Date.now(),
+      round: {
+        roundId: 'round-one',
+        questionNumber: 1,
+        category: 'Science',
+        difficulty: 'hard',
+        prompt: 'Outgoing question',
+        options: ['One', 'Two', 'Three', 'Four'],
+        answer: 'One',
+        correctOptionIndex: 0,
+        answeredCount: 2,
+        optionAnswerCounts: [1, 0, 1, 0],
+      },
+      playerAnswer: null,
+      leaderboard: leaderboard(),
+    };
+    mocks.game = revealGame;
+
+    const view = render(
+      <MemoryRouter>
+        <TriviaRoom guest={guest} session={session} />
+      </MemoryRouter>
+    );
+
+    mocks.game = {
+      ...revealGame,
+      phase: 'question',
+      currentQuestionNumber: 2,
+      phaseStartedAt: Date.now(),
+      phaseEndsAt: Date.now() + 15_000,
+      round: {
+        ...revealGame.round,
+        roundId: 'round-two',
+        questionNumber: 2,
+        prompt: 'Incoming question',
+        answer: null,
+        correctOptionIndex: null,
+        answeredCount: 0,
+        optionAnswerCounts: null,
+      },
+    };
+    view.rerender(
+      <MemoryRouter>
+        <TriviaRoom guest={guest} session={session} />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByText('Outgoing question')).not.toBeInTheDocument();
+    expect(screen.getByText('Incoming question')).toBeInTheDocument();
+    const questionContent = document.querySelector('.trivia-question-content');
+    expect(questionContent).not.toHaveAttribute('data-transition');
+    expect(questionContent).not.toHaveClass('transition-opacity');
+    expect(screen.getByRole('timer')).toHaveAttribute('data-phase', 'question');
+  });
+
+  it('fades the final question before showing the round-over board', () => {
     vi.useFakeTimers();
     try {
-      const revealGame = {
+      const finalQuestion = {
         gameNumber: 1,
         phase: 'reveal',
-        currentQuestionNumber: 1,
+        currentQuestionNumber: 10,
         totalQuestions: 10,
         phaseStartedAt: Date.now() - 7_000,
         phaseEndsAt: Date.now(),
         round: {
-          roundId: 'round-one',
-          questionNumber: 1,
+          roundId: 'round-ten',
+          questionNumber: 10,
           category: 'Science',
           difficulty: 'hard',
-          prompt: 'Outgoing question',
+          prompt: 'The final question',
           options: ['One', 'Two', 'Three', 'Four'],
           answer: 'One',
           correctOptionIndex: 0,
@@ -280,32 +346,18 @@ describe('TriviaRoom', () => {
         playerAnswer: null,
         leaderboard: leaderboard(),
       };
-      mocks.game = revealGame;
-
+      mocks.game = finalQuestion;
       const view = render(
         <MemoryRouter>
           <TriviaRoom guest={guest} session={session} />
         </MemoryRouter>
       );
 
-      expect(document.querySelector('.trivia-question-content')).toHaveAttribute('data-transition', 'visible');
-
       mocks.game = {
-        ...revealGame,
-        phase: 'question',
-        currentQuestionNumber: 2,
-        phaseStartedAt: Date.now(),
-        phaseEndsAt: Date.now() + 15_000,
-        round: {
-          ...revealGame.round,
-          roundId: 'round-two',
-          questionNumber: 2,
-          prompt: 'Incoming question',
-          answer: null,
-          correctOptionIndex: null,
-          answeredCount: 0,
-          optionAnswerCounts: null,
-        },
+        ...finalQuestion,
+        phase: 'complete',
+        phaseEndsAt: null,
+        round: null,
       };
       view.rerender(
         <MemoryRouter>
@@ -313,22 +365,14 @@ describe('TriviaRoom', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByText('Outgoing question')).toBeInTheDocument();
-      expect(screen.queryByText('Incoming question')).not.toBeInTheDocument();
-      expect(document.querySelector('.trivia-question-content')).toHaveAttribute('data-transition', 'out');
-      const outgoingTimer = screen.getByRole('timer');
-      expect(outgoingTimer).toHaveAttribute('data-phase', 'reveal');
+      expect(screen.getByText('The final question')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Ada takes it.' })).not.toBeInTheDocument();
+      expect(screen.getByText('The final question').closest('[data-transition="game-out"]')).not.toBeNull();
 
-      act(() => vi.advanceTimersByTime(260));
-      expect(screen.getByText('Incoming question')).toBeInTheDocument();
-      expect(document.querySelector('.trivia-question-content')).toHaveAttribute('data-transition', 'in');
-      const incomingTimer = screen.getByRole('timer');
-      expect(incomingTimer).toHaveAttribute('data-phase', 'question');
-      expect(incomingTimer).not.toBe(outgoingTimer);
-      expect(incomingTimer.style.getPropertyValue('--round-progress')).toBe('360deg');
+      act(() => vi.advanceTimersByTime(280));
 
-      act(() => vi.advanceTimersByTime(40));
-      expect(document.querySelector('.trivia-question-content')).toHaveAttribute('data-transition', 'visible');
+      expect(screen.queryByText('The final question')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Ada takes it.' })).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
