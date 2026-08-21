@@ -1,7 +1,7 @@
 import { api } from '@convex/_generated/api';
 import { useMutation, useQuery } from 'convex/react';
-import { ArrowRight, LoaderCircle, LockKeyhole, UsersRound } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { ArrowRight, LoaderCircle, LockKeyhole } from 'lucide-react';
+import { type CSSProperties, type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
@@ -79,19 +79,16 @@ export default function Home() {
 
       <main className="mx-auto grid min-h-[calc(100vh-136px)] w-[min(100%-96px,1360px)] animate-in grid-cols-[minmax(390px,0.88fr)_minmax(520px,1.12fr)] items-center gap-[clamp(56px,7vw,120px)] py-8 pb-20 fade-in slide-in-from-bottom-4 duration-500 motion-reduce:animate-none max-[1040px]:w-[min(100%-56px,760px)] max-[1040px]:grid-cols-1 max-[1040px]:gap-20.5 max-[1040px]:pt-18 max-[620px]:w-[calc(100%-32px)] max-[620px]:py-10.5 max-[620px]:pb-14">
         <section className="relative z-2 max-w-152.5 max-[1040px]:max-w-170">
-          <p className="mb-5 text-xs font-[780] tracking-[0.12em] text-[#3155d9] uppercase">
+          <p className="mb-3 text-xs font-[780] tracking-[0.12em] text-[#3155d9] uppercase">
             Pick a game. Bring up to 50 people.
           </p>
-          <h1 className="m-0 max-w-162.5 font-display text-[clamp(62px,6.8vw,108px)] leading-[0.83] font-[820] tracking-[-0.075em] text-[#17203a] max-[620px]:text-[clamp(54px,18vw,74px)]">
+          <h1 className="m-0 max-w-135 font-display text-[clamp(48px,5vw,78px)] leading-[0.88] font-[820] tracking-[-0.065em] text-[#17203a] max-[620px]:text-[clamp(44px,14vw,60px)]">
             One link.
             <span className="block text-[#3155d9]"> Everyone plays.</span>
           </h1>
-          <p className="mt-8 max-w-135 text-[clamp(17px,1.4vw,20px)] leading-[1.58] text-[#59647b] max-[620px]:mt-6 max-[620px]:text-[17px]">
-            Choose an official Xup game or something new from the community. No accounts or installs.
-          </p>
 
           <form
-            className="mt-9.5 w-[min(100%,560px)] rounded-[20px_16px_23px_17px] border border-[rgb(116_132_164/32%)] bg-[rgb(255_255_255/86%)] p-5 shadow-[0_18px_50px_rgb(52_73_118/10%)] backdrop-blur-[14px] max-[620px]:mt-7.5 max-[620px]:box-border max-[620px]:p-4"
+            className="mt-6 w-[min(100%,560px)] rounded-[20px_16px_23px_17px] border border-[rgb(116_132_164/32%)] bg-[rgb(255_255_255/86%)] p-5 shadow-[0_18px_50px_rgb(52_73_118/10%)] backdrop-blur-[14px] max-[620px]:mt-5 max-[620px]:box-border max-[620px]:p-4"
             onSubmit={handleCreateRoom}
           >
             <fieldset className="mb-5 grid grid-cols-2 gap-2.25 border-0 p-0 max-[520px]:grid-cols-1">
@@ -112,26 +109,22 @@ export default function Home() {
                   <Button
                     type="button"
                     variant="choice"
-                    className="min-h-24 min-w-0 items-start justify-start gap-2.75 p-3 text-left"
+                    className="min-h-44 min-w-0 flex-col items-stretch justify-start gap-0 bg-[var(--game-tint)] p-4 text-left enabled:hover:border-[var(--game-color)] data-[selected=true]:border-[var(--game-color)] data-[selected=true]:bg-[var(--game-tint)] data-[selected=true]:shadow-[0_4px_0_var(--game-color)]"
                     key={game.gameType}
+                    style={{ '--game-color': presentation.color, '--game-tint': presentation.tint } as CSSProperties}
                     data-selected={selected}
                     aria-pressed={selected}
                     onClick={() => setGameType(game.gameType)}
                   >
-                    <span
-                      className="mt-0.5 grid size-8.5 shrink-0 place-items-center rounded-[9px_7px_10px_8px]"
-                      style={{ backgroundColor: presentation.tint, color: presentation.color }}
-                    >
-                      <Icon className="size-4.25" aria-hidden="true" />
-                    </span>
-                    <span className="grid min-w-0 flex-1 gap-1">
-                      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                        <strong className="font-display text-sm font-[780] text-[#17203a]">{game.name}</strong>
-                        <GameSourceBadge source={game.source} />
+                    <span className="flex items-start justify-between gap-3">
+                      <span className="grid size-11 shrink-0 place-items-center rounded-[11px_8px_12px_9px] bg-[var(--game-color)] text-white shadow-[2px_2px_0_rgb(23_32_58/18%)]">
+                        <Icon className="size-6" aria-hidden="true" />
                       </span>
-                      <small className="line-clamp-2 text-[10px] leading-[1.35] font-[580] text-[#748097]">
-                        {game.description}
-                      </small>
+                      <GameSourceBadge source={game.source} />
+                    </span>
+                    <span className="mt-3 grid min-w-0 content-start gap-1.5">
+                      <strong className="font-display text-base font-[800] text-[#17203a]">{game.name}</strong>
+                      <small className="text-[11px] leading-[1.5] font-[580] text-[#748097]">{game.description}</small>
                       <GameAuthor game={game} />
                     </span>
                   </Button>
@@ -230,11 +223,6 @@ export default function Home() {
               </p>
             )}
           </form>
-
-          <div className="mt-6 ml-0.5 flex items-center gap-2.25 text-[13px] font-[620] text-[#59647b] max-[620px]:items-start">
-            <UsersRound className="size-4.25 text-[#3155d9]" aria-hidden="true" />
-            Anyone with the link can join while there is room.
-          </div>
         </section>
 
         {selectedGameType ? <GamePreview gameType={selectedGameType} /> : null}

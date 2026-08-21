@@ -21,6 +21,13 @@ const mocks = vi.hoisted(() => ({
       author: { name: 'Xup Games', url: 'https://xup.games' },
       source: 'official',
     },
+    {
+      gameType: 'trendline',
+      name: 'Trendline',
+      description: 'Draw the shape of real-world data.',
+      author: { name: 'Igor Amidzic', url: null },
+      source: 'community',
+    },
   ],
 }));
 
@@ -47,9 +54,19 @@ describe('Home', () => {
     expect(screen.getByLabelText('What should we call you?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Trivia/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Type Racer/i })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getAllByText('Official')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /Trivia/ })).toHaveTextContent('by Xup Games');
-    expect(screen.getByRole('button', { name: /Type Racer/i })).toHaveTextContent('by Xup Games');
+    expect(screen.queryByText('Official')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Trendline/ })).toHaveTextContent('Community game');
+    expect(screen.getByRole('button', { name: /Trendline/ })).toHaveTextContent('by Igor Amidzic');
+    expect(screen.getByRole('button', { name: /Trivia/ })).not.toHaveTextContent('by Xup Games');
+    expect(screen.getByRole('button', { name: /Type Racer/i })).not.toHaveTextContent('by Xup Games');
+    expect(screen.getByRole('button', { name: /Trivia/ })).toHaveClass('min-h-44');
+    expect(screen.getByRole('button', { name: /Trivia/ })).toHaveStyle({ '--game-color': '#6347e8' });
+    expect(screen.getByRole('button', { name: /Trivia/ }).querySelector('svg')).toHaveClass('size-6');
+    expect(screen.getByText('Ten fast questions where quick correct answers score more.')).not.toHaveClass(
+      'line-clamp-2'
+    );
+    expect(screen.queryByText(/Choose an official Xup game/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Anyone with the link can join/)).not.toBeInTheDocument();
 
     const main = screen.getByRole('main');
     const preview = screen.getByLabelText('A preview of a trivia round');
@@ -115,6 +132,28 @@ describe('Home', () => {
     );
   });
 
+  it('creates the attributed community Trendline room when selected', async () => {
+    mocks.createRoom.mockResolvedValue({ code: 'ABCDEFGH' });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('button', { name: /Trendline/i }));
+    await user.type(screen.getByLabelText('What should we call you?'), 'Igor');
+    await user.click(screen.getByRole('button', { name: 'Create a room' }));
+
+    await waitFor(() =>
+      expect(mocks.createRoom).toHaveBeenCalledWith({
+        gameType: 'trendline',
+        sessionToken: expect.any(String),
+        displayName: 'Igor',
+      })
+    );
+  });
+
   it('creates a password-protected room when selected', async () => {
     mocks.createRoom.mockResolvedValue({ code: 'ABCDEFGH' });
     const user = userEvent.setup();
@@ -139,7 +178,7 @@ describe('Home', () => {
     );
   });
 
-  it('labels community games and shows the database author', () => {
+  it('labels community games and shows only their database author', () => {
     mocks.catalog[0] = {
       ...mocks.catalog[0],
       name: 'Neighborhood Trivia',
@@ -153,7 +192,9 @@ describe('Home', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('button', { name: /Neighborhood Trivia.*Community.*Grace Hopper/ })).toBeInTheDocument();
-    expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
+    const communityGame = screen.getByRole('button', { name: /Neighborhood Trivia/ });
+    expect(communityGame).toHaveTextContent('Community game');
+    expect(communityGame).toHaveTextContent('by Grace Hopper');
+    expect(screen.queryByText('by Xup Games')).not.toBeInTheDocument();
   });
 });

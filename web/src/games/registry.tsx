@@ -1,14 +1,15 @@
 import type { api } from '@convex/_generated/api';
 import type { GameType as BackendGameType } from '@convex/gameRegistry';
 import type { FunctionReturnType } from 'convex/server';
-import { BrainCircuit, Keyboard, type LucideIcon } from 'lucide-react';
+import { BrainCircuit, Keyboard, type LucideIcon, TrendingUp } from 'lucide-react';
 import type { ComponentType } from 'react';
+import TrendlinePreview from '@/games/community/trendline/TrendlinePreview';
 import TriviaPreview from '@/games/official/trivia/TriviaPreview';
 import TypeRacerPreview from '@/games/official/type-racer/TypeRacerPreview';
 import { cn } from '@/lib/utils';
 
 export type GameType = BackendGameType;
-export const GAME_TYPES = ['trivia', 'typeRacer'] as const satisfies readonly GameType[];
+export const GAME_TYPES = ['trivia', 'typeRacer', 'trendline'] as const satisfies readonly GameType[];
 export type GameCatalogEntry = FunctionReturnType<typeof api.games.listAvailable>[number];
 export type GameSource = GameCatalogEntry['source'];
 
@@ -23,17 +24,24 @@ type GamePresentation = {
 const GAME_PRESENTATIONS: Record<GameType, GamePresentation> = {
   trivia: {
     icon: BrainCircuit,
-    color: '#0c8bb7',
-    tint: '#e9f8fc',
+    color: '#6347e8',
+    tint: '#e8e1ff',
     previewLabel: 'A preview of a trivia round',
     preview: TriviaPreview,
   },
   typeRacer: {
     icon: Keyboard,
-    color: '#e54f50',
-    tint: '#fff0ef',
+    color: '#ef493f',
+    tint: '#ffdcd7',
     previewLabel: 'A preview of a multiplayer type race',
     preview: TypeRacerPreview,
+  },
+  trendline: {
+    icon: TrendingUp,
+    color: '#078b68',
+    tint: '#d5f6e8',
+    previewLabel: 'A preview of drawing a real-world historical trend',
+    preview: TrendlinePreview,
   },
 };
 
@@ -67,22 +75,22 @@ export function GamePreview({ gameType }: { gameType: GameType }) {
 }
 
 export function GameSourceBadge({ source, className }: { source: GameSource; className?: string }) {
+  if (source === 'official') return null;
   return (
     <span
       className={cn(
         'inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-[9px] leading-none font-[820] tracking-[0.08em] uppercase',
-        source === 'community'
-          ? 'border-[#b991db] bg-[#f4eafe] text-[#74409d]'
-          : 'border-[#b8c7f5] bg-[#edf2ff] text-[#3155d9]',
+        'border-[#b991db] bg-[#f4eafe] text-[#74409d]',
         className
       )}
     >
-      {source === 'community' ? 'Community' : 'Official'}
+      Community game
     </span>
   );
 }
 
 export function GameAuthor({ game }: { game: GameCatalogEntry }) {
+  if (game.source === 'official') return null;
   return (
     <span className="text-[10px] text-[#7a8499]">
       by <span className="font-[680] text-[#536079]">{game.author.name}</span>

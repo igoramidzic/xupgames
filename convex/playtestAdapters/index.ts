@@ -1,5 +1,6 @@
 import type { Doc } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
+import { initializeTrendlineBot, runTrendlineBotTick, stopTrendlineBot } from './trendline';
 import { initializeTriviaBot, runTriviaBotTick, stopTriviaBot } from './trivia';
 import { initializeTypeRacerBot, runTypeRacerBotTick, stopTypeRacerBot } from './typeRacer';
 
@@ -10,6 +11,9 @@ export async function initializeGameBot(ctx: MutationCtx, room: Doc<'rooms'>, bo
       return;
     case 'typeRacer':
       await initializeTypeRacerBot(ctx, bot);
+      return;
+    case 'trendline':
+      await initializeTrendlineBot(ctx, bot);
       return;
     default: {
       const unsupportedGameType: never = room.gameType;
@@ -28,6 +32,8 @@ export async function runGameBotTick(
       return await runTriviaBotTick(ctx, room, bot);
     case 'typeRacer':
       return await runTypeRacerBotTick(ctx, room, bot);
+    case 'trendline':
+      return await runTrendlineBotTick(ctx, room, bot);
     default: {
       const unsupportedGameType: never = room.gameType;
       throw new Error(`No playtest adapter exists for game type: ${unsupportedGameType}`);
@@ -47,6 +53,9 @@ export async function stopGameBot(
       return;
     case 'typeRacer':
       await stopTypeRacerBot(ctx, bot);
+      return;
+    case 'trendline':
+      await stopTrendlineBot(ctx, bot);
       return;
     case undefined:
       return;

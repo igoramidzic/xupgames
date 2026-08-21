@@ -26,6 +26,9 @@ Xup Games is a platform for multiple games.
 
 - Official games are maintained with Xup Games. Their backend lifecycle adapters live in `convex/officialGames/<gameType>/`, and their web UI lives in `web/src/games/official/<game-slug>/`.
 - Community games are independently attributed contributions. Each backend lives in its own local Convex Component under `convex/communityGames/<gameType>/`, and each web UI lives under `web/src/games/community/<game-slug>/`.
+- Honor an explicit user choice of `official` or `community`. Never infer that a game is official merely because the user asks to add or implement it, or because no contributor metadata was supplied.
+- If the execution context positively identifies the current user as Igor Amidzic (for example, an authenticated account identity or the `/Users/igoramidzic/` home path), treat an otherwise-unspecified owner-authored game as official and proceed without interrupting the work to ask.
+- In every other context, default an otherwise-unspecified game to `community` without interrupting the work to ask. The user may explicitly override that default at any time; never silently promote a non-Igor contribution to `official`.
 - A local Convex Component is the required boundary for community game state. It cannot read parent-app tables or another component's tables unless the parent explicitly passes data through a narrow function API.
 - Component isolation does not remove the need for review. Do not pass broad function handles, raw session tokens, secrets, or unrelated room/member data into community components.
 - Shared app wrappers own authorization. They validate the guest session, active room membership, owner-only actions, and the room's `gameType` before calling a game component.

@@ -10,6 +10,7 @@
 
 import type * as __mocks____generated_api from "../__mocks__/_generated/api.js";
 import type * as __mocks____generated_server from "../__mocks__/_generated/server.js";
+import type * as communityGameAdapters_trendline from "../communityGameAdapters/trendline.js";
 import type * as cursorPresence from "../cursorPresence.js";
 import type * as domain from "../domain.js";
 import type * as gameRegistry from "../gameRegistry.js";
@@ -21,6 +22,7 @@ import type * as officialGames_trivia_lifecycle from "../officialGames/trivia/li
 import type * as officialGames_typeRacer_lifecycle from "../officialGames/typeRacer/lifecycle.js";
 import type * as passwords from "../passwords.js";
 import type * as playtestAdapters_index from "../playtestAdapters/index.js";
+import type * as playtestAdapters_trendline from "../playtestAdapters/trendline.js";
 import type * as playtestAdapters_trivia from "../playtestAdapters/trivia.js";
 import type * as playtestAdapters_typeRacer from "../playtestAdapters/typeRacer.js";
 import type * as playtestLifecycle from "../playtestLifecycle.js";
@@ -30,6 +32,8 @@ import type * as roomGames from "../roomGames.js";
 import type * as roomMembers from "../roomMembers.js";
 import type * as roomPresence from "../roomPresence.js";
 import type * as rooms from "../rooms.js";
+import type * as trendline from "../trendline.js";
+import type * as trendlineWorldBank from "../trendlineWorldBank.js";
 import type * as trivia from "../trivia.js";
 import type * as triviaEngine from "../triviaEngine.js";
 import type * as triviaQuestions from "../triviaQuestions.js";
@@ -48,6 +52,7 @@ import { anyApi, componentsGeneric } from "convex/server";
 const fullApi: ApiFromModules<{
   "__mocks__/_generated/api": typeof __mocks____generated_api;
   "__mocks__/_generated/server": typeof __mocks____generated_server;
+  "communityGameAdapters/trendline": typeof communityGameAdapters_trendline;
   cursorPresence: typeof cursorPresence;
   domain: typeof domain;
   gameRegistry: typeof gameRegistry;
@@ -59,6 +64,7 @@ const fullApi: ApiFromModules<{
   "officialGames/typeRacer/lifecycle": typeof officialGames_typeRacer_lifecycle;
   passwords: typeof passwords;
   "playtestAdapters/index": typeof playtestAdapters_index;
+  "playtestAdapters/trendline": typeof playtestAdapters_trendline;
   "playtestAdapters/trivia": typeof playtestAdapters_trivia;
   "playtestAdapters/typeRacer": typeof playtestAdapters_typeRacer;
   playtestLifecycle: typeof playtestLifecycle;
@@ -68,6 +74,8 @@ const fullApi: ApiFromModules<{
   roomMembers: typeof roomMembers;
   roomPresence: typeof roomPresence;
   rooms: typeof rooms;
+  trendline: typeof trendline;
+  trendlineWorldBank: typeof trendlineWorldBank;
   trivia: typeof trivia;
   triviaEngine: typeof triviaEngine;
   triviaQuestions: typeof triviaQuestions;
@@ -106,4 +114,5 @@ export const internal: FilterApi<
 export const components = componentsGeneric() as unknown as {
   migrations: import("@convex-dev/migrations/_generated/component.js").ComponentApi<"migrations">;
   presence: import("@convex-dev/presence/_generated/component.js").ComponentApi<"presence">;
+  trendline: import("../communityGames/trendline/_generated/component.js").ComponentApi<"trendline">;
 };

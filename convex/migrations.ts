@@ -39,6 +39,12 @@ export const initializeRoomGameLifecycle = migrations.define({
           status = state?.phase === 'complete' ? 'complete' : state?.phase === 'lobby' ? 'lobby' : 'active';
           break;
         }
+        case 'trendline': {
+          // Trendline was introduced after this migration; no legacy rooms can
+          // have an active component state to recover.
+          status = 'lobby';
+          break;
+        }
       }
       roomPatch.currentGameId = await ctx.db.insert('roomGames', {
         roomId: room._id,

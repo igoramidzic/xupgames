@@ -56,7 +56,7 @@ async function requireActiveMember(
 
 function validatePresenceSessionId(sessionId: string): string {
   if (!PRESENCE_SESSION_ID_PATTERN.test(sessionId)) {
-    fail('INVALID_PRESENCE_SESSION', 'The cursor presence session is invalid.');
+    fail('INVALID_PRESENCE_SESSION', 'Your live session expired. Refresh the page and try again.');
   }
   return sessionId;
 }

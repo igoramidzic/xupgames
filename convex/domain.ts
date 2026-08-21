@@ -50,15 +50,27 @@ export type AppErrorCode =
   | 'TYPE_RACER_IN_PROGRESS'
   | 'TYPE_RACER_NOT_RUNNING'
   | 'TYPE_RACER_NOT_PARTICIPATING'
-  | 'INVALID_TYPE_RACER_PROGRESS';
+  | 'INVALID_TYPE_RACER_PROGRESS'
+  | 'TRENDLINE_GAME_IN_PROGRESS'
+  | 'TRENDLINE_GAME_NOT_RUNNING'
+  | 'TRENDLINE_DRAWING_CLOSED'
+  | 'TRENDLINE_ALREADY_SUBMITTED'
+  | 'TRENDLINE_HINT_CLOSED'
+  | 'INVALID_TRENDLINE_PREDICTION'
+  | 'TRENDLINE_PREPARATION_FAILED';
+
+export type AppErrorData = {
+  code: AppErrorCode;
+  message: string;
+};
 
 export function fail(code: AppErrorCode, message: string): never {
-  throw new ConvexError({ code, message });
+  throw new ConvexError<AppErrorData>({ code, message });
 }
 
 export function validateSessionToken(sessionToken: string): string {
   if (!SESSION_TOKEN_PATTERN.test(sessionToken)) {
-    fail('INVALID_SESSION_TOKEN', 'The session token must be a 32-128 character base64url-style opaque value.');
+    fail('INVALID_SESSION_TOKEN', 'Your browser session is invalid. Refresh the page and try again.');
   }
   return sessionToken;
 }
@@ -71,7 +83,7 @@ export function normalizeDisplayName(displayName: string): string {
     return codePoint !== undefined && (codePoint <= 31 || codePoint === 127);
   });
   if (characterCount < 1 || characterCount > 24 || hasControlCharacter) {
-    fail('INVALID_DISPLAY_NAME', 'Display names must contain 1-24 visible characters.');
+    fail('INVALID_DISPLAY_NAME', 'Enter a display name with 1–24 visible characters.');
   }
   return normalized;
 }
@@ -79,7 +91,7 @@ export function normalizeDisplayName(displayName: string): string {
 export function normalizeRoomCode(code: string): string {
   const normalized = code.trim().toUpperCase();
   if (!ROOM_CODE_PATTERN.test(normalized)) {
-    fail('INVALID_ROOM_CODE', 'The room code is invalid.');
+    fail('INVALID_ROOM_CODE', 'That room code is invalid.');
   }
   return normalized;
 }
@@ -94,7 +106,7 @@ export function normalizeRoomPassword(password: string): string {
   if (characterCount < MIN_ROOM_PASSWORD_LENGTH || characterCount > MAX_ROOM_PASSWORD_LENGTH || hasControlCharacter) {
     fail(
       'INVALID_ROOM_PASSWORD',
-      `Room passwords must contain ${MIN_ROOM_PASSWORD_LENGTH}-${MAX_ROOM_PASSWORD_LENGTH} visible characters.`
+      `Use a room password with ${MIN_ROOM_PASSWORD_LENGTH}–${MAX_ROOM_PASSWORD_LENGTH} visible characters.`
     );
   }
   return normalized;
@@ -118,7 +130,7 @@ export function normalizePoint(point: NormalizedPoint): NormalizedPoint {
     point.y < 0 ||
     point.y > 1
   ) {
-    fail('INVALID_POINT', 'Cursor coordinates must contain finite x/y values between 0 and 1.');
+    fail('INVALID_POINT', 'That cursor position is invalid.');
   }
 
   return {

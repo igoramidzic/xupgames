@@ -25,7 +25,7 @@ export const heartbeat = mutation({
   handler: async (ctx, args) => {
     const sessionToken = validateSessionToken(args.sessionToken);
     if (!PRESENCE_SESSION_ID_PATTERN.test(args.presenceSessionId)) {
-      fail('INVALID_PRESENCE_SESSION', 'The room presence session is invalid.');
+      fail('INVALID_PRESENCE_SESSION', 'Your live session expired. Refresh the page and try again.');
     }
     const room = await ctx.db.get('rooms', args.roomId);
     if (room === null) {

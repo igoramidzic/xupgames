@@ -1,46 +1,76 @@
-const USER_ERROR_MESSAGES = {
-  INVALID_SESSION_TOKEN: 'Your browser session is invalid. Refresh the page and try again.',
-  INVALID_DISPLAY_NAME: 'Enter a display name with 1–24 visible characters.',
-  INVALID_ROOM_CODE: 'That room code is invalid.',
-  ROOM_NOT_FOUND: 'That room could not be found.',
-  WRONG_GAME_TYPE: 'This action is not available for this game.',
-  ROOM_CLOSED: 'This room is closed.',
-  ROOM_FULL: 'This room is full.',
-  INVALID_ROOM_PASSWORD: 'Use a room password with 4–64 visible characters.',
-  ROOM_PASSWORD_REQUIRED: 'Enter the room password to join.',
-  NOT_A_MEMBER: 'You are not a member of this room.',
-  MEMBER_INACTIVE: 'You are no longer active in this room.',
-  NOT_ROOM_OWNER: 'Only the room owner can do that.',
-  INVALID_POINT: 'That cursor position is invalid.',
-  INVALID_PRESENCE_SESSION: 'Your live session expired. Refresh the page and try again.',
-  INVALID_PLAYTEST_TARGET: 'Choose a valid number of simulated players.',
-  PLAYTEST_ALREADY_RUNNING: 'A playtest is already running for this room.',
-  PLAYTEST_NOT_FOUND: 'No active playtest was found.',
-  TRIVIA_GAME_IN_PROGRESS: 'A trivia game is already in progress.',
-  TRIVIA_GAME_NOT_RUNNING: 'The trivia game is not running yet.',
-  TRIVIA_ANSWER_CLOSED: 'Time is up for this question.',
-  TRIVIA_ALREADY_ANSWERED: 'Your answer is already locked in.',
-  INVALID_TRIVIA_OPTION: 'Choose one of the available answers.',
-} as const;
+const APP_ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
-type UserErrorCode = keyof typeof USER_ERROR_MESSAGES;
+export type ApplicationErrorDetails = {
+  code: string | null;
+  message: string;
+};
 
-function codeFromError(error: unknown): string | null {
-  if (typeof error === 'object' && error !== null && 'data' in error) {
-    const data = error.data;
-    if (typeof data === 'object' && data !== null && 'code' in data && typeof data.code === 'string') {
-      return data.code;
-    }
+function applicationErrorData(value: unknown): { code: string; message: string } | null {
+  if (typeof value !== 'object' || value === null || !('code' in value) || !('message' in value)) {
+    return null;
   }
 
-  if (error instanceof Error) {
-    return error.message.match(/"code"\s*:\s*"([A-Z_]+)"/)?.[1] ?? null;
+  const { code, message } = value;
+  if (
+    typeof code !== 'string' ||
+    !APP_ERROR_CODE_PATTERN.test(code) ||
+    typeof message !== 'string' ||
+    message.trim() === ''
+  ) {
+    return null;
+  }
+
+  return { code, message };
+}
+
+function serializedConvexErrorData(error: Error): unknown {
+  const markerIndex = error.message.indexOf('ConvexError:');
+  const objectStart = markerIndex === -1 ? -1 : error.message.indexOf('{', markerIndex);
+  if (objectStart === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let isEscaped = false;
+  for (let index = objectStart; index < error.message.length; index += 1) {
+    const character = error.message[index];
+    if (inString) {
+      if (isEscaped) isEscaped = false;
+      else if (character === '\\') isEscaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+
+    if (character === '"') inString = true;
+    else if (character === '{') depth += 1;
+    else if (character === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          return JSON.parse(error.message.slice(objectStart, index + 1));
+        } catch {
+          return null;
+        }
+      }
+    }
   }
 
   return null;
 }
 
+export function applicationErrorDetails(error: unknown, fallback: string): ApplicationErrorDetails {
+  if (typeof error === 'object' && error !== null && 'data' in error) {
+    const details = applicationErrorData(error.data);
+    if (details !== null) return details;
+  }
+
+  if (error instanceof Error) {
+    const details = applicationErrorData(serializedConvexErrorData(error));
+    if (details !== null) return details;
+  }
+
+  return { code: null, message: fallback };
+}
+
 export function userFacingError(error: unknown, fallback: string): string {
-  const code = codeFromError(error);
-  return code !== null && code in USER_ERROR_MESSAGES ? USER_ERROR_MESSAGES[code as UserErrorCode] : fallback;
+  return applicationErrorDetails(error, fallback).message;
 }

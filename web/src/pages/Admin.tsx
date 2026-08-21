@@ -504,6 +504,11 @@ function gameAdapterCopy(gameType: PlaytestRoom['room']['gameType']) {
         description:
           'Bots type in every race at varied speeds and accuracy. They stay at the table until you remove them.',
       };
+    case 'trendline':
+      return {
+        label: 'Trendline drawing adapter',
+        description: 'Bots draw varied predictions in every data round. They stay at the table until you remove them.',
+      };
     default: {
       const unsupportedGameType: never = gameType;
       throw new Error(`Missing playtest copy for game type: ${unsupportedGameType}`);

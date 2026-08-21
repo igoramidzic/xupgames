@@ -10,6 +10,7 @@
       "!!**/.codex",
       "!!coverage",
       "!!convex/_generated",
+      "!!convex/communityGames/**/_generated",
       "!!docs/logo",
       "!!site/public",
       "!!web/public"

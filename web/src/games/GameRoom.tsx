@@ -1,5 +1,6 @@
 import type { api } from '@convex/_generated/api';
 import type { FunctionReturnType } from 'convex/server';
+import TrendlineRoom from '@/games/community/trendline/TrendlineRoom';
 import TriviaRoom from '@/games/official/trivia/TriviaRoom';
 import TypeRacerRoom from '@/games/official/type-racer/TypeRacerRoom';
 import type { GuestIdentity } from '@/lib/guest';
@@ -14,6 +15,8 @@ export default function GameRoom({ guest, session }: { guest: GuestIdentity; ses
       return <TriviaRoom guest={guest} session={session} />;
     case 'typeRacer':
       return <TypeRacerRoom guest={guest} session={session} />;
+    case 'trendline':
+      return <TrendlineRoom guest={guest} session={session} />;
     default: {
       const unsupportedGameType: never = session.gameType;
       throw new Error(`Unsupported game type: ${unsupportedGameType}`);

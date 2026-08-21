@@ -8,11 +8,14 @@ export type ActionCtx = {
 export type MutationCtx = {
   db: Record<string, unknown>;
   auth: Record<string, unknown>;
+  runMutation: (...args: unknown[]) => Promise<unknown>;
+  runQuery: (...args: unknown[]) => Promise<unknown>;
 };
 
 export type QueryCtx = {
   db: Record<string, unknown>;
   auth: Record<string, unknown>;
+  runQuery: (...args: unknown[]) => Promise<unknown>;
 };
 
 function registerFunction<T>(definition: T): T {
@@ -20,5 +23,7 @@ function registerFunction<T>(definition: T): T {
 }
 
 export const internalMutation = registerFunction;
+export const internalQuery = registerFunction;
 export const mutation = registerFunction;
 export const query = registerFunction;
+export const action = registerFunction;

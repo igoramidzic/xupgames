@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NextGameVoting from './NextGameVoting';
@@ -19,6 +19,13 @@ const mocks = vi.hoisted(() => ({
       description: 'Line up for a new passage.',
       author: { name: 'Xup Games', url: 'https://xup.games' },
       source: 'official',
+    },
+    {
+      gameType: 'trendline',
+      name: 'Trendline',
+      description: 'Draw the shape of real-world data, then compare your line with history.',
+      author: { name: 'Igor Amidzic', url: null },
+      source: 'community',
     },
   ],
   mutationIndex: 0,
@@ -56,7 +63,7 @@ const basePoll = {
   chosenGameType: null,
 };
 
-function renderVoting(isOwner = false, currentGameType: 'trivia' | 'typeRacer' = 'trivia') {
+function renderVoting(isOwner = false, currentGameType: 'trivia' | 'typeRacer' | 'trendline' = 'trivia') {
   return render(
     <NextGameVoting
       roomId={'room-1' as never}
@@ -82,7 +89,6 @@ describe('NextGameVoting', () => {
     const user = userEvent.setup();
     renderVoting();
 
-    expect(screen.getByText(/Vote to reveal the live count/)).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Final vote count' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Switch to Type Racer/ }));
 
@@ -146,5 +152,37 @@ describe('NextGameVoting', () => {
       'justify-start',
       'gap-0'
     );
+    expect(screen.getByRole('button', { name: /Switch to Trivia/ }).querySelector('svg')).toHaveClass('size-6');
+    expect(screen.queryByText('Official')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Race Again/ })).not.toHaveTextContent('by Xup Games');
+  });
+
+  it('shows compact community metadata without a description', () => {
+    mocks.poll = { ...basePoll, options: ['trivia', 'trendline'] };
+    renderVoting();
+
+    const trendline = screen.getByRole('button', { name: /Switch to Trendline/ });
+    expect(trendline).toHaveClass('min-h-32');
+    expect(trendline).toHaveTextContent('Community game');
+    expect(trendline).not.toHaveTextContent('Draw the shape of real-world data, then compare your line with history.');
+    expect(trendline).toHaveTextContent('by Igor Amidzic');
+    expect(screen.queryByText('Official')).not.toBeInTheDocument();
+    expect(screen.queryByText(/two-thirds majority/)).not.toBeInTheDocument();
+  });
+
+  it('keeps every visible vote count aligned to the right edge of its card', () => {
+    mocks.poll = {
+      ...basePoll,
+      votesCast: 1,
+      selectedGameType: 'typeRacer',
+      tallies: [
+        { gameType: 'trivia', votes: 0, percentage: 0 },
+        { gameType: 'typeRacer', votes: 1, percentage: 100 },
+      ],
+    };
+    renderVoting(false, 'typeRacer');
+
+    expect(within(screen.getByRole('button', { name: /Race Again/ })).getByText('1')).toHaveClass('ml-auto');
+    expect(within(screen.getByRole('button', { name: /Switch to Trivia/ })).getByText('0')).toHaveClass('ml-auto');
   });
 });

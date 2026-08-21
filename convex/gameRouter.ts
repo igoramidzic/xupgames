@@ -1,5 +1,11 @@
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
+import {
+  initializeTrendlineGame,
+  prepareTrendlineGame,
+  syncTrendlineMembership,
+  trendlineGameIsComplete,
+} from './communityGameAdapters/trendline';
 import type { GameType } from './games';
 import { initializeTriviaGame, prepareTriviaGame, triviaGameIsComplete } from './officialGames/trivia/lifecycle';
 import {
@@ -9,7 +15,7 @@ import {
   typeRacerGameIsComplete,
 } from './officialGames/typeRacer/lifecycle';
 
-type DatabaseReaderContext = Pick<QueryCtx, 'db'>;
+type DatabaseReaderContext = Pick<QueryCtx, 'db' | 'runQuery'>;
 
 /**
  * The only shared-platform switch over game implementations.
@@ -25,6 +31,9 @@ export async function initializeGameState(ctx: MutationCtx, roomId: Id<'rooms'>,
       return;
     case 'typeRacer':
       await initializeTypeRacerGame(ctx, roomId);
+      return;
+    case 'trendline':
+      await initializeTrendlineGame(ctx, roomId);
       return;
     default: {
       const unsupportedGameType: never = gameType;
@@ -45,6 +54,9 @@ export async function syncGameMembership(
     case 'typeRacer':
       await syncTypeRacerMembership(ctx, room._id, membership, now);
       return;
+    case 'trendline':
+      await syncTrendlineMembership(ctx, room._id, membership, now);
+      return;
     default: {
       const unsupportedGameType: never = room.gameType;
       throw new Error(`No membership adapter exists for game type: ${unsupportedGameType}`);
@@ -60,6 +72,9 @@ export async function prepareGameState(ctx: MutationCtx, room: Doc<'rooms'>, gam
     case 'typeRacer':
       await prepareTypeRacerGame(ctx, room._id);
       return;
+    case 'trendline':
+      await prepareTrendlineGame(ctx, room._id);
+      return;
     default: {
       const unsupportedGameType: never = gameType;
       throw new Error(`No preparation adapter exists for game type: ${unsupportedGameType}`);
@@ -73,6 +88,8 @@ export async function gameStateIsComplete(ctx: DatabaseReaderContext, room: Doc<
       return await triviaGameIsComplete(ctx, room._id);
     case 'typeRacer':
       return await typeRacerGameIsComplete(ctx, room._id);
+    case 'trendline':
+      return await trendlineGameIsComplete(ctx, room._id);
     default: {
       const unsupportedGameType: never = room.gameType;
       throw new Error(`No completion adapter exists for game type: ${unsupportedGameType}`);

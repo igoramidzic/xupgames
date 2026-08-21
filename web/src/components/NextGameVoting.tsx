@@ -30,6 +30,8 @@ function replayLabel(gameType: GameType) {
       return 'Play Trivia Again';
     case 'typeRacer':
       return 'Race Again';
+    case 'trendline':
+      return 'Draw Again';
   }
 }
 
@@ -180,7 +182,7 @@ export default function NextGameVoting({
               return (
                 <Button
                   variant="game-choice"
-                  className="relative min-h-28 flex-col items-stretch justify-start gap-0 overflow-hidden p-3.5 disabled:cursor-default disabled:opacity-60"
+                  className="relative min-h-32 flex-col items-stretch justify-start gap-0 overflow-hidden p-4 disabled:cursor-default disabled:opacity-60"
                   type="button"
                   key={gameType}
                   style={{ '--game-color': presentation.color, '--game-tint': presentation.tint } as CSSProperties}
@@ -197,7 +199,9 @@ export default function NextGameVoting({
                     />
                   ) : null}
                   <span className="relative z-1 flex items-center justify-between gap-2">
-                    <Icon className="size-5 text-[var(--game-color)]" aria-hidden="true" />
+                    <span className="grid size-11 place-items-center rounded-[11px_8px_12px_9px] bg-[var(--game-color)] text-white shadow-[2px_2px_0_rgb(23_32_58/18%)]">
+                      <Icon className="size-6" aria-hidden="true" />
+                    </span>
                     {pendingAction === `vote:${gameType}` ? (
                       <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
                     ) : selected ? (
@@ -210,25 +214,16 @@ export default function NextGameVoting({
                     </strong>
                     <GameSourceBadge source={game.source} />
                   </span>
-                  <span className="relative z-1 mt-1 flex items-end justify-between gap-2 text-[11px] leading-[1.35] text-[#657087]">
-                    <span>
-                      {isReplay ? `Keep playing ${game.name}.` : game.description} <GameAuthor game={game} />
-                    </span>
-                    {tally ? <b className="text-[#34415b] tabular-nums">{tally.votes}</b> : null}
+                  <span className="relative z-1 mt-auto flex items-end justify-between gap-2 pt-2">
+                    <GameAuthor game={game} />
+                    {tally ? <b className="ml-auto text-[#34415b] tabular-nums">{tally.votes}</b> : null}
                   </span>
                 </Button>
               );
             })}
           </div>
-          <div className="mt-4 flex items-center justify-between gap-4 max-[620px]:items-start">
-            <p className="m-0 text-[11px] leading-[1.45] text-[#6d788c]">
-              {poll.selectedGameType === null
-                ? 'Vote to reveal the live count. You can change your pick until the owner closes the round.'
-                : poll.roundNumber === 1
-                  ? 'A two-thirds majority ends the ballot. Otherwise the leading choices go to round two.'
-                  : 'This runoff produces a recommendation; the owner still decides.'}
-            </p>
-            {isOwner ? (
+          {isOwner ? (
+            <div className="mt-4 flex justify-end">
               <Button
                 variant="sunny"
                 className="h-10 shrink-0 text-xs [&_svg]:size-3.75"
@@ -239,8 +234,8 @@ export default function NextGameVoting({
                 {pendingAction === 'close-round' ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
                 Close round
               </Button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </>
       ) : null}
 
@@ -285,7 +280,7 @@ export default function NextGameVoting({
                 return (
                   <Button
                     variant="decision"
-                    className="min-h-22 flex-col items-stretch justify-start gap-0 p-3 disabled:cursor-wait disabled:opacity-60"
+                    className="min-h-28 flex-col items-stretch justify-start gap-0 p-3.5 disabled:cursor-wait disabled:opacity-60"
                     type="button"
                     key={game.gameType}
                     data-recommended={recommended}
@@ -293,7 +288,7 @@ export default function NextGameVoting({
                     disabled={currentGameId === null || pendingAction !== null}
                   >
                     <span className="flex items-center justify-between gap-2">
-                      <Icon className="size-4.5" style={{ color: presentation.color }} aria-hidden="true" />
+                      <Icon className="size-6" style={{ color: presentation.color }} aria-hidden="true" />
                       {pendingAction === `choose:${game.gameType}` ? (
                         <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
                       ) : recommended ? (
@@ -308,7 +303,9 @@ export default function NextGameVoting({
                       </strong>
                       <GameSourceBadge source={game.source} />
                     </span>
-                    <span className="mt-0.5 block text-[10px] text-[#6b768a]">{game.description}</span>
+                    <span className="mt-auto pt-2">
+                      <GameAuthor game={game} />
+                    </span>
                   </Button>
                 );
               })}

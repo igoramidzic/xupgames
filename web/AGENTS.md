@@ -33,7 +33,8 @@ These instructions apply to everything under `web/` and supplement the repositor
 - `src/games/registry.tsx` owns code-side presentation: icon, accent/tint, preview, and the supported web `gameType` union. Human-facing name, description, author, source, enabled state, and ordering come from `api.games.listAvailable`; do not duplicate them in UI constants.
 - Official game UI belongs in `src/games/official/<game-slug>/`. Community game UI belongs in `src/games/community/<game-slug>/`. Keep the room, preview, tests, and unavoidable component CSS together.
 - Keep `src/components/` for game-neutral multiplayer surfaces such as voting and post-game flow. A shared component may consume catalog metadata but must not import game-specific state or behavior.
-- Game picker and next-game choices must show the catalog source badge and author. Community games use the explicit `Community` badge; official games use `Official`.
+- Game picker and next-game choices show no source or author metadata for official entries. Community entries show `Community game` and the catalog author; do not attribute official games in these surfaces.
+- Let game descriptions wrap in full in the game picker. Keep voting options compact by omitting descriptions and showing only the action name, allowed community metadata, and vote count.
 - Never render a catalog entry that has no registered web presentation and room route. A game remains disabled until the complete vertical slice exists.
 
 ## Xup visual language

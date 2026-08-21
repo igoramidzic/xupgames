@@ -1,9 +1,9 @@
 import { v } from 'convex/values';
 
-export const GAME_TYPES = ['trivia', 'typeRacer'] as const;
+export const GAME_TYPES = ['trivia', 'typeRacer', 'trendline'] as const;
 export type GameType = (typeof GAME_TYPES)[number];
 
-export const gameTypeValidator = v.union(v.literal('trivia'), v.literal('typeRacer'));
+export const gameTypeValidator = v.union(v.literal('trivia'), v.literal('typeRacer'), v.literal('trendline'));
 export const gameSourceValidator = v.union(v.literal('official'), v.literal('community'));
 export type GameSource = 'official' | 'community';
 
@@ -46,5 +46,15 @@ export const GAME_DEFINITIONS = [
     source: 'official',
     isEnabled: true,
     sortOrder: 20,
+  },
+  {
+    gameType: 'trendline',
+    name: 'Trendline',
+    description: 'Draw the shape of real-world data, then see how closely your prediction follows history.',
+    authorName: 'Igor Amidzic',
+    authorUrl: null,
+    source: 'community',
+    isEnabled: true,
+    sortOrder: 30,
   },
 ] as const satisfies readonly StaticGameDefinition[];
