@@ -4,15 +4,7 @@ import { ArrowRight, BrainCircuit, LoaderCircle, LockKeyhole, PencilLine, Timer,
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { readGuest, saveGuest, validateDisplayName } from '@/lib/guest';
-
-function errorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    const convexPayload = error.message.match(/\{.*"message":"([^"]+)".*\}/)?.[1];
-    return convexPayload ?? error.message.replace(/^Uncaught Error:\s*/, '');
-  }
-
-  return 'The room could not be created. Try again.';
-}
+import { userFacingError } from '@/lib/userFacingError';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -44,7 +36,7 @@ export default function Home() {
       });
       navigate(`/r/${room.code}`);
     } catch (createError) {
-      setError(errorMessage(createError));
+      setError(userFacingError(createError, 'The room could not be created. Try again.'));
       setIsCreating(false);
     }
   }

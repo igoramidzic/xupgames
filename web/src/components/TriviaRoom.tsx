@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { GuestIdentity } from '@/lib/guest';
+import { userFacingError } from '@/lib/userFacingError';
 
 type SessionResult = FunctionReturnType<typeof api.rooms.getSession>;
 type ActiveSession = Extract<SessionResult, { kind: 'session' }>;
@@ -39,14 +40,6 @@ const ANSWER_DURATION_MS = 15_000;
 const COUNTDOWN_DURATION_MS = 3_000;
 const REVEAL_DURATION_MS = 7_000;
 const QUESTION_FADE_OUT_MS = 260;
-
-function errorMessage(error: unknown, fallback: string) {
-  if (!(error instanceof Error)) {
-    return fallback;
-  }
-  const convexPayload = error.message.match(/\{.*"message":"([^"]+)".*\}/)?.[1];
-  return convexPayload ?? error.message.replace(/^Uncaught Error:\s*/, '');
-}
 
 function useClock(enabled: boolean) {
   const [now, setNow] = useState(Date.now());
@@ -195,7 +188,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
     try {
       await startGame({ roomId: session.roomId, sessionToken: guest.sessionToken });
     } catch (startError) {
-      setNotice(errorMessage(startError, 'Trivia could not be started.'));
+      setNotice(userFacingError(startError, 'Trivia could not be started.'));
       setStarting(false);
     }
   }
@@ -217,7 +210,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
         selectedOptionIndex: optionIndex,
       });
     } catch (answerError) {
-      setNotice(errorMessage(answerError, 'Your answer could not be locked in.'));
+      setNotice(userFacingError(answerError, 'Your answer could not be locked in.'));
       setPendingAnswer(null);
     }
   }
@@ -229,7 +222,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
       await leaveRoom({ code: session.code, sessionToken: guest.sessionToken });
       navigate('/');
     } catch (leaveError) {
-      setNotice(errorMessage(leaveError, 'The room could not be left.'));
+      setNotice(userFacingError(leaveError, 'The room could not be left.'));
       setActionPending(null);
     }
   }
@@ -242,7 +235,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
       setNotice('Room closed. The final scoreboard stays visible.');
       setActionPending(null);
     } catch (closeError) {
-      setNotice(errorMessage(closeError, 'The room could not be closed.'));
+      setNotice(userFacingError(closeError, 'The room could not be closed.'));
       setActionPending(null);
     }
   }

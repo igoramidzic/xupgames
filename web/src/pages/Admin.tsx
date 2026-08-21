@@ -15,6 +15,7 @@ import {
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { readGuest } from '@/lib/guest';
+import { userFacingError } from '@/lib/userFacingError';
 
 type InspectResult = FunctionReturnType<typeof api.playtests.inspect>;
 type PlaytestRoom = Extract<InspectResult, { kind: 'room' }>;
@@ -26,14 +27,6 @@ const DURATIONS = [
   { value: 120_000, label: '2 min' },
   { value: 300_000, label: '5 min' },
 ] as const;
-
-function errorMessage(error: unknown, fallback: string) {
-  if (!(error instanceof Error)) {
-    return fallback;
-  }
-  const convexPayload = error.message.match(/\{.*"message":"([^"]+)".*\}/)?.[1];
-  return convexPayload ?? error.message.replace(/^Uncaught Error:\s*/, '');
-}
 
 export default function Admin() {
   const params = useParams();
@@ -220,7 +213,7 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
         ...(isTrivia ? {} : { durationMs }),
       });
     } catch (error) {
-      setNotice(errorMessage(error, 'The playtest could not start.'));
+      setNotice(userFacingError(error, 'The playtest could not start.'));
     } finally {
       setPending(null);
     }
@@ -235,7 +228,7 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
     try {
       await stopPlaytest({ runId: run.runId, sessionToken });
     } catch (error) {
-      setNotice(errorMessage(error, 'The playtest could not stop.'));
+      setNotice(userFacingError(error, 'The playtest could not stop.'));
     } finally {
       setPending(null);
     }

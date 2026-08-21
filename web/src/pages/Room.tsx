@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { type GuestIdentity, readGuest, saveGuest, validateDisplayName } from '@/lib/guest';
+import { userFacingError } from '@/lib/userFacingError';
 
 type PreviewResult = FunctionReturnType<typeof api.rooms.preview>;
 type SessionResult = FunctionReturnType<typeof api.rooms.getSession>;
@@ -23,15 +24,6 @@ type ActiveSession = Extract<SessionResult, { kind: 'session' }>;
 const ROOM_CODE_PATTERN = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/;
 const COLORS = ['#3155d9', '#ff685b', '#f3cb42', '#35b87f', '#8d5cf6', '#17203a'];
 const WIDTHS = [4, 10, 22];
-
-function errorMessage(error: unknown, fallback: string) {
-  if (!(error instanceof Error)) {
-    return fallback;
-  }
-
-  const convexPayload = error.message.match(/\{.*"message":"([^"]+)".*\}/)?.[1];
-  return convexPayload ?? error.message.replace(/^Uncaught Error:\s*/, '');
-}
 
 export default function Room() {
   const params = useParams();
@@ -131,7 +123,7 @@ function JoinRoom({
       await joinRoom({ code, ...identity, ...(preview.isPasswordProtected ? { password } : {}) });
       onJoined(identity);
     } catch (joinError) {
-      setError(errorMessage(joinError, 'The room could not be joined. Try again.'));
+      setError(userFacingError(joinError, 'The room could not be joined. Try again.'));
       setJoining(false);
     }
   }
@@ -345,7 +337,7 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
       await leaveRoom({ code: session.code, sessionToken: guest.sessionToken });
       navigate('/');
     } catch (leaveError) {
-      setNotice(errorMessage(leaveError, 'The room could not be left.'));
+      setNotice(userFacingError(leaveError, 'The room could not be left.'));
       setActionPending(null);
     }
   }
@@ -358,7 +350,7 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
       setNotice('Room closed. The drawing is now read only.');
       setActionPending(null);
     } catch (closeError) {
-      setNotice(errorMessage(closeError, 'The room could not be closed.'));
+      setNotice(userFacingError(closeError, 'The room could not be closed.'));
       setActionPending(null);
     }
   }

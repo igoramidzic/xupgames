@@ -13,6 +13,7 @@ import {
   useState,
 } from 'react';
 import { type RemoteCursor, useCursorPresence } from '@/lib/useCursorPresence';
+import { userFacingError } from '@/lib/userFacingError';
 
 export type DrawingPoint = {
   x: number;
@@ -95,15 +96,6 @@ const MAX_ZOOM = 4;
 const MAX_POINTS_PER_STROKE = 1000;
 const POINTS_PER_BATCH = 48;
 
-function messageFromError(error: unknown) {
-  if (!(error instanceof Error)) {
-    return 'The mark could not be saved.';
-  }
-
-  const convexPayload = error.message.match(/\{.*"message":"([^"]+)".*\}/)?.[1];
-  return convexPayload ?? error.message.replace(/^Uncaught Error:\s*/, '');
-}
-
 export default function DrawingCanvas({
   roomId,
   sessionToken,
@@ -147,7 +139,7 @@ export default function DrawingCanvas({
     (error: unknown) => {
       activeRef.current = null;
       redrawActive();
-      onError(messageFromError(error));
+      onError(userFacingError(error, 'The mark could not be saved.'));
     },
     [onError, redrawActive]
   );
