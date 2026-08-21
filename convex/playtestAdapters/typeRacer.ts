@@ -1,6 +1,6 @@
 import type { Doc } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
-import { findTypeRacerGameState, recordTypeRacerProgress } from '../typeRacer';
+import { enrollTypeRacerMemberInActiveRace, findTypeRacerGameState, recordTypeRacerProgress } from '../typeRacer';
 
 const MIN_REPORT_INTERVAL_MS = 460;
 const REPORT_INTERVAL_VARIANCE_MS = 340;
@@ -38,6 +38,12 @@ export async function initializeTypeRacerBot(
   if (state === null) {
     throw new Error('Type racer bot state could not be loaded.');
   }
+  await enrollTypeRacerMemberInActiveRace(
+    ctx,
+    bot.roomId,
+    { _id: bot.memberId, displayName: bot.displayName },
+    Date.now()
+  );
   return state;
 }
 
@@ -81,7 +87,7 @@ export async function runTypeRacerBotTick(
     return { cursor };
   }
 
-  const elapsedMs = Math.max(1, now - gameState.startsAt);
+  const elapsedMs = Math.max(1, now - progress.startedAt);
   const targetChars = Math.floor((botState.targetWpm * 5 * elapsedMs) / 60_000);
   const correctChars = Math.min(
     gameState.passageText.length,

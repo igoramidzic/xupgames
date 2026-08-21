@@ -218,16 +218,16 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
   const [now, setNow] = useState(Date.now());
   const run = panel.latestRun;
   const isRunActive = run?.isActive ?? false;
-  const isTrivia = panel.room.gameType === 'trivia';
+  const isDurationBound = panel.room.gameType === 'drawing';
   const adapterCopy = gameAdapterCopy(panel.room.gameType);
 
   useEffect(() => {
-    if (!isRunActive || isTrivia) {
+    if (!isRunActive || !isDurationBound) {
       return;
     }
     const interval = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(interval);
-  }, [isRunActive, isTrivia]);
+  }, [isDurationBound, isRunActive]);
 
   async function handleStart() {
     setPending('start');
@@ -237,7 +237,7 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
         code: panel.room.code,
         sessionToken,
         targetActiveMemberCount: target,
-        ...(isTrivia ? {} : { durationMs }),
+        ...(isDurationBound ? { durationMs } : {}),
       });
     } catch (error) {
       setNotice(userFacingError(error, 'The playtest could not start.'));
@@ -363,11 +363,15 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
                 </span>
               </div>
               <div className="flex items-center gap-2.75 px-3.5 pt-5 pb-0.5 max-[620px]:gap-1.75 max-[620px]:px-2 max-[620px]:pt-3.75">
-                <Timer className="size-4.5 text-[#3155d9] max-[620px]:hidden" aria-hidden="true" />
+                {isDurationBound ? (
+                  <Timer className="size-4.5 text-[#3155d9] max-[620px]:hidden" aria-hidden="true" />
+                ) : (
+                  <Bot className="size-4.5 text-[#3155d9] max-[620px]:hidden" aria-hidden="true" />
+                )}
                 <span className="flex flex-col text-[10px] font-bold tracking-[0.04em] text-[#7a8497] uppercase">
-                  {isTrivia ? 'Players stay' : 'Time left'}
+                  {isDurationBound ? 'Time left' : 'Players stay'}
                   <strong className="mt-0.75 text-lg tracking-[-0.02em] text-[#17203a] normal-case max-[620px]:text-[15px]">
-                    {isTrivia ? 'Until you remove them' : isRunActive ? formatDuration(remainingSeconds) : '—'}
+                    {isDurationBound ? (isRunActive ? formatDuration(remainingSeconds) : '—') : 'Until you remove them'}
                   </strong>
                 </span>
               </div>
@@ -406,7 +410,7 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
               </div>
             </fieldset>
 
-            {!isTrivia ? (
+            {isDurationBound ? (
               <fieldset className="mt-6.25 min-w-0 border-0 p-0" disabled={isRunActive || pending !== null}>
                 <legend className="mb-2.25 text-[11px] font-[730] text-[#4f5b72]">Run for</legend>
                 <div className="grid grid-cols-3 gap-1.5 rounded-[10px] border border-[#c8d2e0] bg-[#eef2f7] p-1.25">
@@ -448,10 +452,10 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
                   <CircleStop aria-hidden="true" />
                 )}
                 {run.status === 'stopping'
-                  ? isTrivia
+                  ? !isDurationBound
                     ? 'Removing players…'
                     : 'Removing bots…'
-                  : isTrivia
+                  : !isDurationBound
                     ? 'Remove players'
                     : 'Stop playtest'}
               </button>
@@ -564,7 +568,7 @@ function gameAdapterCopy(gameType: PlaytestRoom['room']['gameType']) {
       return {
         label: 'Type racer adapter',
         description:
-          'Bots type in readable chunks at varied speeds and accuracy, making a 10, 25, or 50-player race easy to inspect.',
+          'Bots type in every race at varied speeds and accuracy. They stay at the table until you remove them.',
       };
     default: {
       const unsupportedGameType: never = gameType;

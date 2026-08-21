@@ -6,6 +6,7 @@ import TypeRacerRoom from './TypeRacerRoom';
 
 const mocks = vi.hoisted(() => ({
   game: null as Record<string, unknown> | null,
+  onlineByMemberId: new Map<string, boolean>(),
   mutationIndex: 0,
   startRace: vi.fn(),
   reportProgress: vi.fn(),
@@ -24,7 +25,7 @@ vi.mock('convex/react', () => ({
 }));
 
 vi.mock('@/lib/useRoomPresence', () => ({
-  useRoomPresence: () => ({ onlineByMemberId: new Map([['member-1', true]]) }),
+  useRoomPresence: () => ({ onlineByMemberId: mocks.onlineByMemberId }),
 }));
 
 vi.mock('@/lib/environment', () => ({ isLocalhost: () => false }));
@@ -74,6 +75,8 @@ function racer() {
 
 describe('TypeRacerRoom', () => {
   beforeEach(() => {
+    mocks.onlineByMemberId.clear();
+    mocks.onlineByMemberId.set('member-1', true);
     mocks.mutationIndex = 0;
     mocks.startRace.mockReset().mockResolvedValue({ raceNumber: 1, startsAt: Date.now() + 4_000 });
     mocks.reportProgress.mockReset().mockResolvedValue({ wpm: 60, accuracy: 95, finished: false });
@@ -335,5 +338,90 @@ describe('TypeRacerRoom', () => {
     expect(standings.getByText('Ada')).toHaveClass('text-sm');
     expect(standings.getByText('72', { exact: false }).closest('span')).toHaveClass('text-sm');
     expect(standings.getByText('12.35s').parentElement).toHaveClass('text-[11px]');
+  });
+
+  it('labels and dims racers who disconnected or stopped playing without presence dots', () => {
+    mocks.onlineByMemberId.set('member-1', false);
+    const disconnected = racer();
+    const inactive = {
+      ...racer(),
+      rank: 2,
+      memberId: 'member-2',
+      displayName: 'Grace',
+      isCurrentPlayer: false,
+      isActive: false,
+    };
+    mocks.game = {
+      raceNumber: 1,
+      phase: 'racing',
+      phaseStartedAt: Date.now() - 1_000,
+      startsAt: Date.now() - 1_000,
+      phaseEndsAt: Date.now() + 60_000,
+      participantCount: 2,
+      finishedCount: 0,
+      winnerMemberId: null,
+      passage: {
+        id: 'ishmael',
+        text: 'Call me Ishmael.',
+        title: 'Moby-Dick',
+        author: 'Herman Melville',
+        kind: 'phrase',
+      },
+      racers: [disconnected, inactive],
+      currentPlayer: disconnected,
+    };
+
+    render(
+      <MemoryRouter>
+        <TypeRacerRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    const standings = within(screen.getByRole('list', { name: 'Racer standings' }));
+    const disconnectedCard = standings.getByText('Ada').closest('li');
+    const inactiveCard = standings.getByText('Grace').closest('li');
+    expect(standings.getByText('Disconnected')).toBeInTheDocument();
+    expect(standings.getByText('No longer playing')).toBeInTheDocument();
+    expect(disconnectedCard).toHaveAttribute('data-player-state', 'disconnected');
+    expect(disconnectedCard).toHaveClass('data-[player-state=disconnected]:opacity-55');
+    expect(inactiveCard).toHaveAttribute('data-player-state', 'inactive');
+    expect(inactiveCard).toHaveClass('data-[player-state=inactive]:opacity-40');
+    expect(disconnectedCard?.querySelector('span[class*="rounded-full"]')).toBeNull();
+  });
+
+  it('uses a continuous high-contrast progress lane without an end cap', () => {
+    const current = { ...racer(), progress: 0.73, isCurrentPlayer: false };
+    mocks.game = {
+      raceNumber: 1,
+      phase: 'racing',
+      phaseStartedAt: Date.now() - 1_000,
+      startsAt: Date.now() - 1_000,
+      phaseEndsAt: Date.now() + 60_000,
+      participantCount: 1,
+      finishedCount: 0,
+      winnerMemberId: null,
+      passage: {
+        id: 'ishmael',
+        text: 'Call me Ishmael.',
+        title: 'Moby-Dick',
+        author: 'Herman Melville',
+        kind: 'phrase',
+      },
+      racers: [current],
+      currentPlayer: null,
+    };
+
+    render(
+      <MemoryRouter>
+        <TypeRacerRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    const track = screen.getByRole('img', { name: /Ada: 73 percent/ });
+    expect(track).toHaveClass('bg-[#120d1f]');
+    expect(track.className).not.toContain('background-image');
+    const fill = track.querySelector('[data-progress-fill="true"]');
+    expect(fill).toHaveClass('opacity-75');
+    expect(track.children).toHaveLength(2);
   });
 });

@@ -43,7 +43,7 @@ type Racer = RaceView['racers'][number];
 
 const PROGRESS_REPORT_INTERVAL_MS = 500;
 const MAX_INSERTED_CHARACTERS = 64;
-const RACER_COLORS = ['#ff5c57', '#4f6ee8', '#2da875', '#d28b16', '#8b5fd3', '#168ca8', '#d75698', '#695c51'];
+const RACER_COLORS = ['#ff746c', '#74a7ff', '#58d7a1', '#f1c84f', '#d89aff', '#4ed4e6', '#ff8fc5', '#b8d65c'];
 
 type TypingState = {
   text: string;
@@ -753,10 +753,6 @@ function RaceBoard({
         </div>
       </div>
 
-      <div className="border-b border-white/10 bg-white/4 px-5 py-3 text-xs leading-[1.5] text-[#c0bbcc]">
-        Progress lands in ~500 ms chunks, keeping a 30+ player field responsive without sending every keystroke.
-      </div>
-
       <ol
         className="m-0 flex-1 list-none overflow-y-auto p-3.5 [scrollbar-color:#776991_transparent]"
         aria-label="Racer standings"
@@ -764,46 +760,53 @@ function RaceBoard({
         {racers.map((racer, index) => {
           const color = RACER_COLORS[index % RACER_COLORS.length];
           const progress = Math.max(0, Math.min(1, racer.progress));
+          const isDisconnected = racer.isActive && onlineByMemberId.get(racer.memberId) === false;
+          const playerState = !racer.isActive ? 'inactive' : isDisconnected ? 'disconnected' : 'connected';
           const racerStyle = { '--racer-progress': `${progress * 100}%`, '--racer-color': color } as CSSProperties;
           return (
             <li
-              className="mb-2.5 rounded-[10px_15px_11px_14px] border border-white/9 bg-white/6 px-3.5 py-3 data-[current=true]:border-[#ffd65a]/55 data-[current=true]:bg-[#ffd65a]/10"
+              className="mb-2.5 rounded-[10px_15px_11px_14px] border border-[#6e5c87]/55 bg-[#37274f] px-3.5 py-3 transition-[border-color,background-color,opacity,filter] data-[current=true]:border-[#ffd65a]/60 data-[current=true]:bg-[#443452] data-[player-state=disconnected]:opacity-55 data-[player-state=disconnected]:saturate-50 data-[player-state=inactive]:opacity-40 data-[player-state=inactive]:saturate-25 motion-reduce:transition-none"
               key={racer.memberId}
               data-current={racer.isCurrentPlayer}
+              data-player-state={playerState}
             >
               <div className="mb-2.5 grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 text-sm">
-                <strong className="text-[#aaa1b9] tabular-nums">{racer.rank}</strong>
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span
-                    className={cn(
-                      'size-1.5 shrink-0 rounded-full',
-                      onlineByMemberId.get(racer.memberId) ? 'bg-[#8ee4b3]' : 'bg-[#756d83]'
-                    )}
-                  />
-                  <strong className="truncate text-sm text-white">{racer.displayName}</strong>
-                  {racer.rank === 1 && phase !== 'lobby' ? (
-                    <Crown className="size-3 text-[#ffd65a]" aria-label="Leader" />
+                <strong className="self-start pt-0.5 text-[#bcb1ca] tabular-nums">{racer.rank}</strong>
+                <span className="grid min-w-0">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <strong className="truncate text-sm text-white">{racer.displayName}</strong>
+                    {racer.rank === 1 && phase !== 'lobby' ? (
+                      <Crown className="size-3 shrink-0 text-[#ffd65a]" aria-label="Leader" />
+                    ) : null}
+                  </span>
+                  {playerState !== 'connected' ? (
+                    <small className="mt-0.5 text-[10px] leading-none font-[760] tracking-[0.04em] text-[#c9bed7] uppercase">
+                      {playerState === 'inactive' ? 'No longer playing' : 'Disconnected'}
+                    </small>
                   ) : null}
                 </span>
-                <span className="font-mono text-sm text-[#c7c0d2] tabular-nums">
+                <span className="self-start font-mono text-sm text-[#d7cfdf] tabular-nums">
                   {formatWpm(racer.wpm)} <small className="text-[10px]">WPM</small>
                 </span>
               </div>
               <div
-                className="relative h-6 overflow-hidden rounded-full border border-white/10 bg-[#170f25] [background-image:linear-gradient(90deg,transparent_calc(100%-12px),rgb(255_255_255/8%)_calc(100%-12px))]"
+                className="relative h-6 overflow-hidden rounded-full border border-[#806f96]/40 bg-[#120d1f] shadow-[inset_0_1px_3px_rgb(0_0_0/65%)]"
                 style={racerStyle}
                 role="img"
+                data-progress-track="true"
                 aria-label={`${racer.displayName}: ${Math.round(progress * 100)} percent, ${formatWpm(racer.wpm)} words per minute`}
               >
-                <span className="absolute inset-y-0 left-0 w-[var(--racer-progress)] rounded-full bg-[color:var(--racer-color)] opacity-22 transition-[width] duration-500 ease-out motion-reduce:transition-none" />
-                <span className="absolute top-1/2 left-[clamp(10px,var(--racer-progress),calc(100%-10px))] grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[4px_7px_4px_6px] border border-[#170f25] bg-[color:var(--racer-color)] text-[10px] font-[900] text-white shadow-[2px_1px_0_#170f25] transition-[left] duration-500 ease-out motion-reduce:transition-none">
+                <span
+                  className="absolute inset-y-0 left-0 w-[var(--racer-progress)] bg-[color:var(--racer-color)] opacity-75 shadow-[inset_0_1px_0_rgb(255_255_255/28%)] transition-[width] duration-500 ease-out motion-reduce:transition-none"
+                  data-progress-fill="true"
+                />
+                <span className="absolute top-1/2 left-[clamp(10px,var(--racer-progress),calc(100%-10px))] grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[4px_7px_4px_6px] border border-[#0b0711] bg-[color:var(--racer-color)] text-[10px] font-[900] text-[#160d21] shadow-[2px_1px_0_#0b0711] transition-[left] duration-500 ease-out motion-reduce:transition-none">
                   {racer.status === 'finished' ? (
                     <Check className="size-2.5" aria-hidden="true" />
                   ) : (
                     racer.displayName[0]?.toUpperCase()
                   )}
                 </span>
-                <span className="absolute inset-y-0 right-0 w-2.5 bg-[repeating-conic-gradient(#fff_0_25%,#211532_0_50%)_0_0/6px_6px] opacity-75" />
               </div>
               <div className="mt-2 flex items-center justify-between text-[11px] font-[650] text-[#aaa2b6]">
                 <span>{formatAccuracy(racer.accuracy)} accurate</span>

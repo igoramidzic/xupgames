@@ -14,10 +14,8 @@ describe('playtest run completion', () => {
     );
   });
 
-  it('ends type racer playtests at their selected duration', () => {
-    expect(gameBotRunCompletionReason({ gameType: 'typeRacer' }, { endsAt: 1_000 }, 999)).toBeNull();
-    expect(gameBotRunCompletionReason({ gameType: 'typeRacer' }, { endsAt: 1_000 }, 1_000)).toBe(
-      'Completed the selected duration.'
-    );
+  it('keeps type racer players until the owner removes them', () => {
+    expect(gameBotRunCompletionReason({ gameType: 'typeRacer' }, { endsAt: 1_000 }, 2_000)).toBeNull();
+    expect(gameBotRunCompletionReason({ gameType: 'typeRacer' }, { endsAt: null }, 2_000)).toBeNull();
   });
 });

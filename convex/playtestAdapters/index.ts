@@ -50,9 +50,8 @@ export function gameBotRunCompletionReason(
     case 'drawing':
       return run.endsAt !== null && now >= run.endsAt ? 'Completed the selected duration.' : null;
     case 'trivia':
-      return null;
     case 'typeRacer':
-      return run.endsAt !== null && now >= run.endsAt ? 'Completed the selected duration.' : null;
+      return null;
     default: {
       const unsupportedGameType: never = room.gameType;
       throw new Error(`No playtest completion adapter exists for game type: ${unsupportedGameType}`);
