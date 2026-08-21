@@ -42,68 +42,89 @@ export default function Home() {
   }
 
   return (
-    <div className="home-shell">
-      <header className="site-header">
-        <a className="wordmark" href="/" aria-label="Xup Games home">
-          <span className="wordmark-mark" aria-hidden="true">
+    <div className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_74%_16%,rgb(255_255_255/90%)_0_16rem,transparent_34rem),linear-gradient(135deg,#f7f9fd_0%,#edf2fa_62%,#e9eef8_100%)]">
+      <header className="mx-auto flex h-22 w-[min(100%-48px,1440px)] items-center justify-between max-[620px]:h-18 max-[620px]:w-[calc(100%-32px)]">
+        <a
+          className="inline-flex items-center gap-2.75 font-display text-lg font-extrabold tracking-[-0.03em] text-[#17203a] no-underline"
+          href="/"
+          aria-label="Xup Games home"
+        >
+          <span
+            className="grid size-8.5 -rotate-4 place-items-center rounded-[10px_6px_11px_7px] border-2 border-[#17203a] bg-[#f3cb42] text-lg leading-none shadow-[3px_3px_0_#17203a]"
+            aria-hidden="true"
+          >
             X
           </span>
           <span>Xup Games</span>
         </a>
-        <div className="header-note">
-          <span className="live-dot" />
+        <div className="flex items-center gap-2.25 text-[13px] font-[620] text-[#59647b] max-[620px]:text-[0]">
+          <span className="size-2 shrink-0 rounded-full bg-[#35b87f] shadow-[0_0_0_4px_rgb(53_184_127/13%)]" />
           Realtime game rooms
         </div>
       </header>
 
-      <main className="home-main">
-        <section className="home-copy">
-          <p className="eyebrow">Pick a game. Bring up to 50 people.</p>
-          <h1>
+      <main className="mx-auto grid min-h-[calc(100vh-136px)] w-[min(100%-96px,1360px)] grid-cols-[minmax(390px,0.88fr)_minmax(520px,1.12fr)] items-center gap-[clamp(56px,7vw,120px)] py-8 pb-20 max-[1040px]:w-[min(100%-56px,760px)] max-[1040px]:grid-cols-1 max-[1040px]:gap-20.5 max-[1040px]:pt-18 max-[620px]:w-[calc(100%-32px)] max-[620px]:py-10.5 max-[620px]:pb-14">
+        <section className="relative z-2 max-w-152.5 animate-in fade-in slide-in-from-bottom-4 duration-500 motion-reduce:animate-none max-[1040px]:max-w-170">
+          <p className="mb-5 text-xs font-[780] tracking-[0.12em] text-[#3155d9] uppercase">
+            Pick a game. Bring up to 50 people.
+          </p>
+          <h1 className="m-0 max-w-162.5 font-display text-[clamp(62px,6.8vw,108px)] leading-[0.83] font-[820] tracking-[-0.075em] text-[#17203a] max-[620px]:text-[clamp(54px,18vw,74px)]">
             One link.
-            <span className="headline-accent"> Everyone plays.</span>
+            <span className="block text-[#3155d9]"> Everyone plays.</span>
           </h1>
-          <p className="home-intro">
+          <p className="mt-8 max-w-135 text-[clamp(17px,1.4vw,20px)] leading-[1.58] text-[#59647b] max-[620px]:mt-6 max-[620px]:text-[17px]">
             Open a room for a shared canvas or a ten-question trivia sprint. No accounts, installs, or waiting around.
           </p>
 
-          <form className="create-room-card" onSubmit={handleCreateRoom}>
-            <fieldset className="game-picker">
-              <legend>Choose a game</legend>
+          <form
+            className="mt-9.5 w-[min(100%,560px)] rounded-[20px_16px_23px_17px] border border-[rgb(116_132_164/32%)] bg-[rgb(255_255_255/86%)] p-5 shadow-[0_18px_50px_rgb(52_73_118/10%)] backdrop-blur-[14px] max-[620px]:mt-7.5 max-[620px]:box-border max-[620px]:p-4"
+            onSubmit={handleCreateRoom}
+          >
+            <fieldset className="mb-5 grid grid-cols-2 gap-2.25 border-0 p-0 max-[520px]:grid-cols-1">
+              <legend className="col-span-full mb-2.5 ml-0.5 p-0 text-[13px] font-[720] text-[#323e58]">
+                Choose a game
+              </legend>
               <button
                 type="button"
-                className="game-option"
+                className="flex min-w-0 cursor-pointer items-center gap-2.75 rounded-[13px_10px_14px_11px] border-[1.5px] border-[#c6d0df] bg-[#f9fbfd] p-2.5 text-left text-[#38445d] transition-[border-color,background,transform] duration-150 hover:-translate-y-px hover:border-[#9fadc2] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/25%)] data-[selected=true]:border-[#3155d9] data-[selected=true]:bg-[#eef2ff] data-[selected=true]:shadow-[0_0_0_3px_rgb(49_85_217/10%)]"
                 data-selected={gameType === 'drawing'}
                 aria-pressed={gameType === 'drawing'}
                 onClick={() => setGameType('drawing')}
               >
-                <span className="game-option-icon game-option-icon-drawing">
-                  <PencilLine aria-hidden="true" />
+                <span className="grid size-8.5 shrink-0 place-items-center rounded-[9px_7px_10px_8px] bg-[#dfe6ff] text-[#3155d9]">
+                  <PencilLine className="size-4.25" aria-hidden="true" />
                 </span>
-                <span>
-                  <strong>Drawing</strong>
-                  <small>One canvas, total chaos</small>
+                <span className="grid min-w-0">
+                  <strong className="font-display text-sm font-[780] text-[#17203a]">Drawing</strong>
+                  <small className="overflow-hidden text-[10px] font-[580] text-ellipsis whitespace-nowrap text-[#748097]">
+                    One canvas, total chaos
+                  </small>
                 </span>
               </button>
               <button
                 type="button"
-                className="game-option"
+                className="flex min-w-0 cursor-pointer items-center gap-2.75 rounded-[13px_10px_14px_11px] border-[1.5px] border-[#c6d0df] bg-[#f9fbfd] p-2.5 text-left text-[#38445d] transition-[border-color,background,transform] duration-150 hover:-translate-y-px hover:border-[#9fadc2] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/25%)] data-[selected=true]:border-[#3155d9] data-[selected=true]:bg-[#eef2ff] data-[selected=true]:shadow-[0_0_0_3px_rgb(49_85_217/10%)]"
                 data-selected={gameType === 'trivia'}
                 aria-pressed={gameType === 'trivia'}
                 onClick={() => setGameType('trivia')}
               >
-                <span className="game-option-icon game-option-icon-trivia">
-                  <BrainCircuit aria-hidden="true" />
+                <span className="grid size-8.5 shrink-0 place-items-center rounded-[9px_7px_10px_8px] bg-[#fff0b8] text-[#715700]">
+                  <BrainCircuit className="size-4.25" aria-hidden="true" />
                 </span>
-                <span>
-                  <strong>Trivia</strong>
-                  <small>Fast answers score more</small>
+                <span className="grid min-w-0">
+                  <strong className="font-display text-sm font-[780] text-[#17203a]">Trivia</strong>
+                  <small className="overflow-hidden text-[10px] font-[580] text-ellipsis whitespace-nowrap text-[#748097]">
+                    Fast answers score more
+                  </small>
                 </span>
               </button>
             </fieldset>
-            <label htmlFor="display-name">What should we call you?</label>
-            <div className="create-room-row">
+            <label className="mb-2.5 ml-0.5 block text-[13px] font-[720] text-[#323e58]" htmlFor="display-name">
+              What should we call you?
+            </label>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2.5 max-[620px]:grid-cols-1">
               <input
+                className="h-13 w-full rounded-xl border-[1.5px] border-[#b9c4d7] bg-white px-4 text-base text-[#17203a] outline-none transition-[border-color,box-shadow] duration-150 focus:border-[#3155d9] focus:shadow-[0_0_0_4px_rgb(49_85_217/13%)] aria-invalid:border-[#d43c45] motion-reduce:transition-none"
                 id="display-name"
                 name="displayName"
                 autoComplete="nickname"
@@ -114,13 +135,25 @@ export default function Home() {
                 aria-describedby={error ? 'create-error' : 'create-hint'}
                 aria-invalid={Boolean(error)}
               />
-              <button className="primary-action" type="submit" disabled={isCreating}>
-                {isCreating ? <LoaderCircle className="spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}
+              <button
+                className="inline-flex h-13 min-w-40 cursor-pointer items-center justify-center gap-2.25 rounded-[12px_9px_13px_10px] border-0 bg-[#3155d9] px-4.5 text-sm font-[760] text-white shadow-[0_5px_0_#1838aa] transition-[transform,background,box-shadow] duration-150 enabled:hover:-translate-y-px enabled:hover:bg-[#2549cc] enabled:active:translate-y-[3px] enabled:active:shadow-[0_2px_0_#1838aa] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(49_85_217/30%)] disabled:cursor-wait disabled:opacity-72 motion-reduce:transition-none max-[620px]:w-full [&_svg]:size-4.25"
+                type="submit"
+                disabled={isCreating}
+              >
+                {isCreating ? (
+                  <LoaderCircle className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <ArrowRight aria-hidden="true" />
+                )}
                 {isCreating ? 'Opening…' : 'Create a room'}
               </button>
             </div>
-            <label className="password-toggle" htmlFor="password-protected">
+            <label
+              className="mt-4 ml-0.5 flex w-fit cursor-pointer items-center gap-2 text-[13px] font-[720] text-[#323e58]"
+              htmlFor="password-protected"
+            >
               <input
+                className="size-4 accent-[#3155d9]"
                 id="password-protected"
                 type="checkbox"
                 checked={passwordProtected}
@@ -129,13 +162,16 @@ export default function Home() {
                   setError(null);
                 }}
               />
-              <LockKeyhole aria-hidden="true" />
+              <LockKeyhole className="size-3.75 text-[#3155d9]" aria-hidden="true" />
               Require a password to join
             </label>
             {passwordProtected ? (
-              <div className="create-password-field">
-                <label htmlFor="room-password">Room password</label>
+              <div className="mt-3.5">
+                <label className="mb-2.5 ml-0.5 block text-[13px] font-[720] text-[#323e58]" htmlFor="room-password">
+                  Room password
+                </label>
                 <input
+                  className="box-border h-12 w-full rounded-xl border-[1.5px] border-[#b9c4d7] bg-white px-4 text-base text-[#17203a] outline-none transition-[border-color,box-shadow] duration-150 focus:border-[#3155d9] focus:shadow-[0_0_0_4px_rgb(49_85_217/13%)] aria-invalid:border-[#d43c45] motion-reduce:transition-none"
                   id="room-password"
                   name="password"
                   type="password"
@@ -152,75 +188,115 @@ export default function Home() {
               </div>
             ) : null}
             {error ? (
-              <p className="form-error" id="create-error" role="alert">
+              <p
+                className="mt-2.5 ml-0.5 min-h-4.5 text-xs leading-[1.45] font-[650] text-[#b72934]"
+                id="create-error"
+                role="alert"
+              >
                 {error}
               </p>
             ) : (
-              <p className="form-hint" id="create-hint">
+              <p className="mt-2.5 ml-0.5 min-h-4.5 text-xs leading-[1.45] text-[#7a8499]" id="create-hint">
                 No account. Your browser remembers you.
               </p>
             )}
           </form>
 
-          <div className="home-footnote">
-            <UsersRound aria-hidden="true" />
+          <div className="mt-6 ml-0.5 flex items-center gap-2.25 text-[13px] font-[620] text-[#59647b] max-[620px]:items-start">
+            <UsersRound className="size-4.25 text-[#3155d9]" aria-hidden="true" />
             Anyone with the link can join while there is room.
           </div>
         </section>
 
         <section
-          className="preview-stage"
+          className="relative mx-auto w-[min(100%,760px)] [perspective:1200px] animate-in fade-in slide-in-from-bottom-4 delay-100 duration-700 motion-reduce:animate-none max-[1040px]:mb-16 max-[1040px]:w-[min(92%,700px)] max-[620px]:w-[94%]"
           aria-label={gameType === 'drawing' ? 'A preview of the shared drawing canvas' : 'A preview of a trivia round'}
         >
-          <div className="preview-tape">ROOM F7K2P</div>
+          <div className="absolute -top-5.5 left-10.5 z-3 -rotate-4 bg-[rgb(49_85_217/92%)] px-7.5 pt-3.25 pb-2.75 font-display text-[13px] font-extrabold tracking-[0.12em] text-white [clip-path:polygon(7px_0,calc(100%-7px)_0,100%_7px,calc(100%-2px)_calc(100%-6px),calc(100%-7px)_100%,6px_100%,0_calc(100%-7px),2px_6px)] [filter:drop-shadow(0_8px_9px_rgb(49_85_217/22%))] max-[620px]:left-5">
+            ROOM F7K2P
+          </div>
           {gameType === 'drawing' ? (
-            <div className="preview-board">
-              <div className="preview-grid" />
-              <svg className="preview-drawing" viewBox="0 0 720 560" role="img" aria-label="Overlapping colorful lines">
-                <path className="stroke stroke-coral" d="M50 370 C 150 165, 310 490, 430 250 S 610 190, 675 75" />
-                <path className="stroke stroke-blue" d="M75 155 C 180 105, 185 415, 345 330 S 500 105, 650 330" />
-                <path className="stroke stroke-yellow" d="M130 445 C 205 330, 345 185, 595 390" />
-                <path className="stroke stroke-mint" d="M215 70 C 325 175, 445 80, 555 195" />
+            <div className="relative aspect-[1.24] rotate-[1.6deg] overflow-hidden rounded-[28px_18px_32px_20px] border border-[#c9d2e0] bg-white shadow-[0_35px_80px_rgb(38_56_96/18%),16px_20px_0_#dce4f1]">
+              <div className="absolute inset-0 bg-[linear-gradient(#dfe5ef_1px,transparent_1px),linear-gradient(90deg,#dfe5ef_1px,transparent_1px)] bg-size-[32px_32px] opacity-48 [mask-image:linear-gradient(to_bottom_right,#000_15%,transparent_88%)]" />
+              <svg
+                className="absolute inset-[1%_0_0] size-full"
+                viewBox="0 0 720 560"
+                role="img"
+                aria-label="Overlapping colorful lines"
+              >
+                <path
+                  className="fill-none stroke-[#ff685b] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:26]"
+                  d="M50 370 C 150 165, 310 490, 430 250 S 610 190, 675 75"
+                />
+                <path
+                  className="fill-none stroke-[#3155d9] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:19]"
+                  d="M75 155 C 180 105, 185 415, 345 330 S 500 105, 650 330"
+                />
+                <path
+                  className="fill-none stroke-[#f3cb42] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:32]"
+                  d="M130 445 C 205 330, 345 185, 595 390"
+                />
+                <path
+                  className="fill-none stroke-[#35b87f] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:15]"
+                  d="M215 70 C 325 175, 445 80, 555 195"
+                />
               </svg>
-              <div className="preview-person preview-person-one">
-                <span /> Maya
+              <div className="absolute top-[19%] right-[12%] flex -rotate-[1.6deg] items-center gap-1.75 rounded-full border border-[rgb(23_32_58/13%)] bg-[rgb(255_255_255/92%)] py-1.75 pr-2.5 pl-1.75 text-[11px] font-[720] text-[#26324c] shadow-[0_8px_20px_rgb(23_32_58/10%)] max-[620px]:scale-86">
+                <span className="size-5 rounded-full bg-[#ff685b]" /> Maya
               </div>
-              <div className="preview-person preview-person-two">
-                <span /> Theo
+              <div className="absolute right-[28%] bottom-[20%] flex -rotate-[1.6deg] items-center gap-1.75 rounded-full border border-[rgb(23_32_58/13%)] bg-[rgb(255_255_255/92%)] py-1.75 pr-2.5 pl-1.75 text-[11px] font-[720] text-[#26324c] shadow-[0_8px_20px_rgb(23_32_58/10%)] max-[620px]:scale-86">
+                <span className="size-5 rounded-full bg-[#f3cb42]" /> Theo
               </div>
-              <div className="preview-person preview-person-three">
-                <span /> You
+              <div className="absolute top-[45%] left-[10%] flex -rotate-[1.6deg] items-center gap-1.75 rounded-full border border-[rgb(23_32_58/13%)] bg-[rgb(255_255_255/92%)] py-1.75 pr-2.5 pl-1.75 text-[11px] font-[720] text-[#26324c] shadow-[0_8px_20px_rgb(23_32_58/10%)] max-[620px]:scale-86">
+                <span className="size-5 rounded-full bg-[#3155d9]" /> You
               </div>
-              <div className="preview-caption">
-                <span className="live-dot" /> 3 drawing now
+              <div className="absolute right-6 bottom-5 flex items-center gap-2.25 rounded-[10px] bg-[#17203a] px-3 py-2.25 text-[13px] font-[620] text-white">
+                <span className="size-2 shrink-0 rounded-full bg-[#35b87f] shadow-[0_0_0_4px_rgb(53_184_127/13%)]" /> 3
+                drawing now
               </div>
             </div>
           ) : (
-            <div className="preview-board preview-trivia-board">
-              <div className="preview-trivia-topline">
+            <div className="grid aspect-[1.24] rotate-[-1.2deg] grid-cols-[minmax(0,1fr)_168px] grid-rows-[auto_auto_minmax(0,1fr)] gap-x-6 overflow-hidden rounded-[28px_18px_32px_20px] border border-[#142747] bg-[#f8fbff] p-[clamp(28px,4vw,52px)] font-trivia text-[#10213d] shadow-[0_35px_80px_rgb(11_28_56/22%),16px_20px_0_#132746] animate-in fade-in slide-in-from-bottom-2 duration-300 motion-reduce:animate-none max-[520px]:grid-cols-1 max-[520px]:px-6 max-[520px]:py-8">
+              <div className="col-start-1 col-end-2 flex items-center justify-between border-b border-[#cfd9e8] pb-3.25 text-[10px] font-[760] tracking-[0.1em] text-[#52647e] max-[520px]:col-start-1 max-[520px]:col-end-2">
                 <span>QUESTION 7 / 10</span>
-                <span className="preview-trivia-timer">
-                  <Timer aria-hidden="true" /> 08.4
+                <span className="inline-flex items-center gap-1.25 tracking-[0.04em] text-[#e24e44] tabular-nums">
+                  <Timer className="size-3.25" aria-hidden="true" /> 08.4
                 </span>
               </div>
-              <p className="preview-trivia-category">SCIENCE</p>
-              <h2>Which planet has an axial tilt of roughly 98 degrees?</h2>
-              <div className="preview-trivia-options">
-                <span>A · Saturn</span>
-                <span>B · Neptune</span>
-                <span>C · Mars</span>
-                <span className="is-picked">D · Uranus</span>
+              <p className="col-start-1 col-end-2 mt-6.5 mb-2.25 text-[10px] font-[820] tracking-[0.14em] text-[#1a65a8] max-[520px]:col-start-1 max-[520px]:col-end-2">
+                SCIENCE
+              </p>
+              <h2 className="col-start-1 col-end-2 m-0 font-trivia text-[clamp(26px,3vw,43px)] leading-[1.02] font-[790] tracking-[-0.045em] text-[#10213d] [font-stretch:condensed] max-[520px]:col-start-1 max-[520px]:col-end-2">
+                Which planet has an axial tilt of roughly 98 degrees?
+              </h2>
+              <div className="col-start-1 col-end-2 mt-7 grid grid-cols-2 gap-2 self-end max-[520px]:col-start-1 max-[520px]:col-end-2">
+                <span className="rounded-[9px_7px_10px_8px] border border-[#cbd6e6] bg-white px-3.25 py-3 text-[11px] font-[680] text-[#3f506a]">
+                  A · Saturn
+                </span>
+                <span className="rounded-[9px_7px_10px_8px] border border-[#cbd6e6] bg-white px-3.25 py-3 text-[11px] font-[680] text-[#3f506a]">
+                  B · Neptune
+                </span>
+                <span className="rounded-[9px_7px_10px_8px] border border-[#cbd6e6] bg-white px-3.25 py-3 text-[11px] font-[680] text-[#3f506a]">
+                  C · Mars
+                </span>
+                <span className="rounded-[9px_7px_10px_8px] border border-[#f0bc17] bg-[#ffdd61] px-3.25 py-3 text-[11px] font-[680] text-[#352900] shadow-[3px_3px_0_#132746]">
+                  D · Uranus
+                </span>
               </div>
-              <div className="preview-trivia-score">
-                <div>
-                  <small>YOUR SCORE</small>
-                  <strong>4,620</strong>
+              <div className="col-start-2 col-end-3 row-start-1 row-end-[-1] flex flex-col border-l border-[#d6deea] pl-5.5 max-[520px]:hidden">
+                <div className="mb-auto rounded-[15px_11px_17px_12px] bg-[#132746] p-4 text-white">
+                  <small className="mb-1.5 block text-[8px] font-[760] tracking-[0.11em] text-[#8fb6d9]">
+                    YOUR SCORE
+                  </small>
+                  <strong className="font-trivia text-[27px] font-[760] tracking-[-0.035em]">4,620</strong>
                 </div>
-                <p>
-                  <span>1</span> Maya <strong>5,180</strong>
+                <p className="mt-1.75 grid grid-cols-[20px_1fr_auto] items-center gap-1.5 border-b border-[#dce3ed] px-1.75 py-2 text-[9px] text-[#65758c]">
+                  <span className="font-extrabold text-[#8593a6]">1</span> Maya{' '}
+                  <strong className="text-[#23344f] tabular-nums">5,180</strong>
                 </p>
-                <p className="is-you">
-                  <span>2</span> You <strong>4,620</strong>
+                <p className="mt-1.75 grid grid-cols-[20px_1fr_auto] items-center gap-1.5 rounded-md border-b border-[#dce3ed] bg-[#e8f3ff] px-1.75 py-2 text-[9px] text-[#174e80]">
+                  <span className="font-extrabold text-[#8593a6]">2</span> You{' '}
+                  <strong className="text-[#23344f] tabular-nums">4,620</strong>
                 </p>
               </div>
             </div>

@@ -20,6 +20,8 @@ import type * as playtestAdapters_drawing from "../playtestAdapters/drawing.js";
 import type * as playtestAdapters_index from "../playtestAdapters/index.js";
 import type * as playtestAdapters_trivia from "../playtestAdapters/trivia.js";
 import type * as playtests from "../playtests.js";
+import type * as roomMembers from "../roomMembers.js";
+import type * as roomPresence from "../roomPresence.js";
 import type * as rooms from "../rooms.js";
 import type * as trivia from "../trivia.js";
 import type * as triviaEngine from "../triviaEngine.js";
@@ -46,6 +48,8 @@ const fullApi: ApiFromModules<{
   "playtestAdapters/index": typeof playtestAdapters_index;
   "playtestAdapters/trivia": typeof playtestAdapters_trivia;
   playtests: typeof playtests;
+  roomMembers: typeof roomMembers;
+  roomPresence: typeof roomPresence;
   rooms: typeof rooms;
   trivia: typeof trivia;
   triviaEngine: typeof triviaEngine;

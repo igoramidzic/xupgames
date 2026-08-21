@@ -12,6 +12,7 @@ import {
 } from './domain';
 import { gameTypeValidator } from './games';
 import { createPasswordCredential, verifyPasswordCredential } from './passwords';
+import { listRoomMembersForDisplay } from './roomMembers';
 
 const roomStatusValidator = v.union(v.literal('open'), v.literal('closed'));
 
@@ -37,11 +38,13 @@ const currentMemberValidator = v.object({
   leftAt: v.union(v.number(), v.null()),
 });
 
-const activeMemberValidator = v.object({
+const memberValidator = v.object({
   memberId: v.id('roomMembers'),
   displayName: v.string(),
   isOwner: v.boolean(),
+  isActive: v.boolean(),
   joinedAt: v.number(),
+  leftAt: v.union(v.number(), v.null()),
 });
 
 const sessionResultValidator = v.union(
@@ -57,7 +60,7 @@ const sessionResultValidator = v.union(
     maxPlayers: v.number(),
     isOwner: v.boolean(),
     currentMember: currentMemberValidator,
-    activeMembers: v.array(activeMemberValidator),
+    members: v.array(memberValidator),
   })
 );
 
@@ -184,13 +187,7 @@ export const getSession = query({
       return { kind: 'not_member' as const };
     }
 
-    const activeMemberships = await ctx.db
-      .query('roomMembers')
-      .withIndex('by_roomId_and_isActive', (index) => index.eq('roomId', room._id).eq('isActive', true))
-      .take(MAX_PLAYERS + 1);
-    if (activeMemberships.length > MAX_PLAYERS) {
-      throw new Error('Room capacity invariant violated.');
-    }
+    const memberships = await listRoomMembersForDisplay(ctx, room._id);
 
     return {
       kind: 'session' as const,
@@ -208,11 +205,13 @@ export const getSession = query({
         joinedAt: membership.joinedAt,
         leftAt: membership.leftAt,
       },
-      activeMembers: activeMemberships.map((activeMembership) => ({
-        memberId: activeMembership._id,
-        displayName: activeMembership.displayName,
-        isOwner: activeMembership.guestId === room.ownerGuestId,
-        joinedAt: activeMembership.joinedAt,
+      members: memberships.map((roomMembership) => ({
+        memberId: roomMembership._id,
+        displayName: roomMembership.displayName,
+        isOwner: roomMembership.guestId === room.ownerGuestId,
+        isActive: roomMembership.isActive,
+        joinedAt: roomMembership.joinedAt,
+        leftAt: roomMembership.leftAt,
       })),
     };
   },

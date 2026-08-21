@@ -16,6 +16,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { readGuest } from '@/lib/guest';
 import { userFacingError } from '@/lib/userFacingError';
+import { cn } from '@/lib/utils';
 
 type InspectResult = FunctionReturnType<typeof api.playtests.inspect>;
 type PlaytestRoom = Extract<InspectResult, { kind: 'room' }>;
@@ -90,19 +91,26 @@ function AdminRoomPicker({ initialCode = '' }: { initialCode?: string }) {
   }
 
   return (
-    <div className="admin-gate-shell">
+    <div className="min-h-screen bg-[#edf2f8] bg-[radial-gradient(circle_at_50%_45%,rgb(255_255_255/96%)_0_16rem,transparent_35rem)] text-[#17203a] [&_a:focus-visible]:outline-3 [&_a:focus-visible]:outline-offset-3 [&_a:focus-visible]:outline-[rgb(49_85_217/28%)] [&_button:focus-visible]:outline-3 [&_button:focus-visible]:outline-offset-3 [&_button:focus-visible]:outline-[rgb(49_85_217/28%)] [&_input:focus-visible]:outline-3 [&_input:focus-visible]:outline-offset-3 [&_input:focus-visible]:outline-[rgb(49_85_217/28%)]">
       <AdminWordmark />
-      <main className="admin-picker-card">
-        <div className="admin-gate-mark" aria-hidden="true">
-          <Gamepad2 />
+      <main className="mx-auto mt-[11vh] box-border w-[min(460px,calc(100%-40px))] rounded-[18px_13px_20px_14px] border border-[#bdc8d8] bg-white p-9.5 text-center shadow-[8px_9px_0_rgb(23_32_58/9%)] max-[620px]:mt-[7vh] max-[620px]:px-5.5 max-[620px]:py-7">
+        <div className="mx-auto mb-6.25 grid size-14.5 -rotate-4 place-items-center rounded-[18px_13px_17px_12px] border-2 border-[#17203a] bg-[#f3cb42] shadow-[4px_4px_0_#17203a]">
+          <Gamepad2 className="size-6.5" aria-hidden="true" />
         </div>
-        <p className="eyebrow">Playtest control</p>
-        <h1>Choose the room you own.</h1>
-        <p>Enter its eight-character code or use Playtest from the live room toolbar.</p>
-        <form onSubmit={openRoom}>
-          <label htmlFor="admin-room-code">Room code</label>
-          <div>
+        <p className="mb-5 text-xs font-[780] tracking-[0.12em] text-[#3155d9] uppercase">Playtest control</p>
+        <h1 className="m-0 font-display text-[32px] leading-[1.05] font-[780] tracking-[-0.045em]">
+          Choose the room you own.
+        </h1>
+        <p className="mx-auto mt-4 mb-6 text-[13px] leading-[1.55] text-[#667187]">
+          Enter its eight-character code or use Playtest from the live room toolbar.
+        </p>
+        <form className="text-left" onSubmit={openRoom}>
+          <label className="mb-1.75 block text-[11px] font-[730] text-[#4c5870]" htmlFor="admin-room-code">
+            Room code
+          </label>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 max-[620px]:grid-cols-1">
             <input
+              className="box-border h-11 min-w-0 rounded-lg border border-[#bfc9d8] px-3 font-display font-[750] tracking-[0.08em] text-[#17203a] uppercase"
               id="admin-room-code"
               autoCapitalize="characters"
               autoComplete="off"
@@ -111,7 +119,11 @@ function AdminRoomPicker({ initialCode = '' }: { initialCode?: string }) {
               value={code}
               onChange={(event) => setCode(event.target.value.toUpperCase())}
             />
-            <button type="submit" disabled={!ROOM_CODE_PATTERN.test(normalizedCode)}>
+            <button
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.75 rounded-lg border border-[#2748bd] bg-[#3155d9] px-3.5 text-[11px] font-[740] text-white disabled:cursor-not-allowed disabled:opacity-45 [&_svg]:size-3.5"
+              type="submit"
+              disabled={!ROOM_CODE_PATTERN.test(normalizedCode)}
+            >
               Open controls <ArrowRight aria-hidden="true" />
             </button>
           </div>
@@ -123,14 +135,21 @@ function AdminRoomPicker({ initialCode = '' }: { initialCode?: string }) {
 
 function AdminWordmark() {
   return (
-    <header className="admin-gate-header">
-      <Link className="wordmark" to="/" aria-label="Xup Games home">
-        <span className="wordmark-mark" aria-hidden="true">
+    <header className="grid h-19 grid-cols-[1fr_auto] items-center border-b border-[#c8d1e0] bg-[rgb(248_250_253/94%)] px-7 backdrop-blur-[14px] max-[620px]:h-16.5 max-[620px]:px-4">
+      <Link
+        className="inline-flex items-center gap-2.75 font-display text-lg font-extrabold tracking-[-0.03em] text-[#17203a] no-underline"
+        to="/"
+        aria-label="Xup Games home"
+      >
+        <span
+          className="grid size-8.5 -rotate-4 place-items-center rounded-[10px_6px_11px_7px] border-2 border-[#17203a] bg-[#f3cb42] text-lg leading-none shadow-[3px_3px_0_#17203a]"
+          aria-hidden="true"
+        >
           X
         </span>
-        <span>Xup Games</span>
+        <span className="max-[620px]:hidden">Xup Games</span>
       </Link>
-      <span>Playtest control</span>
+      <span className="text-[11px] font-[740] tracking-[0.08em] text-[#6b768b] uppercase">Playtest control</span>
     </header>
   );
 }
@@ -147,22 +166,27 @@ function AdminGate({
   code?: string;
 }) {
   return (
-    <div className="admin-gate-shell">
+    <div className="min-h-screen bg-[#edf2f8] bg-[radial-gradient(circle_at_50%_45%,rgb(255_255_255/96%)_0_16rem,transparent_35rem)] text-[#17203a] [&_a:focus-visible]:outline-3 [&_a:focus-visible]:outline-offset-3 [&_a:focus-visible]:outline-[rgb(49_85_217/28%)] [&_button:focus-visible]:outline-3 [&_button:focus-visible]:outline-offset-3 [&_button:focus-visible]:outline-[rgb(49_85_217/28%)]">
       <AdminWordmark />
-      <main className="admin-picker-card">
-        <div className="admin-gate-mark" aria-hidden="true">
-          <Bot />
+      <main className="mx-auto mt-[11vh] box-border w-[min(460px,calc(100%-40px))] rounded-[18px_13px_20px_14px] border border-[#bdc8d8] bg-white p-9.5 text-center shadow-[8px_9px_0_rgb(23_32_58/9%)] max-[620px]:mt-[7vh] max-[620px]:px-5.5 max-[620px]:py-7">
+        <div className="mx-auto mb-6.25 grid size-14.5 -rotate-4 place-items-center rounded-[18px_13px_17px_12px] border-2 border-[#17203a] bg-[#f3cb42] shadow-[4px_4px_0_#17203a]">
+          <Bot className="size-6.5" aria-hidden="true" />
         </div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h1>{title}</h1>
-        <p>{detail}</p>
-        <div className="admin-gate-actions">
+        <p className="mb-5 text-xs font-[780] tracking-[0.12em] text-[#3155d9] uppercase">{eyebrow}</p>
+        <h1 className="m-0 font-display text-[32px] leading-[1.05] font-[780] tracking-[-0.045em]">{title}</h1>
+        <p className="mx-auto mt-4 mb-6 text-[13px] leading-[1.55] text-[#667187]">{detail}</p>
+        <div className="flex items-center justify-center gap-3.5">
           {code ? (
-            <Link className="admin-primary-link" to={`/r/${code}`}>
+            <Link
+              className="inline-flex h-11 items-center justify-center gap-1.75 rounded-lg border border-[#2748bd] bg-[#3155d9] px-3.5 text-[11px] font-[740] text-white no-underline [&_svg]:size-3.5"
+              to={`/r/${code}`}
+            >
               Open room <ArrowRight aria-hidden="true" />
             </Link>
           ) : null}
-          <Link to="/admin">Try another code</Link>
+          <Link className="text-[11px] font-bold text-[#526079]" to="/admin">
+            Try another code
+          </Link>
         </div>
       </main>
     </div>
@@ -171,12 +195,15 @@ function AdminGate({
 
 function AdminLoading() {
   return (
-    <main className="admin-loading">
-      <div className="wordmark-mark" aria-hidden="true">
+    <main className="grid min-h-screen place-content-center bg-[#eef2f8] text-center text-[#68748a]">
+      <div
+        className="mx-auto grid size-8.5 -rotate-4 place-items-center rounded-[10px_6px_11px_7px] border-2 border-[#17203a] bg-[#f3cb42] text-lg leading-none shadow-[3px_3px_0_#17203a]"
+        aria-hidden="true"
+      >
         X
       </div>
-      <LoaderCircle className="spin" aria-hidden="true" />
-      <p>Counting the seats…</p>
+      <LoaderCircle className="mx-auto mt-4.5 mb-1 size-6 animate-spin text-[#3155d9]" aria-hidden="true" />
+      <p className="text-xs">Counting the seats…</p>
     </main>
   );
 }
@@ -241,79 +268,105 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
   const statusLabel = run ? run.status[0].toUpperCase() + run.status.slice(1) : 'Ready';
 
   return (
-    <div className="admin-shell">
-      <header className="admin-topbar">
-        <Link className="wordmark" to="/" aria-label="Xup Games home">
-          <span className="wordmark-mark" aria-hidden="true">
+    <div className="min-h-screen bg-[#eef2f8] bg-[linear-gradient(90deg,rgb(49_85_217/4%)_1px,transparent_1px),linear-gradient(rgb(49_85_217/4%)_1px,transparent_1px)] bg-size-[32px_32px] text-[#17203a] [&_a:focus-visible]:outline-3 [&_a:focus-visible]:outline-offset-3 [&_a:focus-visible]:outline-[rgb(49_85_217/28%)] [&_button:focus-visible]:outline-3 [&_button:focus-visible]:outline-offset-3 [&_button:focus-visible]:outline-[rgb(49_85_217/28%)]">
+      <header className="grid h-19 grid-cols-[1fr_auto_1fr] items-center border-b border-[#c8d1e0] bg-[rgb(248_250_253/94%)] px-7 backdrop-blur-[14px] max-[620px]:h-16.5 max-[620px]:grid-cols-[1fr_auto] max-[620px]:px-4">
+        <Link
+          className="inline-flex items-center gap-2.75 font-display text-lg font-extrabold tracking-[-0.03em] text-[#17203a] no-underline"
+          to="/"
+          aria-label="Xup Games home"
+        >
+          <span
+            className="grid size-8.5 -rotate-4 place-items-center rounded-[10px_6px_11px_7px] border-2 border-[#17203a] bg-[#f3cb42] text-lg leading-none shadow-[3px_3px_0_#17203a]"
+            aria-hidden="true"
+          >
             X
           </span>
-          <span>Xup Games</span>
+          <span className="max-[620px]:hidden">Xup Games</span>
         </Link>
-        <div className="admin-room-label">
-          <span>PLAYTEST</span>
-          <strong>ROOM {panel.room.code}</strong>
+        <div className="flex -rotate-[0.5deg] items-center gap-2.25 rounded-[8px_11px_7px_10px] border border-[#bfc9d9] bg-white py-1.75 pr-3 pl-2 font-display shadow-[3px_3px_0_#dbe2ec] max-[620px]:justify-self-end">
+          <span className="rounded-sm bg-[#ff685b] px-1.5 py-1 text-[9px] font-[850] tracking-[0.11em] text-white">
+            PLAYTEST
+          </span>
+          <strong className="text-[11px] tracking-[0.09em]">ROOM {panel.room.code}</strong>
         </div>
-        <Link className="admin-open-room" to={`/r/${panel.room.code}`}>
-          Open live room <ExternalLink aria-hidden="true" />
+        <Link
+          className="inline-flex items-center justify-self-end gap-1.75 text-xs font-bold text-[#46536d] no-underline hover:text-[#3155d9] max-[620px]:hidden"
+          to={`/r/${panel.room.code}`}
+        >
+          Open live room <ExternalLink className="size-3.5" aria-hidden="true" />
         </Link>
       </header>
 
-      <main className="admin-main">
-        <section className="admin-intro">
+      <main className="mx-auto w-[min(1180px,calc(100%-48px))] pt-13.5 pb-17.5 max-[900px]:w-[min(100%-32px,720px)] max-[900px]:pt-9.5 max-[620px]:w-[calc(100%-24px)] max-[620px]:pt-7.5 max-[620px]:pb-12">
+        <section className="mb-8.5 grid grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)] items-end gap-18 max-[900px]:grid-cols-1 max-[900px]:gap-4.5">
           <div>
-            <p className="eyebrow">Game master controls</p>
-            <h1>Fill the table. Watch the game bend.</h1>
+            <p className="mb-2.25 text-xs font-[780] tracking-[0.12em] text-[#3155d9] uppercase">
+              Game master controls
+            </p>
+            <h1 className="m-0 max-w-175 font-display text-[clamp(38px,5.2vw,68px)] leading-[0.98] font-[790] tracking-[-0.055em] max-[620px]:text-[38px]">
+              Fill the table. Watch the game bend.
+            </h1>
           </div>
-          <p>
+          <p className="mb-1 max-w-105 text-sm leading-[1.65] text-[#5a667d] max-[900px]:max-w-150 [&_strong]:text-[#3155d9] [&_strong]:capitalize">
             Bots join as room members, publish live cursors, and follow the <strong>{panel.room.gameType}</strong>{' '}
             game’s playtest adapter.
           </p>
         </section>
 
-        <section className="admin-grid">
-          <div className="seat-map-card">
-            <div className="admin-card-heading">
+        <section className="grid grid-cols-[minmax(0,1.48fr)_minmax(310px,0.72fr)] items-start gap-4.5 max-[900px]:grid-cols-1">
+          <div className="rounded-[18px_12px_20px_13px] border border-[#bdc8d9] bg-white p-7 shadow-[7px_8px_0_rgb(23_32_58/8%)] max-[620px]:p-4.75 max-[620px]:shadow-[4px_5px_0_rgb(23_32_58/8%)]">
+            <div className="flex items-start justify-between gap-4.5">
               <div>
-                <p className="eyebrow">Live table map</p>
-                <h2>{panel.room.activeMemberCount} seats occupied</h2>
+                <p className="mb-2.25 text-xs font-[780] tracking-[0.12em] text-[#3155d9] uppercase">Live table map</p>
+                <h2 className="m-0 font-display text-2xl font-[760] tracking-[-0.035em]">
+                  {panel.room.activeMemberCount} seats occupied
+                </h2>
               </div>
-              <span className={`playtest-status playtest-status-${run?.status ?? 'ready'}`}>
-                <span /> {statusLabel}
+              <span className="inline-flex items-center gap-1.75 rounded-full border border-[#cad3e1] bg-[#f7f9fc] px-2.5 py-1.75 text-[11px] font-[740] text-[#5c687d]">
+                <span
+                  className={cn(
+                    'size-1.75 rounded-full bg-[#8c96a8]',
+                    (run?.status === 'provisioning' || run?.status === 'running') &&
+                      'bg-[#35b87f] shadow-[0_0_0_4px_rgb(53_184_127/12%)]',
+                    run?.status === 'stopping' && 'bg-[#f3a63b]'
+                  )}
+                />{' '}
+                {statusLabel}
               </span>
             </div>
 
             <SeatMap panel={panel} target={target} />
 
-            <div className="seat-legend">
-              <span>
-                <i data-seat="human" /> Real players
+            <div className="mb-7 flex flex-wrap items-center gap-4.5 text-[11px] font-[650] text-[#68748a]">
+              <span className="inline-flex items-center gap-1.75">
+                <i className="size-2.25 rounded-full border border-[#17203a] bg-[#f3cb42]" /> Real players
               </span>
-              <span>
-                <i data-seat="bot" /> Live bots
+              <span className="inline-flex items-center gap-1.75">
+                <i className="size-2.25 rounded-full border border-[#3155d9] bg-[#3155d9]" /> Live bots
               </span>
-              <span>
-                <i data-seat="queued" /> Target seats
+              <span className="inline-flex items-center gap-1.75">
+                <i className="size-2.25 rounded-full border border-dashed border-[#ef6d62] bg-[#fff1ef]" /> Target seats
               </span>
             </div>
 
-            <div className="table-readout">
-              <div>
-                <UsersRound aria-hidden="true" />
-                <span>
+            <div className="grid grid-cols-3 border-t border-[#d5dce7] max-[620px]:gap-0">
+              <div className="flex items-center gap-2.75 border-r border-[#d5dce7] pt-5 pr-3.5 pb-0.5 max-[620px]:gap-1.75 max-[620px]:px-2 max-[620px]:pt-3.75">
+                <UsersRound className="size-4.5 text-[#3155d9] max-[620px]:hidden" aria-hidden="true" />
+                <span className="flex flex-col text-[10px] font-bold tracking-[0.04em] text-[#7a8497] uppercase">
                   Real players<strong>{panel.room.humanMemberCount}</strong>
                 </span>
               </div>
-              <div>
-                <Bot aria-hidden="true" />
-                <span>
+              <div className="flex items-center gap-2.75 border-r border-[#d5dce7] px-3.5 pt-5 pb-0.5 max-[620px]:gap-1.75 max-[620px]:px-2 max-[620px]:pt-3.75">
+                <Bot className="size-4.5 text-[#3155d9] max-[620px]:hidden" aria-hidden="true" />
+                <span className="flex flex-col text-[10px] font-bold tracking-[0.04em] text-[#7a8497] uppercase">
                   Live bots<strong>{run?.activeBotCount ?? 0}</strong>
                 </span>
               </div>
-              <div>
-                <Timer aria-hidden="true" />
-                <span>
+              <div className="flex items-center gap-2.75 px-3.5 pt-5 pb-0.5 max-[620px]:gap-1.75 max-[620px]:px-2 max-[620px]:pt-3.75">
+                <Timer className="size-4.5 text-[#3155d9] max-[620px]:hidden" aria-hidden="true" />
+                <span className="flex flex-col text-[10px] font-bold tracking-[0.04em] text-[#7a8497] uppercase">
                   {isTrivia ? 'Players stay' : 'Time left'}
-                  <strong>
+                  <strong className="mt-0.75 text-lg tracking-[-0.02em] text-[#17203a] normal-case max-[620px]:text-[15px]">
                     {isTrivia ? 'Until you remove them' : isRunActive ? formatDuration(remainingSeconds) : '—'}
                   </strong>
                 </span>
@@ -321,23 +374,27 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
             </div>
           </div>
 
-          <aside className="playtest-controls-card">
-            <div className="admin-card-heading">
+          <aside className="rotate-[0.15deg] rounded-[12px_19px_13px_18px] border border-[#bdc8d9] bg-white p-6 shadow-[7px_8px_0_rgb(23_32_58/8%)] max-[900px]:rotate-0 max-[620px]:p-4.75 max-[620px]:shadow-[4px_5px_0_rgb(23_32_58/8%)]">
+            <div className="flex items-start justify-between gap-4.5">
               <div>
-                <p className="eyebrow">Run setup</p>
-                <h2>Call bots to the table</h2>
+                <p className="mb-2.25 text-xs font-[780] tracking-[0.12em] text-[#3155d9] uppercase">Run setup</p>
+                <h2 className="m-0 font-display text-2xl font-[760] tracking-[-0.035em]">Call bots to the table</h2>
               </div>
-              <Gamepad2 aria-hidden="true" />
+              <Gamepad2
+                className="size-6.75 rotate-7 rounded-full border border-[#c5cfdd] bg-[#f3cb42] p-2"
+                aria-hidden="true"
+              />
             </div>
 
-            <fieldset disabled={isRunActive || pending !== null}>
-              <legend>Target room size</legend>
-              <div className="segmented-control target-control">
+            <fieldset className="mt-6.25 min-w-0 border-0 p-0" disabled={isRunActive || pending !== null}>
+              <legend className="mb-2.25 text-[11px] font-[730] text-[#4f5b72]">Target room size</legend>
+              <div className="grid grid-cols-3 gap-1.5 rounded-[10px] border border-[#c8d2e0] bg-[#eef2f7] p-1.25">
                 {TARGETS.map((option) => (
                   <button
                     key={option}
                     type="button"
                     aria-label={`${option} seats`}
+                    className="flex h-11.25 min-w-0 cursor-pointer flex-col items-center justify-center rounded-[7px] border border-transparent bg-transparent text-xs font-bold text-[#69758b] data-[selected=true]:border-[#bdc7d8] data-[selected=true]:bg-white data-[selected=true]:text-[#3155d9] data-[selected=true]:shadow-[0_2px_4px_rgb(23_32_58/9%)] disabled:cursor-not-allowed disabled:opacity-[.38] [&_strong]:font-display [&_strong]:text-[17px] [&_strong]:leading-none [&_span]:mt-0.5 [&_span]:text-[9px] [&_span]:font-[650]"
                     data-selected={target === option}
                     disabled={option <= panel.room.activeMemberCount}
                     onClick={() => setTarget(option)}
@@ -350,13 +407,14 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
             </fieldset>
 
             {!isTrivia ? (
-              <fieldset disabled={isRunActive || pending !== null}>
-                <legend>Run for</legend>
-                <div className="segmented-control duration-control">
+              <fieldset className="mt-6.25 min-w-0 border-0 p-0" disabled={isRunActive || pending !== null}>
+                <legend className="mb-2.25 text-[11px] font-[730] text-[#4f5b72]">Run for</legend>
+                <div className="grid grid-cols-3 gap-1.5 rounded-[10px] border border-[#c8d2e0] bg-[#eef2f7] p-1.25">
                   {DURATIONS.map((option) => (
                     <button
                       key={option.value}
                       type="button"
+                      className="flex h-9.5 min-w-0 cursor-pointer flex-col items-center justify-center rounded-[7px] border border-transparent bg-transparent text-xs font-bold text-[#69758b] data-[selected=true]:border-[#bdc7d8] data-[selected=true]:bg-white data-[selected=true]:text-[#3155d9] data-[selected=true]:shadow-[0_2px_4px_rgb(23_32_58/9%)] disabled:cursor-not-allowed disabled:opacity-[.38]"
                       data-selected={durationMs === option.value}
                       onClick={() => setDurationMs(option.value)}
                     >
@@ -367,20 +425,25 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
               </fieldset>
             ) : null}
 
-            <div className="adapter-note">
-              <span>
-                <Bot aria-hidden="true" />
+            <div className="my-6 flex items-start gap-3 rounded-[9px_13px_8px_12px] border border-dashed border-[#bdc8d8] bg-[#f7f9fc] p-3.5">
+              <span className="grid size-7.5 shrink-0 -rotate-3 place-items-center rounded-[8px_6px_9px_7px] bg-[#dfe6fb] text-[#3155d9]">
+                <Bot className="size-4" aria-hidden="true" />
               </span>
               <div>
-                <strong>{adapterCopy.label}</strong>
-                <p>{adapterCopy.description}</p>
+                <strong className="text-xs">{adapterCopy.label}</strong>
+                <p className="mt-0.75 text-[11px] leading-[1.45] text-[#6a758a]">{adapterCopy.description}</p>
               </div>
             </div>
 
             {isRunActive && run ? (
-              <button className="stop-playtest" type="button" onClick={handleStop} disabled={pending !== null}>
+              <button
+                className="flex h-12 w-full cursor-pointer items-center justify-center gap-2.25 rounded-[9px] border border-[#d7544b] bg-[#fff3f1] text-[13px] font-[760] text-[#b73c34] shadow-[0_4px_0_#e5b0ab] transition-none enabled:hover:bg-[#ffe9e6] enabled:active:translate-y-1 enabled:active:shadow-none disabled:cursor-not-allowed disabled:opacity-52 [&_svg]:size-4.25"
+                type="button"
+                onClick={handleStop}
+                disabled={pending !== null}
+              >
                 {pending === 'stop' ? (
-                  <LoaderCircle className="spin" aria-hidden="true" />
+                  <LoaderCircle className="animate-spin" aria-hidden="true" />
                 ) : (
                   <CircleStop aria-hidden="true" />
                 )}
@@ -394,13 +457,13 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
               </button>
             ) : (
               <button
-                className="start-playtest"
+                className="flex h-12 w-full cursor-pointer items-center justify-center gap-2.25 rounded-[9px] border border-[#2748bd] bg-[#3155d9] text-[13px] font-[760] text-white shadow-[0_4px_0_#1f3b9e] transition-none enabled:hover:bg-[#294bc5] enabled:active:translate-y-1 enabled:active:shadow-none disabled:cursor-not-allowed disabled:opacity-52 [&_svg]:size-4.25"
                 type="button"
                 onClick={handleStart}
                 disabled={!canStart || pending !== null}
               >
                 {pending === 'start' ? (
-                  <LoaderCircle className="spin" aria-hidden="true" />
+                  <LoaderCircle className="animate-spin" aria-hidden="true" />
                 ) : (
                   <Play aria-hidden="true" />
                 )}
@@ -409,18 +472,23 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
             )}
 
             {run ? (
-              <div className="last-run-note">
-                <span>
+              <div className="mt-4 flex flex-col gap-1 text-center text-[10px] text-[#6c778c]">
+                <span className="font-[720] uppercase">
                   {run.provisionedBotCount}/{run.requestedBotCount} bots joined
                 </span>
-                {run.stopReason ? <p>{run.stopReason}</p> : null}
+                {run.stopReason ? <p className="m-0">{run.stopReason}</p> : null}
               </div>
             ) : null}
             {panel.room.status === 'closed' ? (
-              <p className="admin-error">This room is closed. Create a new room to run another playtest.</p>
+              <p className="mt-3.5 rounded-lg border border-[#efb4af] bg-[#fff2f0] px-3 py-2.5 text-[11px] leading-[1.4] text-[#ad3932]">
+                This room is closed. Create a new room to run another playtest.
+              </p>
             ) : null}
             {notice ? (
-              <p className="admin-error" role="alert">
+              <p
+                className="mt-3.5 rounded-lg border border-[#efb4af] bg-[#fff2f0] px-3 py-2.5 text-[11px] leading-[1.4] text-[#ad3932]"
+                role="alert"
+              >
                 {notice}
               </p>
             ) : null}
@@ -436,7 +504,7 @@ function SeatMap({ panel, target }: { panel: PlaytestRoom; target: number }) {
   const humans = panel.room.humanMemberCount;
   return (
     <div
-      className="seat-map"
+      className="my-6.25 mt-8.5 grid grid-cols-10 gap-x-2.5 gap-y-3 rounded-[42%_44%_40%_43%/16%_17%_15%_18%] border border-dashed border-[#b9c5d6] bg-[#f3f6fa] bg-[radial-gradient(circle_at_50%_48%,#fff_0_30%,transparent_69%)] px-6 py-7 shadow-[inset_0_0_0_7px_#fff] max-[620px]:grid-cols-5 max-[620px]:gap-2.25 max-[620px]:rounded-[26%_28%_25%_27%/8%_9%_8%_10%] max-[620px]:px-5 max-[620px]:py-5.5"
       role="img"
       aria-label={`${panel.room.activeMemberCount} of ${panel.room.maxPlayers} seats occupied`}
     >
@@ -451,8 +519,21 @@ function SeatMap({ panel, target }: { panel: PlaytestRoom; target: number }) {
                 ? 'queued'
                 : 'empty';
         return (
-          <span key={seatNumber} data-seat={state} aria-hidden="true">
-            <i>{seatNumber}</i>
+          <span
+            className={cn(
+              'relative grid aspect-square place-items-center rounded-full border border-[#c3cedd] bg-[#e7ebf2] font-display text-[#9aa4b4] shadow-[0_2px_0_#c4cedc] transition-[transform,background,border-color] duration-200 motion-reduce:transition-none',
+              seatNumber % 3 === 0 && 'translate-y-0.75',
+              seatNumber % 4 === 0 && 'rotate-3',
+              state === 'human' && 'border-[#17203a] bg-[#f3cb42] text-[#17203a] shadow-[0_3px_0_#17203a]',
+              state === 'bot' &&
+                'animate-pulse border-[#2748bd] bg-[#3155d9] text-white shadow-[0_3px_0_#1f3b9e] motion-reduce:animate-none',
+              state === 'queued' && 'border-dashed border-[#ef6d62] bg-[#fff1ef] text-[#c64e46] shadow-none'
+            )}
+            key={seatNumber}
+            data-seat={state}
+            aria-hidden="true"
+          >
+            <i className="text-[9px] font-[750] not-italic">{seatNumber}</i>
           </span>
         );
       })}

@@ -3,11 +3,12 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, type QueryCtx, query } from './_generated/server';
 import { fail, MAX_PLAYERS, validateSessionToken } from './domain';
+import { listActiveRoomMembers, listRoomMembersForDisplay } from './roomMembers';
 import { findTriviaGameState, findTriviaRound, recordTriviaAnswer, revealTriviaQuestion } from './triviaEngine';
 import { TRIVIA_QUESTIONS, type TriviaQuestion } from './triviaQuestions';
 import { TRIVIA_ANSWER_DURATION_MS } from './triviaScoring';
 
-export const TRIVIA_QUESTION_COUNT = 7;
+export const TRIVIA_QUESTION_COUNT = 10;
 export const TRIVIA_COUNTDOWN_MS = 3_000;
 
 const triviaPhaseValidator = v.union(
@@ -28,6 +29,7 @@ const leaderboardEntryValidator = v.object({
   bestStreak: v.number(),
   pointsGained: v.union(v.number(), v.null()),
   isCurrentPlayer: v.boolean(),
+  isActive: v.boolean(),
 });
 
 const roundViewValidator = v.object({
@@ -125,13 +127,7 @@ export const getGame = query({
       throw new Error('Trivia game state is missing.');
     }
 
-    const activeMembers = await ctx.db
-      .query('roomMembers')
-      .withIndex('by_roomId_and_isActive', (index) => index.eq('roomId', args.roomId).eq('isActive', true))
-      .take(MAX_PLAYERS + 1);
-    if (activeMembers.length > MAX_PLAYERS) {
-      throw new Error('Room capacity invariant violated.');
-    }
+    const activeMembers = await listActiveRoomMembers(ctx, args.roomId);
     const scores = await ctx.db
       .query('triviaScores')
       .withIndex('by_roomId_and_gameNumber', (index) =>
@@ -141,8 +137,23 @@ export const getGame = query({
     if (scores.length > MAX_PLAYERS) {
       throw new Error('Trivia score capacity invariant violated.');
     }
+    const memberById = new Map(activeMembers.map((activeMember) => [activeMember._id, activeMember]));
+    for (const score of scores) {
+      if (!memberById.has(score.memberId)) {
+        const scoreMember = await ctx.db.get('roomMembers', score.memberId);
+        if (scoreMember !== null) {
+          memberById.set(scoreMember._id, scoreMember);
+        }
+      }
+    }
+    if (state.gameNumber === 0) {
+      for (const roomMember of await listRoomMembersForDisplay(ctx, args.roomId)) {
+        memberById.set(roomMember._id, roomMember);
+      }
+    }
+
     const scoreByMemberId = new Map(scores.map((score) => [score.memberId, score]));
-    const sortedLeaderboard = activeMembers
+    const sortedLeaderboard = [...memberById.values()]
       .map((member) => {
         const score = scoreByMemberId.get(member._id);
         return {
@@ -153,6 +164,7 @@ export const getGame = query({
           answersSubmitted: score?.answersSubmitted ?? 0,
           bestStreak: score?.bestStreak ?? 0,
           joinedAt: member.joinedAt,
+          isActive: member.isActive,
         };
       })
       .sort(
@@ -172,6 +184,7 @@ export const getGame = query({
       bestStreak: entry.bestStreak,
       pointsGained: null,
       isCurrentPlayer: entry.memberId === membership._id,
+      isActive: entry.isActive,
     }));
 
     if (state.currentQuestionNumber < 1) {
@@ -267,6 +280,22 @@ export const startGame = mutation({
     }
 
     const gameNumber = state.gameNumber + 1;
+    const now = Date.now();
+    const participants = await listActiveRoomMembers(ctx, room._id);
+    for (const participant of participants) {
+      await ctx.db.insert('triviaScores', {
+        roomId: room._id,
+        gameNumber,
+        memberId: participant._id,
+        displayName: participant.displayName,
+        totalPoints: 0,
+        correctAnswers: 0,
+        answersSubmitted: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        updatedAt: now,
+      });
+    }
     const selectedQuestions = shuffledQuestions(TRIVIA_QUESTION_COUNT);
     for (const [index, selectedQuestion] of selectedQuestions.entries()) {
       await ctx.db.insert('triviaRounds', {
@@ -285,7 +314,6 @@ export const startGame = mutation({
       });
     }
 
-    const now = Date.now();
     await ctx.db.patch('triviaGameStates', state._id, {
       gameNumber,
       phase: 'countdown',

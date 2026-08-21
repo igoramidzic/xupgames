@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   leaveRoom: vi.fn(),
   closeRoom: vi.fn(),
   mutationIndex: 0,
+  onlineByMemberId: new Map<string, boolean>(),
 }));
 
 vi.mock('convex/react', () => ({
@@ -21,6 +22,10 @@ vi.mock('convex/react', () => ({
     return mutation;
   },
   useQuery: () => mocks.game,
+}));
+
+vi.mock('@/lib/useRoomPresence', () => ({
+  useRoomPresence: () => ({ onlineByMemberId: mocks.onlineByMemberId }),
 }));
 
 const guest = { sessionToken: 'a'.repeat(32), displayName: 'Ada' };
@@ -40,9 +45,16 @@ const session = {
     joinedAt: 1,
     leftAt: null,
   },
-  activeMembers: [
-    { memberId: 'member-ada' as never, displayName: 'Ada', isOwner: true, joinedAt: 1 },
-    { memberId: 'member-grace' as never, displayName: 'Grace', isOwner: false, joinedAt: 2 },
+  members: [
+    { memberId: 'member-ada' as never, displayName: 'Ada', isOwner: true, isActive: true, joinedAt: 1, leftAt: null },
+    {
+      memberId: 'member-grace' as never,
+      displayName: 'Grace',
+      isOwner: false,
+      isActive: true,
+      joinedAt: 2,
+      leftAt: null,
+    },
   ],
 };
 
@@ -57,6 +69,7 @@ function leaderboard() {
       answersSubmitted: 0,
       bestStreak: 0,
       isCurrentPlayer: true,
+      isActive: true,
     },
     {
       rank: 2,
@@ -67,6 +80,7 @@ function leaderboard() {
       answersSubmitted: 0,
       bestStreak: 0,
       isCurrentPlayer: false,
+      isActive: true,
     },
   ];
 }
@@ -78,6 +92,7 @@ describe('TriviaRoom', () => {
     mocks.submitAnswer.mockReset();
     mocks.leaveRoom.mockReset();
     mocks.closeRoom.mockReset();
+    mocks.onlineByMemberId.clear();
   });
 
   it('lets the owner start a ten-question game from the lobby', async () => {
@@ -348,6 +363,73 @@ describe('TriviaRoom', () => {
     const answerFills = document.querySelectorAll<HTMLElement>('.trivia-answer-result > span');
     expect(answerFills[1]?.style.getPropertyValue('--answer-share')).toBe('50%');
     expect(answerFills[2]?.style.getPropertyValue('--answer-share')).toBe('50%');
+  });
+
+  it('labels disconnected players without removing their score', () => {
+    mocks.onlineByMemberId.set('member-grace', false);
+    mocks.game = {
+      gameNumber: 1,
+      phase: 'complete',
+      currentQuestionNumber: 10,
+      totalQuestions: 10,
+      phaseStartedAt: Date.now(),
+      phaseEndsAt: null,
+      round: null,
+      playerAnswer: null,
+      leaderboard: leaderboard().map((entry) =>
+        entry.memberId === 'member-grace' ? { ...entry, totalPoints: 1_250 } : entry
+      ),
+    };
+
+    const view = render(
+      <MemoryRouter>
+        <TriviaRoom guest={guest} session={session} />
+      </MemoryRouter>
+    );
+
+    const standings = within(screen.getByRole('list', { name: 'Player standings' }));
+    expect(standings.getByText('Disconnected')).toBeInTheDocument();
+    expect(standings.getByText('1,250')).toBeInTheDocument();
+
+    mocks.onlineByMemberId.set('member-grace', true);
+    view.rerender(
+      <MemoryRouter>
+        <TriviaRoom guest={guest} session={session} />
+      </MemoryRouter>
+    );
+    expect(standings.queryByText('Disconnected')).not.toBeInTheDocument();
+    const graceRow = standings.getByText('Grace').closest('li');
+    expect(graceRow).not.toBeNull();
+    expect(within(graceRow as HTMLElement).getByText('0 right')).toBeInTheDocument();
+  });
+
+  it('keeps a player who left in the standings but excludes them from winning', () => {
+    mocks.game = {
+      gameNumber: 1,
+      phase: 'complete',
+      currentQuestionNumber: 10,
+      totalQuestions: 10,
+      phaseStartedAt: Date.now(),
+      phaseEndsAt: null,
+      round: null,
+      playerAnswer: null,
+      leaderboard: [
+        { ...leaderboard()[1], rank: 1, totalPoints: 2_000, isActive: false },
+        { ...leaderboard()[0], rank: 2, totalPoints: 1_000 },
+      ],
+    };
+
+    render(
+      <MemoryRouter>
+        <TriviaRoom guest={guest} session={session} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('heading', { name: 'Ada takes it.' })).toBeInTheDocument();
+    const standings = within(screen.getByRole('list', { name: 'Player standings' }));
+    expect(standings.getByText('Left')).toBeInTheDocument();
+    expect(standings.getByText('2,000')).toBeInTheDocument();
+    expect(standings.getByText('Grace').closest('li')).toHaveClass('opacity-45');
   });
 
   it('animates players into their newly ranked positions', () => {

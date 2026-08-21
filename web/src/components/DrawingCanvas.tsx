@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { type RemoteCursor, useCursorPresence } from '@/lib/useCursorPresence';
 import { userFacingError } from '@/lib/userFacingError';
+import { cn } from '@/lib/utils';
 
 export type DrawingPoint = {
   x: number;
@@ -537,13 +538,20 @@ export default function DrawingCanvas({
 
   return (
     <>
-      <div className="drawing-toolbar" role="toolbar" aria-label="Drawing and canvas tools">
+      <div
+        className="relative z-3 mx-auto -mb-4 flex min-h-14.5 w-max max-w-[calc(100%-32px)] flex-wrap items-center justify-center gap-4.5 rounded-[14px_11px_16px_12px] border border-[#cbd4e2] bg-[rgb(255_255_255/96%)] py-2 pr-3 pl-4 shadow-[0_12px_30px_rgb(45_61_95/15%)] backdrop-blur-xl max-[920px]:gap-3 max-[760px]:min-h-22 max-[760px]:w-[calc(100%-14px)] max-[760px]:max-w-none max-[760px]:gap-2 max-[760px]:px-2 max-[760px]:py-1.5 motion-reduce:transition-none"
+        role="toolbar"
+        aria-label="Drawing and canvas tools"
+      >
         {drawingControls}
-        <span className="toolbar-divider toolbar-view-divider" />
-        <div className="canvas-navigation">
-          <span className="tool-label">View</span>
-          <div className="canvas-tool-toggle">
+        <span className="h-7 w-px bg-[#dce2ec] max-[760px]:mx-auto max-[760px]:block max-[760px]:h-px max-[760px]:w-[calc(100%-12px)]" />
+        <div className="flex h-8 items-center gap-0.75 max-[760px]:w-full max-[760px]:justify-center">
+          <span className="text-[10px] font-[760] tracking-[0.08em] text-[#69758b] uppercase max-[760px]:hidden">
+            View
+          </span>
+          <div className="flex items-center gap-0.5">
             <button
+              className="grid size-7.5 cursor-pointer place-items-center rounded-[7px] border-0 bg-transparent p-0 text-[#5d6980] transition-[color,background,transform] duration-150 enabled:hover:bg-[#e9eef7] enabled:hover:text-[#17203a] enabled:active:translate-y-px focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/26%)] data-[active=true]:bg-[#17203a] data-[active=true]:text-white disabled:cursor-not-allowed disabled:opacity-[.38] motion-reduce:transition-none [&_svg]:size-3.75"
               type="button"
               data-active={tool === 'draw' && !spacePanning}
               onClick={() => setTool('draw')}
@@ -555,6 +563,7 @@ export default function DrawingCanvas({
               <Pencil aria-hidden="true" />
             </button>
             <button
+              className="grid size-7.5 cursor-pointer place-items-center rounded-[7px] border-0 bg-transparent p-0 text-[#5d6980] transition-[color,background,transform] duration-150 enabled:hover:bg-[#e9eef7] enabled:hover:text-[#17203a] enabled:active:translate-y-px focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/26%)] data-[active=true]:bg-[#17203a] data-[active=true]:text-white disabled:cursor-not-allowed disabled:opacity-[.38] motion-reduce:transition-none [&_svg]:size-3.75"
               type="button"
               data-active={tool === 'pan' || spacePanning}
               onClick={() => setTool('pan')}
@@ -565,26 +574,54 @@ export default function DrawingCanvas({
               <Hand aria-hidden="true" />
             </button>
           </div>
-          <span className="canvas-navigation-divider" />
-          <button type="button" onClick={() => zoomFromCenter(0.8)} aria-label="Zoom out" title="Zoom out">
+          <span className="mx-0.75 h-5.5 w-px bg-[#d7deea]" />
+          <button
+            className="grid size-7.5 cursor-pointer place-items-center rounded-[7px] border-0 bg-transparent p-0 text-[#5d6980] transition-[color,background,transform] duration-150 enabled:hover:bg-[#e9eef7] enabled:hover:text-[#17203a] enabled:active:translate-y-px focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/26%)] disabled:cursor-not-allowed disabled:opacity-[.38] motion-reduce:transition-none [&_svg]:size-3.75"
+            type="button"
+            onClick={() => zoomFromCenter(0.8)}
+            aria-label="Zoom out"
+            title="Zoom out"
+          >
             <Minus aria-hidden="true" />
           </button>
-          <output className="canvas-zoom-value" aria-label="Current zoom">
+          <output
+            className="min-w-9.75 text-center text-[10px] font-[730] text-[#657188] tabular-nums"
+            aria-label="Current zoom"
+          >
             {Math.round(camera.zoom * 100)}%
           </output>
-          <button type="button" onClick={() => zoomFromCenter(1.25)} aria-label="Zoom in" title="Zoom in">
+          <button
+            className="grid size-7.5 cursor-pointer place-items-center rounded-[7px] border-0 bg-transparent p-0 text-[#5d6980] transition-[color,background,transform] duration-150 enabled:hover:bg-[#e9eef7] enabled:hover:text-[#17203a] enabled:active:translate-y-px focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/26%)] disabled:cursor-not-allowed disabled:opacity-[.38] motion-reduce:transition-none [&_svg]:size-3.75"
+            type="button"
+            onClick={() => zoomFromCenter(1.25)}
+            aria-label="Zoom in"
+            title="Zoom in"
+          >
             <Plus aria-hidden="true" />
           </button>
-          <button type="button" onClick={fitView} aria-label="Fit drawing in view" title="Fit drawing in view">
+          <button
+            className="grid size-7.5 cursor-pointer place-items-center rounded-[7px] border-0 bg-transparent p-0 text-[#5d6980] transition-[color,background,transform] duration-150 enabled:hover:bg-[#e9eef7] enabled:hover:text-[#17203a] enabled:active:translate-y-px focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/26%)] disabled:cursor-not-allowed disabled:opacity-[.38] motion-reduce:transition-none [&_svg]:size-3.75"
+            type="button"
+            onClick={fitView}
+            aria-label="Fit drawing in view"
+            title="Fit drawing in view"
+          >
             <Maximize2 aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      <div className="drawing-frame" ref={frameRef}>
+      <div
+        className="relative min-h-0 overflow-hidden rounded-[24px_17px_26px_19px] border border-[#cbd4e1] bg-[#e7ecf5] shadow-[8px_9px_0_#dce4f0]"
+        ref={frameRef}
+      >
         <canvas
           ref={canvasRef}
-          className={`drawing-canvas${panningEnabled ? ' is-pan-tool' : ''}${pointerPanning ? ' is-panning' : ''}`}
+          className={cn(
+            'absolute inset-0 block size-full touch-none cursor-crosshair focus-visible:outline-3 focus-visible:-outline-offset-4 focus-visible:outline-[rgb(49_85_217/35%)]',
+            panningEnabled && 'cursor-grab',
+            pointerPanning && 'cursor-grabbing'
+          )}
           aria-label={disabled ? 'Shared drawing canvas, read only' : 'Shared drawing canvas'}
           tabIndex={0}
           onPointerDown={handlePointerDown}
@@ -595,7 +632,7 @@ export default function DrawingCanvas({
           onWheel={handleWheel}
         />
 
-        <div className="remote-cursors" aria-hidden="true">
+        <div className="pointer-events-none absolute inset-0 z-4 overflow-hidden" aria-hidden="true">
           {remoteCursors.map((cursor) => {
             const position = cursorScreenPosition(cursor, camera, canvasSize);
             return (
@@ -610,20 +647,29 @@ export default function DrawingCanvas({
         </div>
 
         {strokes.length === 0 && !activeRef.current ? (
-          <div className="canvas-empty" aria-hidden="true">
+          <div className="pointer-events-none absolute top-1/2 left-1/2 z-2 grid -translate-x-1/2 -translate-y-1/2 -rotate-3 font-display text-[22px] font-bold text-[#98a3b6]">
             <span>Make the first mark</span>
-            <svg viewBox="0 0 86 54">
+            <svg className="mx-auto mt-2.5 w-21.5" viewBox="0 0 86 54">
               <title>Arrow pointing to the canvas</title>
-              <path d="M4 14 C 24 0, 45 42, 80 18" />
-              <path d="m72 10 10 7-7 10" />
+              <path
+                className="fill-none stroke-[#aab4c5] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:3]"
+                d="M4 14 C 24 0, 45 42, 80 18"
+              />
+              <path
+                className="fill-none stroke-[#aab4c5] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:3]"
+                d="m72 10 10 7-7 10"
+              />
             </svg>
           </div>
         ) : null}
 
         {showMinimap ? (
-          <div className="canvas-minimap">
-            <span>Map</span>
+          <div className="absolute right-4 bottom-4 z-3 box-border animate-in rounded-[11px_8px_12px_9px] border border-[#bac6d8] bg-[rgb(255_255_255/94%)] px-1.25 pt-4.5 pb-1.25 shadow-[0_9px_24px_rgb(37_52_84/20%)] backdrop-blur-lg fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none max-[760px]:right-18 max-[760px]:bottom-3">
+            <span className="absolute top-1 left-2 text-[8px] font-extrabold tracking-[0.1em] text-[#6c7890] uppercase">
+              Map
+            </span>
             <canvas
+              className="block h-27.5 w-44 cursor-crosshair touch-none rounded-[5px] border border-[#d0d8e5] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgb(49_85_217/26%)] max-[760px]:h-20 max-[760px]:w-32"
               ref={minimapRef}
               aria-label="Canvas minimap. Drag to move around the drawing."
               onPointerDown={handleMinimapPointerDown}
@@ -633,7 +679,7 @@ export default function DrawingCanvas({
         ) : null}
 
         {!disabled ? (
-          <div className="canvas-shortcut-hint">
+          <div className="pointer-events-none absolute bottom-4.5 left-4.5 z-2 rounded-lg border border-[rgb(188_199_216/72%)] bg-[rgb(255_255_255/84%)] px-2.5 py-2 text-[9px] font-[620] text-[#78849a] backdrop-blur-lg max-[760px]:hidden [&_kbd]:rounded-sm [&_kbd]:border [&_kbd]:border-[#c7d0df] [&_kbd]:bg-[#f5f7fa] [&_kbd]:px-1 [&_kbd]:py-px [&_kbd]:font-[inherit] [&_kbd]:font-[780] [&_kbd]:text-[#4d5971] [&_kbd]:shadow-[0_1px_0_#bcc7d7]">
             Hold <kbd>Space</kbd> and drag to move · Pinch or <kbd>⌘</kbd>/<kbd>Ctrl</kbd> + scroll to zoom
           </div>
         ) : null}
@@ -706,7 +752,7 @@ function RemoteCursorMarker({
 
   return (
     <div
-      className="remote-cursor"
+      className="absolute flex items-start text-[var(--remote-cursor-color)] opacity-[.68] [will-change:transform] [&>svg]:h-7.5 [&>svg]:w-6 [&>svg]:shrink-0 [&>svg]:[filter:drop-shadow(0_2px_2px_rgb(23_32_58/24%))] [&_path]:fill-current [&_path]:stroke-[rgb(255_255_255/88%)] [&_path]:[stroke-linejoin:round] [&_path]:[stroke-width:1.5px]"
       ref={markerRef}
       style={
         {
@@ -718,7 +764,9 @@ function RemoteCursorMarker({
       <svg viewBox="0 0 24 30" aria-hidden="true">
         <path d="M3 2 20 17l-8 .8-4.2 8.4z" />
       </svg>
-      <span>{cursor.displayName}</span>
+      <span className="mt-4 -ml-0.5 max-w-37.5 overflow-hidden rounded-[4px_8px_7px_6px] border border-[rgb(255_255_255/62%)] bg-[var(--remote-cursor-color)] px-1.75 py-1 text-[10px] leading-none font-[760] text-ellipsis whitespace-nowrap text-white shadow-[0_3px_8px_rgb(23_32_58/16%)]">
+        {cursor.displayName}
+      </span>
     </div>
   );
 }

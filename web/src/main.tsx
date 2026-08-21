@@ -15,11 +15,13 @@ const convexUrl = import.meta.env.VITE_CONVEX_URL;
 
 if (!convexUrl) {
   createRoot(rootElement).render(
-    <main className="configuration-error">
-      <p className="eyebrow">Xup Games</p>
-      <h1>Connect the canvas.</h1>
-      <p>
-        Add <code>VITE_CONVEX_URL</code> to <code>web/.env.local</code>, then restart the app.
+    <main className="grid min-h-screen place-content-center p-8 text-center">
+      <p className="mb-5 text-xs font-[780] tracking-[0.12em] text-[#3155d9] uppercase">Xup Games</p>
+      <h1 className="mb-2.5 font-display text-5xl tracking-[-0.04em]">Connect the canvas.</h1>
+      <p className="max-w-135 leading-[1.6] text-[#59647b]">
+        Add <code className="rounded-[5px] bg-[#e1e7f3] px-1.5 py-0.5 text-[#243db0]">VITE_CONVEX_URL</code> to{' '}
+        <code className="rounded-[5px] bg-[#e1e7f3] px-1.5 py-0.5 text-[#243db0]">web/.env.local</code>, then restart
+        the app.
       </p>
     </main>
   );
