@@ -31,6 +31,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { isLocalhost } from '@/lib/environment';
 import type { GuestIdentity } from '@/lib/guest';
+import { getRoomMembers } from '@/lib/roomSession';
 import { useRoomPresence } from '@/lib/useRoomPresence';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
@@ -154,7 +155,8 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
     }
   }, [game?.phase]);
 
-  const ownerName = session.members.find((member) => member.isOwner)?.displayName ?? 'The room owner';
+  const members = getRoomMembers(session);
+  const ownerName = members.find((member) => member.isOwner)?.displayName ?? 'The room owner';
   const currentPlayer = game?.leaderboard.find((entry) => entry.isCurrentPlayer) ?? null;
   const completedRounds = game ? completedRoundCount(game.phase, game.currentQuestionNumber) : 0;
   const phaseDuration =
@@ -375,8 +377,8 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
           ) : null}
         </section>
 
-        <aside className="flex h-[max(680px,calc(100dvh-112px))] min-h-0 flex-col self-start overflow-hidden rounded-[15px_7px_17px_9px] border border-[#aebfd0] bg-[rgb(250_252_254/96%)] pt-5 pr-1 pl-3 shadow-[5px_6px_0_#ccdae6] max-[760px]:h-107.5 max-[760px]:min-h-107.5">
-          <div className="flex items-start justify-between border-b border-[#ced9e4] pb-3.75">
+        <aside className="flex h-[max(680px,calc(100dvh-112px))] min-h-0 flex-col self-start overflow-hidden rounded-[15px_7px_17px_9px] border border-[#aebfd0] bg-[rgb(250_252_254/96%)] shadow-[5px_6px_0_#ccdae6] max-[760px]:h-107.5 max-[760px]:min-h-107.5">
+          <div className="mx-3 flex items-start justify-between border-b border-[#ced9e4] pt-5 pb-3.75">
             <div>
               <p className="mb-0.75 text-[10px] font-[850] tracking-[0.13em] text-[#0c86ae]">LIVE TABLE</p>
               <h2 className="m-0 text-[25px] tracking-[-0.045em] text-[#10213d]">Standings</h2>
@@ -387,7 +389,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
           </div>
 
           {currentPlayer ? (
-            <div className="my-4 grid grid-cols-[1fr_auto] rounded-[12px_6px_13px_7px] bg-[#10213d] p-3.5 text-white">
+            <div className="mx-3 my-4 grid grid-cols-[1fr_auto] rounded-[12px_6px_13px_7px] bg-[#10213d] p-3.5 text-white">
               <span className="text-xs font-bold text-[#91a7bf]">Your score</span>
               <strong className="col-start-2 row-start-1 row-end-3 self-center text-[28px] text-[#ffda55] tabular-nums">
                 {formatPoints(currentPlayer.totalPoints)}
@@ -399,13 +401,13 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
           ) : null}
 
           <ScrollArea
-            className="-mr-1.75 -ml-0.75 min-h-25 flex-1 [--scroll-fade-reveal:72px] [--scroll-fade-size:30px]"
+            className="min-h-25 flex-1 [--scroll-fade-reveal:72px] [--scroll-fade-size:30px]"
             viewportClassName="scroll-fade"
             scrollbarClassName="w-2 border-l-0 px-0.5 py-0.25"
             thumbClassName="bg-[#aeb8c2]"
             type="always"
           >
-            <ol className="m-0 flex list-none flex-col gap-2 pt-3 pr-3.75 pb-7.5 pl-0.75" aria-label="Player standings">
+            <ol className="m-0 flex list-none flex-col gap-2 pt-3 pr-4 pb-7.5 pl-3" aria-label="Player standings">
               {game.leaderboard.map((entry) => {
                 const isDisconnected = entry.isActive && onlineByMemberId.get(entry.memberId) === false;
                 return (

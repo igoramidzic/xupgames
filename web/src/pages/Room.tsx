@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { isLocalhost } from '@/lib/environment';
 import { type GuestIdentity, readGuest, saveGuest, validateDisplayName } from '@/lib/guest';
+import { getRoomMembers } from '@/lib/roomSession';
 import { useRoomPresence } from '@/lib/useRoomPresence';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
@@ -308,6 +309,7 @@ function JoinRoom({
 }
 
 function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveSession }) {
+  const members = getRoomMembers(session);
   const navigate = useNavigate();
   const leaveRoom = useMutation(api.rooms.leave);
   const closeRoom = useMutation(api.rooms.close);
@@ -327,11 +329,11 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
   );
   const memberColors = useMemo(
     () =>
-      Object.fromEntries(session.members.map((member, index) => [member.memberId, memberColor(index)])) as Record<
+      Object.fromEntries(members.map((member, index) => [member.memberId, memberColor(index)])) as Record<
         string,
         string
       >,
-    [session.members]
+    [members]
   );
   const [color, setColor] = useState(COLORS[0]);
   const [width, setWidth] = useState(WIDTHS[1]);
@@ -609,7 +611,7 @@ function CanvasRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
                   'max-[920px]:pt-12 max-[920px]:[scrollbar-width:none] max-[920px]:[&::-webkit-scrollbar]:w-0'
               )}
             >
-              {session.members.map((member) => {
+              {members.map((member) => {
                 const isDisconnected = member.isActive && onlineByMemberId.get(member.memberId) === false;
                 return (
                   <div
