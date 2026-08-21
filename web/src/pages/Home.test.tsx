@@ -48,7 +48,8 @@ describe('Home', () => {
     expect(screen.getByRole('button', { name: /Trivia/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Type Racer/i })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getAllByText('Official')).toHaveLength(2);
-    expect(screen.getAllByRole('link', { name: 'Xup Games' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /Trivia/ })).toHaveTextContent('by Xup Games');
+    expect(screen.getByRole('button', { name: /Type Racer/i })).toHaveTextContent('by Xup Games');
 
     const main = screen.getByRole('main');
     const preview = screen.getByLabelText('A preview of a trivia round');
@@ -153,6 +154,6 @@ describe('Home', () => {
     );
 
     expect(screen.getByRole('button', { name: /Neighborhood Trivia.*Community.*Grace Hopper/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Grace Hopper' })).toHaveAttribute('href', 'https://example.com/grace');
+    expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
   });
 });

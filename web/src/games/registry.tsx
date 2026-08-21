@@ -83,18 +83,9 @@ export function GameSourceBadge({ source, className }: { source: GameSource; cla
 }
 
 export function GameAuthor({ game }: { game: GameCatalogEntry }) {
-  const className = 'font-[680] text-[#536079] underline-offset-2 hover:text-[#3155d9] hover:underline';
-
   return (
     <span className="text-[10px] text-[#7a8499]">
-      by{' '}
-      {game.author.url ? (
-        <a className={className} href={game.author.url} target="_blank" rel="noreferrer">
-          {game.author.name}
-        </a>
-      ) : (
-        <span className="font-[680] text-[#536079]">{game.author.name}</span>
-      )}
+      by <span className="font-[680] text-[#536079]">{game.author.name}</span>
     </span>
   );
 }
