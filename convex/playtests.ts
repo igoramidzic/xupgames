@@ -186,7 +186,7 @@ export const start = mutation({
       fail('INVALID_PLAYTEST_TARGET', `Choose a room size between 2 and ${room.maxPlayers}.`);
     }
     if (
-      room.gameType === 'drawing' &&
+      room.gameType !== 'trivia' &&
       !ALLOWED_DURATIONS_MS.includes(args.durationMs as (typeof ALLOWED_DURATIONS_MS)[number])
     ) {
       fail('INVALID_PLAYTEST_DURATION', 'Choose a playtest duration of 1, 2, or 5 minutes.');

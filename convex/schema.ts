@@ -11,6 +11,9 @@ const triviaPhase = v.union(
   v.literal('reveal'),
   v.literal('complete')
 );
+const typeRacerPhase = v.union(v.literal('lobby'), v.literal('countdown'), v.literal('racing'), v.literal('complete'));
+const typeRacerProgressStatus = v.union(v.literal('waiting'), v.literal('racing'), v.literal('finished'));
+const typeRacerPassageKind = v.union(v.literal('phrase'), v.literal('sentence'), v.literal('paragraph'));
 const playtestStatus = v.union(
   v.literal('provisioning'),
   v.literal('running'),
@@ -130,6 +133,44 @@ export default defineSchema({
     .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber'])
     .index('by_roomId_and_gameNumber_and_memberId', ['roomId', 'gameNumber', 'memberId']),
 
+  typeRacerGameStates: defineTable({
+    roomId: v.id('rooms'),
+    raceNumber: v.number(),
+    phase: typeRacerPhase,
+    passageId: v.union(v.string(), v.null()),
+    passageText: v.union(v.string(), v.null()),
+    passageTitle: v.union(v.string(), v.null()),
+    passageAuthor: v.union(v.string(), v.null()),
+    passageKind: v.union(typeRacerPassageKind, v.null()),
+    phaseStartedAt: v.union(v.number(), v.null()),
+    startsAt: v.union(v.number(), v.null()),
+    phaseEndsAt: v.union(v.number(), v.null()),
+    participantCount: v.number(),
+    finishedCount: v.number(),
+    winnerMemberId: v.union(v.id('roomMembers'), v.null()),
+    winnerFinishedAt: v.union(v.number(), v.null()),
+  }).index('by_roomId', ['roomId']),
+
+  typeRacerProgress: defineTable({
+    roomId: v.id('rooms'),
+    memberId: v.id('roomMembers'),
+    raceNumber: v.number(),
+    displayName: v.string(),
+    status: typeRacerProgressStatus,
+    correctChars: v.number(),
+    typedChars: v.number(),
+    totalKeystrokes: v.number(),
+    errorKeystrokes: v.number(),
+    revision: v.number(),
+    wpm: v.number(),
+    accuracy: v.number(),
+    startedAt: v.number(),
+    finishedAt: v.union(v.number(), v.null()),
+    updatedAt: v.number(),
+  })
+    .index('by_roomId_and_raceNumber', ['roomId', 'raceNumber'])
+    .index('by_roomId_and_memberId', ['roomId', 'memberId']),
+
   drawingPlaytestBotStates: defineTable({
     botId: v.id('playtestBots'),
     roomId: v.id('rooms'),
@@ -150,6 +191,15 @@ export default defineSchema({
     answerAt: v.number(),
     selectedOptionIndex: v.number(),
     submitted: v.boolean(),
+  }).index('by_botId', ['botId']),
+
+  typeRacerPlaytestBotStates: defineTable({
+    botId: v.id('playtestBots'),
+    roomId: v.id('rooms'),
+    raceNumber: v.number(),
+    targetWpm: v.number(),
+    targetAccuracy: v.number(),
+    nextReportAt: v.number(),
   }).index('by_botId', ['botId']),
 
   playtestRuns: defineTable({

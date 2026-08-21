@@ -13,6 +13,7 @@ import {
 import { gameTypeValidator } from './games';
 import { createPasswordCredential, verifyPasswordCredential } from './passwords';
 import { listRoomMembersForDisplay } from './roomMembers';
+import { enrollTypeRacerMemberInActiveRace } from './typeRacer';
 
 const roomStatusValidator = v.union(v.literal('open'), v.literal('closed'));
 
@@ -65,6 +66,26 @@ const sessionResultValidator = v.union(
 );
 
 type DatabaseReaderContext = Pick<QueryCtx, 'db'>;
+
+async function syncGameMembership(
+  ctx: MutationCtx,
+  room: Doc<'rooms'>,
+  membership: Pick<Doc<'roomMembers'>, '_id' | 'displayName'>,
+  now: number
+): Promise<void> {
+  switch (room.gameType) {
+    case 'drawing':
+    case 'trivia':
+      return;
+    case 'typeRacer':
+      await enrollTypeRacerMemberInActiveRace(ctx, room._id, membership, now);
+      return;
+    default: {
+      const unsupportedGameType: never = room.gameType;
+      throw new Error(`Unsupported game type: ${unsupportedGameType}`);
+    }
+  }
+}
 
 async function findRoomByCode(ctx: DatabaseReaderContext, code: string): Promise<Doc<'rooms'> | null> {
   return await ctx.db
@@ -281,6 +302,25 @@ export const create = mutation({
           phaseEndsAt: null,
         });
         break;
+      case 'typeRacer':
+        await ctx.db.insert('typeRacerGameStates', {
+          roomId,
+          raceNumber: 0,
+          phase: 'lobby',
+          passageId: null,
+          passageText: null,
+          passageTitle: null,
+          passageAuthor: null,
+          passageKind: null,
+          phaseStartedAt: null,
+          startsAt: null,
+          phaseEndsAt: null,
+          participantCount: 0,
+          finishedCount: 0,
+          winnerMemberId: null,
+          winnerFinishedAt: null,
+        });
+        break;
       default: {
         const unsupportedGameType: never = gameType;
         throw new Error(`Unsupported game type: ${unsupportedGameType}`);
@@ -333,20 +373,23 @@ export const join = mutation({
       if (existingMembership.displayName !== displayName) {
         await ctx.db.patch('roomMembers', existingMembership._id, { displayName });
       }
+      await syncGameMembership(ctx, room, { ...existingMembership, displayName }, now);
       return { code: room.code };
     }
     if (room.activeMemberCount >= room.maxPlayers) {
       fail('ROOM_FULL', 'This room already has 50 active members.');
     }
 
+    let membership: Pick<Doc<'roomMembers'>, '_id' | 'displayName'>;
     if (existingMembership !== null) {
       await ctx.db.patch('roomMembers', existingMembership._id, {
         displayName,
         isActive: true,
         leftAt: null,
       });
+      membership = { _id: existingMembership._id, displayName };
     } else {
-      await ctx.db.insert('roomMembers', {
+      const memberId = await ctx.db.insert('roomMembers', {
         roomId: room._id,
         guestId: guest._id,
         displayName,
@@ -354,10 +397,12 @@ export const join = mutation({
         joinedAt: now,
         leftAt: null,
       });
+      membership = { _id: memberId, displayName };
     }
     await ctx.db.patch('rooms', room._id, {
       activeMemberCount: room.activeMemberCount + 1,
     });
+    await syncGameMembership(ctx, room, membership, now);
 
     return { code: room.code };
   },

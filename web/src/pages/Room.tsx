@@ -6,6 +6,7 @@ import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useStat
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import DrawingCanvas from '@/components/DrawingCanvas';
 import TriviaRoom from '@/components/TriviaRoom';
+import TypeRacerRoom from '@/components/TypeRacerRoom';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +54,9 @@ export default function Room() {
   if (guest && session?.kind === 'session' && session.currentMember.isActive) {
     if (session.gameType === 'trivia') {
       return <TriviaRoom guest={guest} session={session} />;
+    }
+    if (session.gameType === 'typeRacer') {
+      return <TypeRacerRoom guest={guest} session={session} />;
     }
     return <CanvasRoom guest={guest} session={session} />;
   }
@@ -127,6 +131,7 @@ function JoinRoom({
   const isClosed = preview.status === 'closed';
   const isFull = preview.activeMemberCount >= preview.maxPlayers;
   const isTrivia = preview.gameType === 'trivia';
+  const isTypeRacer = preview.gameType === 'typeRacer';
 
   async function handleJoin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -190,11 +195,19 @@ function JoinRoom({
             {isClosed
               ? isTrivia
                 ? 'The trivia room is finished'
-                : 'The drawing is finished'
+                : isTypeRacer
+                  ? 'The type race is finished'
+                  : 'The drawing is finished'
               : `${preview.ownerName} invited you`}
           </p>
           <h1 className="m-0 font-display text-[clamp(40px,6vw,58px)] leading-[0.98] font-[820] tracking-[-0.055em] text-[#17203a]">
-            {isClosed ? 'This room is closed.' : isTrivia ? 'Take your place at the table.' : 'Step up to the canvas.'}
+            {isClosed
+              ? 'This room is closed.'
+              : isTrivia
+                ? 'Take your place at the table.'
+                : isTypeRacer
+                  ? 'Take your place on the line.'
+                  : 'Step up to the canvas.'}
           </h1>
           <div className="my-7 flex items-center justify-between border-y border-[#e1e6ef] py-3.5 text-[13px] text-[#687389] max-[520px]:gap-3">
             <span className="flex items-center gap-1.75">
@@ -224,7 +237,9 @@ function JoinRoom({
                   {isClosed
                     ? isTrivia
                       ? 'No more answers can be added.'
-                      : 'No more marks can be added.'
+                      : isTypeRacer
+                        ? 'No more progress can be added.'
+                        : 'No more marks can be added.'
                     : 'Every seat is taken.'}
                 </strong>
                 <p className="m-0 text-[13px] leading-[1.45]">
@@ -282,10 +297,14 @@ function JoinRoom({
                   : guest
                     ? isTrivia
                       ? 'Rejoin the quiz'
-                      : 'Rejoin the canvas'
+                      : isTypeRacer
+                        ? 'Rejoin the race'
+                        : 'Rejoin the canvas'
                     : isTrivia
                       ? 'Join the quiz'
-                      : 'Join the canvas'}
+                      : isTypeRacer
+                        ? 'Join the race'
+                        : 'Join the canvas'}
               </button>
               {error ? (
                 <p

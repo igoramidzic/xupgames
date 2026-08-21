@@ -2,6 +2,7 @@ import type { Doc } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
 import { initializeDrawingBot, runDrawingBotTick, stopDrawingBot } from './drawing';
 import { initializeTriviaBot, runTriviaBotTick, stopTriviaBot } from './trivia';
+import { initializeTypeRacerBot, runTypeRacerBotTick, stopTypeRacerBot } from './typeRacer';
 
 export async function initializeGameBot(ctx: MutationCtx, room: Doc<'rooms'>, bot: Doc<'playtestBots'>): Promise<void> {
   switch (room.gameType) {
@@ -10,6 +11,9 @@ export async function initializeGameBot(ctx: MutationCtx, room: Doc<'rooms'>, bo
       return;
     case 'trivia':
       await initializeTriviaBot(ctx, bot);
+      return;
+    case 'typeRacer':
+      await initializeTypeRacerBot(ctx, bot);
       return;
     default: {
       const unsupportedGameType: never = room.gameType;
@@ -28,6 +32,8 @@ export async function runGameBotTick(
       return await runDrawingBotTick(ctx, room, bot);
     case 'trivia':
       return await runTriviaBotTick(ctx, room, bot);
+    case 'typeRacer':
+      return await runTypeRacerBotTick(ctx, room, bot);
     default: {
       const unsupportedGameType: never = room.gameType;
       throw new Error(`No playtest adapter exists for game type: ${unsupportedGameType}`);
@@ -45,6 +51,8 @@ export function gameBotRunCompletionReason(
       return run.endsAt !== null && now >= run.endsAt ? 'Completed the selected duration.' : null;
     case 'trivia':
       return null;
+    case 'typeRacer':
+      return run.endsAt !== null && now >= run.endsAt ? 'Completed the selected duration.' : null;
     default: {
       const unsupportedGameType: never = room.gameType;
       throw new Error(`No playtest completion adapter exists for game type: ${unsupportedGameType}`);
@@ -64,6 +72,9 @@ export async function stopGameBot(
       return;
     case 'trivia':
       await stopTriviaBot(ctx, bot);
+      return;
+    case 'typeRacer':
+      await stopTypeRacerBot(ctx, bot);
       return;
     case undefined:
       return;

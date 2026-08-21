@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Xup Games X</title>
+  <g transform="rotate(-4 256 256)">
+    <path
+      fill="#17203a"
+      d="M123 74c-35 2-56 25-54 61l17 296c2 37 30 60 67 57l275-16c36-2 58-29 55-65l-17-278c-2-35-28-57-64-55Z"
+    />
+    <path
+      fill="#f3cb42"
+      stroke="#17203a"
+      stroke-width="22"
+      d="M101 50c-35 2-56 25-54 61l17 296c2 37 30 60 67 57l275-16c36-2 58-29 55-65l-17-278c-2-35-28-57-64-55Z"
+    />
+    <path
+      fill="none"
+      stroke="#17203a"
+      stroke-linecap="round"
+      stroke-width="54"
+      d="m172 161 172 176M343 157 175 342"
+    />
+  </g>
+</svg>

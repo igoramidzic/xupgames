@@ -13,4 +13,11 @@ describe('playtest run completion', () => {
       'Completed the selected duration.'
     );
   });
+
+  it('ends type racer playtests at their selected duration', () => {
+    expect(gameBotRunCompletionReason({ gameType: 'typeRacer' }, { endsAt: 1_000 }, 999)).toBeNull();
+    expect(gameBotRunCompletionReason({ gameType: 'typeRacer' }, { endsAt: 1_000 }, 1_000)).toBe(
+      'Completed the selected duration.'
+    );
+  });
 });

@@ -27,6 +27,27 @@ describe('Home', () => {
     expect(screen.getByLabelText('What should we call you?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Drawing/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Trivia/ })).toHaveAttribute('aria-pressed', 'false');
+
+    const main = screen.getByRole('main');
+    const preview = screen.getByLabelText('A preview of the shared drawing canvas');
+    expect(main).toHaveClass('animate-in', 'fade-in', 'slide-in-from-bottom-4', 'duration-500');
+    expect(preview).not.toHaveClass('animate-in', 'delay-100');
+  });
+
+  it('switches previews without replaying a card entrance animation', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('button', { name: /Trivia/ }));
+
+    const triviaPreview = screen.getByRole('heading', {
+      name: 'Which planet has an axial tilt of roughly 98 degrees?',
+    }).parentElement;
+    expect(triviaPreview).not.toHaveClass('animate-in', 'fade-in', 'slide-in-from-bottom-2', 'duration-300');
   });
 
   it('creates a trivia room when trivia is selected', async () => {
@@ -47,6 +68,28 @@ describe('Home', () => {
         gameType: 'trivia',
         sessionToken: expect.any(String),
         displayName: 'Grace',
+      })
+    );
+  });
+
+  it('creates a type racer room when type racer is selected', async () => {
+    createRoom.mockResolvedValue({ code: 'ABCDEFGH' });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('button', { name: /Type racer/ }));
+    await user.type(screen.getByLabelText('What should we call you?'), 'Ada');
+    await user.click(screen.getByRole('button', { name: 'Create a room' }));
+
+    await waitFor(() =>
+      expect(createRoom).toHaveBeenCalledWith({
+        gameType: 'typeRacer',
+        sessionToken: expect.any(String),
+        displayName: 'Ada',
       })
     );
   });

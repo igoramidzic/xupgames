@@ -50,7 +50,11 @@ export type AppErrorCode =
   | 'TRIVIA_GAME_NOT_RUNNING'
   | 'TRIVIA_ANSWER_CLOSED'
   | 'TRIVIA_ALREADY_ANSWERED'
-  | 'INVALID_TRIVIA_OPTION';
+  | 'INVALID_TRIVIA_OPTION'
+  | 'TYPE_RACER_IN_PROGRESS'
+  | 'TYPE_RACER_NOT_RUNNING'
+  | 'TYPE_RACER_NOT_PARTICIPATING'
+  | 'INVALID_TYPE_RACER_PROGRESS';
 
 export function fail(code: AppErrorCode, message: string): never {
   throw new ConvexError({ code, message });

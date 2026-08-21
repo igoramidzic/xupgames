@@ -19,6 +19,7 @@ import type * as passwords from "../passwords.js";
 import type * as playtestAdapters_drawing from "../playtestAdapters/drawing.js";
 import type * as playtestAdapters_index from "../playtestAdapters/index.js";
 import type * as playtestAdapters_trivia from "../playtestAdapters/trivia.js";
+import type * as playtestAdapters_typeRacer from "../playtestAdapters/typeRacer.js";
 import type * as playtests from "../playtests.js";
 import type * as roomMembers from "../roomMembers.js";
 import type * as roomPresence from "../roomPresence.js";
@@ -27,6 +28,9 @@ import type * as trivia from "../trivia.js";
 import type * as triviaEngine from "../triviaEngine.js";
 import type * as triviaQuestions from "../triviaQuestions.js";
 import type * as triviaScoring from "../triviaScoring.js";
+import type * as typeRacer from "../typeRacer.js";
+import type * as typeRacerPassages from "../typeRacerPassages.js";
+import type * as typeRacerScoring from "../typeRacerScoring.js";
 
 import type {
   ApiFromModules,
@@ -47,6 +51,7 @@ const fullApi: ApiFromModules<{
   "playtestAdapters/drawing": typeof playtestAdapters_drawing;
   "playtestAdapters/index": typeof playtestAdapters_index;
   "playtestAdapters/trivia": typeof playtestAdapters_trivia;
+  "playtestAdapters/typeRacer": typeof playtestAdapters_typeRacer;
   playtests: typeof playtests;
   roomMembers: typeof roomMembers;
   roomPresence: typeof roomPresence;
@@ -55,6 +60,9 @@ const fullApi: ApiFromModules<{
   triviaEngine: typeof triviaEngine;
   triviaQuestions: typeof triviaQuestions;
   triviaScoring: typeof triviaScoring;
+  typeRacer: typeof typeRacer;
+  typeRacerPassages: typeof typeRacerPassages;
+  typeRacerScoring: typeof typeRacerScoring;
 }> = anyApi as any;
 
 /**

@@ -560,6 +560,12 @@ function gameAdapterCopy(gameType: PlaytestRoom['room']['gameType']) {
         description:
           'Bots answer every game with varied speed and accuracy. They stay at the table until you remove them.',
       };
+    case 'typeRacer':
+      return {
+        label: 'Type racer adapter',
+        description:
+          'Bots type in readable chunks at varied speeds and accuracy, making a 10, 25, or 50-player race easy to inspect.',
+      };
     default: {
       const unsupportedGameType: never = gameType;
       throw new Error(`Missing playtest copy for game type: ${unsupportedGameType}`);

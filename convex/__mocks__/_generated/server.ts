@@ -14,3 +14,11 @@ export type QueryCtx = {
   db: Record<string, unknown>;
   auth: Record<string, unknown>;
 };
+
+function registerFunction<T>(definition: T): T {
+  return definition;
+}
+
+export const internalMutation = registerFunction;
+export const mutation = registerFunction;
+export const query = registerFunction;
