@@ -51,9 +51,6 @@ Thumbs.db
 # typescript
 *.tsbuildinfo
 
-# Convex generated types
-convex/_generated/
-
 # Astro site
 site/dist/
 site/.astro/

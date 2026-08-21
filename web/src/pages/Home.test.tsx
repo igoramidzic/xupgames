@@ -16,15 +16,39 @@ describe('Home', () => {
     createRoom.mockReset();
   });
 
-  it('renders the drawing room creation flow', () => {
+  it('renders the game room creation flow', () => {
     render(
       <MemoryRouter>
         <Home />
       </MemoryRouter>
     );
-    expect(screen.getByRole('heading', { name: /Draw over.*each other\./ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /One link.*Everyone plays\./ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create a room' })).toBeInTheDocument();
     expect(screen.getByLabelText('What should we call you?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Drawing/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Trivia/ })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('creates a trivia room when trivia is selected', async () => {
+    createRoom.mockResolvedValue({ code: 'ABCDEFGH' });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('button', { name: /Trivia/ }));
+    await user.type(screen.getByLabelText('What should we call you?'), 'Grace');
+    await user.click(screen.getByRole('button', { name: 'Create a room' }));
+
+    await waitFor(() =>
+      expect(createRoom).toHaveBeenCalledWith({
+        gameType: 'trivia',
+        sessionToken: expect.any(String),
+        displayName: 'Grace',
+      })
+    );
   });
 
   it('creates a password-protected room when selected', async () => {

@@ -271,6 +271,17 @@ export const create = mutation({
           nextStrokeSequence: 1,
         });
         break;
+      case 'trivia':
+        await ctx.db.insert('triviaGameStates', {
+          roomId,
+          gameNumber: 0,
+          phase: 'lobby',
+          currentQuestionNumber: 0,
+          totalQuestions: 10,
+          phaseStartedAt: null,
+          phaseEndsAt: null,
+        });
+        break;
       default: {
         const unsupportedGameType: never = gameType;
         throw new Error(`Unsupported game type: ${unsupportedGameType}`);

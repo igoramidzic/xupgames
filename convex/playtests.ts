@@ -5,7 +5,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, type MutationCtx, mutation, query } from './_generated/server';
 import { fail, normalizeRoomCode, validateSessionToken } from './domain';
 import { gameTypeValidator } from './games';
-import { initializeGameBot, runGameBotTick, stopGameBot } from './playtestAdapters';
+import { gameBotRunCompletionReason, initializeGameBot, runGameBotTick, stopGameBot } from './playtestAdapters';
 
 const playtestStatusValidator = v.union(
   v.literal('provisioning'),
@@ -22,9 +22,9 @@ const runSummaryValidator = v.object({
   requestedBotCount: v.number(),
   provisionedBotCount: v.number(),
   activeBotCount: v.number(),
-  durationMs: v.number(),
+  durationMs: v.union(v.number(), v.null()),
   startedAt: v.number(),
-  endsAt: v.number(),
+  endsAt: v.union(v.number(), v.null()),
   lastTickAt: v.union(v.number(), v.null()),
   stoppedAt: v.union(v.number(), v.null()),
   stopReason: v.union(v.string(), v.null()),
@@ -165,7 +165,7 @@ export const start = mutation({
     code: v.string(),
     sessionToken: v.string(),
     targetActiveMemberCount: v.number(),
-    durationMs: v.number(),
+    durationMs: v.optional(v.number()),
   },
   returns: v.object({ runId: v.id('playtestRuns') }),
   handler: async (ctx, args) => {
@@ -185,7 +185,10 @@ export const start = mutation({
     ) {
       fail('INVALID_PLAYTEST_TARGET', `Choose a room size between 2 and ${room.maxPlayers}.`);
     }
-    if (!ALLOWED_DURATIONS_MS.includes(args.durationMs as (typeof ALLOWED_DURATIONS_MS)[number])) {
+    if (
+      room.gameType === 'drawing' &&
+      !ALLOWED_DURATIONS_MS.includes(args.durationMs as (typeof ALLOWED_DURATIONS_MS)[number])
+    ) {
       fail('INVALID_PLAYTEST_DURATION', 'Choose a playtest duration of 1, 2, or 5 minutes.');
     }
 
@@ -203,6 +206,7 @@ export const start = mutation({
     }
 
     const now = Date.now();
+    const durationMs = room.gameType === 'trivia' ? null : (args.durationMs ?? null);
     const runId = await ctx.db.insert('playtestRuns', {
       roomId: room._id,
       gameType: room.gameType,
@@ -211,9 +215,9 @@ export const start = mutation({
       requestedBotCount,
       provisionedBotCount: 0,
       activeBotCount: 0,
-      durationMs: args.durationMs,
+      durationMs,
       startedAt: now,
-      endsAt: now + args.durationMs,
+      endsAt: durationMs === null ? null : now + durationMs,
       lastTickAt: null,
       stoppedAt: null,
       stopReason: null,
@@ -359,8 +363,9 @@ export const tick = internalMutation({
       return null;
     }
     const now = Date.now();
-    if (now >= run.endsAt) {
-      await beginStopping(ctx, run, 'Completed the selected duration.');
+    const completionReason = gameBotRunCompletionReason(room, run, now);
+    if (completionReason !== null) {
+      await beginStopping(ctx, run, completionReason);
       return null;
     }
 

@@ -45,7 +45,12 @@ export type AppErrorCode =
   | 'NOT_STROKE_AUTHOR'
   | 'STROKE_FINISHED'
   | 'STROKE_OUT_OF_SYNC'
-  | 'STROKE_POINT_LIMIT';
+  | 'STROKE_POINT_LIMIT'
+  | 'TRIVIA_GAME_IN_PROGRESS'
+  | 'TRIVIA_GAME_NOT_RUNNING'
+  | 'TRIVIA_ANSWER_CLOSED'
+  | 'TRIVIA_ALREADY_ANSWERED'
+  | 'INVALID_TRIVIA_OPTION';
 
 export function fail(code: AppErrorCode, message: string): never {
   throw new ConvexError({ code, message });

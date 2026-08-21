@@ -1,11 +1,15 @@
 import type { Doc } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
 import { initializeDrawingBot, runDrawingBotTick, stopDrawingBot } from './drawing';
+import { initializeTriviaBot, runTriviaBotTick, stopTriviaBot } from './trivia';
 
 export async function initializeGameBot(ctx: MutationCtx, room: Doc<'rooms'>, bot: Doc<'playtestBots'>): Promise<void> {
   switch (room.gameType) {
     case 'drawing':
       await initializeDrawingBot(ctx, bot);
+      return;
+    case 'trivia':
+      await initializeTriviaBot(ctx, bot);
       return;
     default: {
       const unsupportedGameType: never = room.gameType;
@@ -22,9 +26,28 @@ export async function runGameBotTick(
   switch (room.gameType) {
     case 'drawing':
       return await runDrawingBotTick(ctx, room, bot);
+    case 'trivia':
+      return await runTriviaBotTick(ctx, room, bot);
     default: {
       const unsupportedGameType: never = room.gameType;
       throw new Error(`No playtest adapter exists for game type: ${unsupportedGameType}`);
+    }
+  }
+}
+
+export function gameBotRunCompletionReason(
+  room: Pick<Doc<'rooms'>, 'gameType'>,
+  run: Pick<Doc<'playtestRuns'>, 'endsAt'>,
+  now: number
+): string | null {
+  switch (room.gameType) {
+    case 'drawing':
+      return run.endsAt !== null && now >= run.endsAt ? 'Completed the selected duration.' : null;
+    case 'trivia':
+      return null;
+    default: {
+      const unsupportedGameType: never = room.gameType;
+      throw new Error(`No playtest completion adapter exists for game type: ${unsupportedGameType}`);
     }
   }
 }
@@ -38,6 +61,9 @@ export async function stopGameBot(
   switch (gameType) {
     case 'drawing':
       await stopDrawingBot(ctx, bot);
+      return;
+    case 'trivia':
+      await stopTriviaBot(ctx, bot);
       return;
     case undefined:
       return;

@@ -198,15 +198,16 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
   const [now, setNow] = useState(Date.now());
   const run = panel.latestRun;
   const isRunActive = run?.isActive ?? false;
+  const isTrivia = panel.room.gameType === 'trivia';
   const adapterCopy = gameAdapterCopy(panel.room.gameType);
 
   useEffect(() => {
-    if (!isRunActive) {
+    if (!isRunActive || isTrivia) {
       return;
     }
     const interval = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(interval);
-  }, [isRunActive]);
+  }, [isRunActive, isTrivia]);
 
   async function handleStart() {
     setPending('start');
@@ -216,7 +217,7 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
         code: panel.room.code,
         sessionToken,
         targetActiveMemberCount: target,
-        durationMs,
+        ...(isTrivia ? {} : { durationMs }),
       });
     } catch (error) {
       setNotice(errorMessage(error, 'The playtest could not start.'));
@@ -240,7 +241,8 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
     }
   }
 
-  const remainingSeconds = run?.isActive ? Math.max(0, Math.ceil((run.endsAt - now) / 1_000)) : 0;
+  const remainingSeconds =
+    run?.isActive && run.endsAt !== null ? Math.max(0, Math.ceil((run.endsAt - now) / 1_000)) : 0;
   const targetUnavailable = target <= panel.room.activeMemberCount;
   const canStart = panel.room.status === 'open' && !isRunActive && !targetUnavailable;
   const statusLabel = run ? run.status[0].toUpperCase() + run.status.slice(1) : 'Ready';
@@ -317,7 +319,10 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
               <div>
                 <Timer aria-hidden="true" />
                 <span>
-                  Time left<strong>{isRunActive ? formatDuration(remainingSeconds) : '—'}</strong>
+                  {isTrivia ? 'Players stay' : 'Time left'}
+                  <strong>
+                    {isTrivia ? 'Until you remove them' : isRunActive ? formatDuration(remainingSeconds) : '—'}
+                  </strong>
                 </span>
               </div>
             </div>
@@ -351,21 +356,23 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
               </div>
             </fieldset>
 
-            <fieldset disabled={isRunActive || pending !== null}>
-              <legend>Run for</legend>
-              <div className="segmented-control duration-control">
-                {DURATIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    data-selected={durationMs === option.value}
-                    onClick={() => setDurationMs(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
+            {!isTrivia ? (
+              <fieldset disabled={isRunActive || pending !== null}>
+                <legend>Run for</legend>
+                <div className="segmented-control duration-control">
+                  {DURATIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-selected={durationMs === option.value}
+                      onClick={() => setDurationMs(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
 
             <div className="adapter-note">
               <span>
@@ -384,7 +391,13 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
                 ) : (
                   <CircleStop aria-hidden="true" />
                 )}
-                {run.status === 'stopping' ? 'Removing bots…' : 'Stop playtest'}
+                {run.status === 'stopping'
+                  ? isTrivia
+                    ? 'Removing players…'
+                    : 'Removing bots…'
+                  : isTrivia
+                    ? 'Remove players'
+                    : 'Stop playtest'}
               </button>
             ) : (
               <button
@@ -466,6 +479,12 @@ function gameAdapterCopy(gameType: PlaytestRoom['room']['gameType']) {
       return {
         label: 'Drawing adapter',
         description: 'Bots roam independently, then draw loops, spirals, waves, and zigzags point by point.',
+      };
+    case 'trivia':
+      return {
+        label: 'Trivia answer adapter',
+        description:
+          'Bots answer every game with varied speed and accuracy. They stay at the table until you remove them.',
       };
     default: {
       const unsupportedGameType: never = gameType;

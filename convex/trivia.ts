@@ -1,0 +1,412 @@
+import { v } from 'convex/values';
+import { internal } from './_generated/api';
+import type { Doc, Id } from './_generated/dataModel';
+import { internalMutation, mutation, type QueryCtx, query } from './_generated/server';
+import { fail, MAX_PLAYERS, validateSessionToken } from './domain';
+import { findTriviaGameState, findTriviaRound, recordTriviaAnswer, revealTriviaQuestion } from './triviaEngine';
+import { TRIVIA_QUESTIONS, type TriviaQuestion } from './triviaQuestions';
+import { TRIVIA_ANSWER_DURATION_MS } from './triviaScoring';
+
+export const TRIVIA_QUESTION_COUNT = 7;
+export const TRIVIA_COUNTDOWN_MS = 3_000;
+
+const triviaPhaseValidator = v.union(
+  v.literal('lobby'),
+  v.literal('countdown'),
+  v.literal('question'),
+  v.literal('reveal'),
+  v.literal('complete')
+);
+
+const leaderboardEntryValidator = v.object({
+  rank: v.number(),
+  memberId: v.id('roomMembers'),
+  displayName: v.string(),
+  totalPoints: v.number(),
+  correctAnswers: v.number(),
+  answersSubmitted: v.number(),
+  bestStreak: v.number(),
+  pointsGained: v.union(v.number(), v.null()),
+  isCurrentPlayer: v.boolean(),
+});
+
+const roundViewValidator = v.object({
+  roundId: v.id('triviaRounds'),
+  questionNumber: v.number(),
+  category: v.string(),
+  difficulty: v.literal('hard'),
+  prompt: v.string(),
+  options: v.array(v.string()),
+  answer: v.union(v.string(), v.null()),
+  correctOptionIndex: v.union(v.number(), v.null()),
+  answeredCount: v.number(),
+  optionAnswerCounts: v.union(v.array(v.number()), v.null()),
+});
+
+const playerAnswerValidator = v.object({
+  selectedOptionIndex: v.number(),
+  pointsAwarded: v.number(),
+  responseTimeMs: v.number(),
+  isCorrect: v.union(v.boolean(), v.null()),
+});
+
+const gameViewValidator = v.object({
+  gameNumber: v.number(),
+  phase: triviaPhaseValidator,
+  currentQuestionNumber: v.number(),
+  totalQuestions: v.number(),
+  phaseStartedAt: v.union(v.number(), v.null()),
+  phaseEndsAt: v.union(v.number(), v.null()),
+  round: v.union(roundViewValidator, v.null()),
+  playerAnswer: v.union(playerAnswerValidator, v.null()),
+  leaderboard: v.array(leaderboardEntryValidator),
+});
+
+type DatabaseReaderContext = Pick<QueryCtx, 'db'>;
+
+async function findGuestByToken(ctx: DatabaseReaderContext, sessionToken: string) {
+  return await ctx.db
+    .query('guestSessions')
+    .withIndex('by_sessionToken', (index) => index.eq('sessionToken', sessionToken))
+    .unique();
+}
+
+async function findMembership(ctx: DatabaseReaderContext, roomId: Id<'rooms'>, guestId: Id<'guestSessions'>) {
+  return await ctx.db
+    .query('roomMembers')
+    .withIndex('by_roomId_and_guestId', (index) => index.eq('roomId', roomId).eq('guestId', guestId))
+    .unique();
+}
+
+async function requireTriviaMember(
+  ctx: DatabaseReaderContext,
+  roomId: Id<'rooms'>,
+  rawSessionToken: string,
+  requireActive: boolean
+): Promise<{ room: Doc<'rooms'>; membership: Doc<'roomMembers'> }> {
+  const sessionToken = validateSessionToken(rawSessionToken);
+  const room = await ctx.db.get('rooms', roomId);
+  if (room === null) {
+    fail('ROOM_NOT_FOUND', 'Room not found.');
+  }
+  if (room.gameType !== 'trivia') {
+    fail('WRONG_GAME_TYPE', 'This room does not support trivia.');
+  }
+  const guest = await findGuestByToken(ctx, sessionToken);
+  if (guest === null) {
+    fail('NOT_A_MEMBER', 'You are not a member of this room.');
+  }
+  const membership = await findMembership(ctx, room._id, guest._id);
+  if (membership === null) {
+    fail('NOT_A_MEMBER', 'You are not a member of this room.');
+  }
+  if (requireActive && !membership.isActive) {
+    fail('MEMBER_INACTIVE', 'Rejoin the room before answering.');
+  }
+  return { room, membership };
+}
+
+function shuffledQuestions(count: number): TriviaQuestion[] {
+  const questions = [...TRIVIA_QUESTIONS];
+  for (let index = questions.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [questions[index], questions[swapIndex]] = [questions[swapIndex], questions[index]];
+  }
+  return questions.slice(0, count);
+}
+
+export const getGame = query({
+  args: { roomId: v.id('rooms'), sessionToken: v.string() },
+  returns: gameViewValidator,
+  handler: async (ctx, args) => {
+    const { membership } = await requireTriviaMember(ctx, args.roomId, args.sessionToken, false);
+    const state = await findTriviaGameState(ctx, args.roomId);
+    if (state === null) {
+      throw new Error('Trivia game state is missing.');
+    }
+
+    const activeMembers = await ctx.db
+      .query('roomMembers')
+      .withIndex('by_roomId_and_isActive', (index) => index.eq('roomId', args.roomId).eq('isActive', true))
+      .take(MAX_PLAYERS + 1);
+    if (activeMembers.length > MAX_PLAYERS) {
+      throw new Error('Room capacity invariant violated.');
+    }
+    const scores = await ctx.db
+      .query('triviaScores')
+      .withIndex('by_roomId_and_gameNumber', (index) =>
+        index.eq('roomId', args.roomId).eq('gameNumber', state.gameNumber)
+      )
+      .take(MAX_PLAYERS + 1);
+    if (scores.length > MAX_PLAYERS) {
+      throw new Error('Trivia score capacity invariant violated.');
+    }
+    const scoreByMemberId = new Map(scores.map((score) => [score.memberId, score]));
+    const sortedLeaderboard = activeMembers
+      .map((member) => {
+        const score = scoreByMemberId.get(member._id);
+        return {
+          memberId: member._id,
+          displayName: member.displayName,
+          totalPoints: score?.totalPoints ?? 0,
+          correctAnswers: score?.correctAnswers ?? 0,
+          answersSubmitted: score?.answersSubmitted ?? 0,
+          bestStreak: score?.bestStreak ?? 0,
+          joinedAt: member.joinedAt,
+        };
+      })
+      .sort(
+        (first, second) =>
+          second.totalPoints - first.totalPoints ||
+          second.correctAnswers - first.correctAnswers ||
+          second.bestStreak - first.bestStreak ||
+          first.joinedAt - second.joinedAt
+      );
+    const leaderboard = sortedLeaderboard.map((entry, index) => ({
+      rank: index + 1,
+      memberId: entry.memberId,
+      displayName: entry.displayName,
+      totalPoints: entry.totalPoints,
+      correctAnswers: entry.correctAnswers,
+      answersSubmitted: entry.answersSubmitted,
+      bestStreak: entry.bestStreak,
+      pointsGained: null,
+      isCurrentPlayer: entry.memberId === membership._id,
+    }));
+
+    if (state.currentQuestionNumber < 1) {
+      return {
+        gameNumber: state.gameNumber,
+        phase: state.phase,
+        currentQuestionNumber: state.currentQuestionNumber,
+        totalQuestions: state.totalQuestions,
+        phaseStartedAt: state.phaseStartedAt,
+        phaseEndsAt: state.phaseEndsAt,
+        round: null,
+        playerAnswer: null,
+        leaderboard,
+      };
+    }
+
+    const round = await findTriviaRound(ctx, args.roomId, state.gameNumber, state.currentQuestionNumber);
+    if (round === null) {
+      throw new Error('Current trivia round is missing.');
+    }
+    const answers = await ctx.db
+      .query('triviaAnswers')
+      .withIndex('by_roundId_and_memberId', (index) => index.eq('roundId', round._id))
+      .take(MAX_PLAYERS + 1);
+    if (answers.length > MAX_PLAYERS) {
+      throw new Error('Trivia answer capacity invariant violated.');
+    }
+    const playerAnswer = answers.find((answer) => answer.memberId === membership._id) ?? null;
+    const isAnswerRevealed = state.phase === 'reveal' || state.phase === 'complete';
+    const pointsGainedByMemberId =
+      state.phase === 'reveal'
+        ? new Map(answers.filter((answer) => answer.isCorrect).map((answer) => [answer.memberId, answer.pointsAwarded]))
+        : null;
+    const optionAnswerCounts = isAnswerRevealed
+      ? round.options.map((_, optionIndex) =>
+          answers.reduce((count, answer) => count + (answer.selectedOptionIndex === optionIndex ? 1 : 0), 0)
+        )
+      : null;
+
+    return {
+      gameNumber: state.gameNumber,
+      phase: state.phase,
+      currentQuestionNumber: state.currentQuestionNumber,
+      totalQuestions: state.totalQuestions,
+      phaseStartedAt: state.phaseStartedAt,
+      phaseEndsAt: state.phaseEndsAt,
+      round: {
+        roundId: round._id,
+        questionNumber: round.questionNumber,
+        category: round.category,
+        difficulty: round.difficulty,
+        prompt: round.prompt,
+        options: round.options,
+        answer: isAnswerRevealed ? round.answer : null,
+        correctOptionIndex: isAnswerRevealed ? round.correctOptionIndex : null,
+        answeredCount: answers.length,
+        optionAnswerCounts,
+      },
+      playerAnswer:
+        playerAnswer === null
+          ? null
+          : {
+              selectedOptionIndex: playerAnswer.selectedOptionIndex,
+              pointsAwarded: playerAnswer.pointsAwarded,
+              responseTimeMs: playerAnswer.responseTimeMs,
+              isCorrect: isAnswerRevealed ? playerAnswer.isCorrect : null,
+            },
+      leaderboard: leaderboard.map((entry) => ({
+        ...entry,
+        pointsGained: pointsGainedByMemberId?.get(entry.memberId) ?? null,
+      })),
+    };
+  },
+});
+
+export const startGame = mutation({
+  args: { roomId: v.id('rooms'), sessionToken: v.string() },
+  returns: v.object({ gameNumber: v.number() }),
+  handler: async (ctx, args) => {
+    const { room, membership } = await requireTriviaMember(ctx, args.roomId, args.sessionToken, true);
+    if (membership.guestId !== room.ownerGuestId) {
+      fail('NOT_ROOM_OWNER', 'Only the room owner can start trivia.');
+    }
+    if (room.status === 'closed') {
+      fail('ROOM_CLOSED', 'This room is closed.');
+    }
+    const state = await findTriviaGameState(ctx, room._id);
+    if (state === null) {
+      throw new Error('Trivia game state is missing.');
+    }
+    if (state.phase === 'countdown' || state.phase === 'question' || state.phase === 'reveal') {
+      fail('TRIVIA_GAME_IN_PROGRESS', 'A trivia game is already in progress.');
+    }
+
+    const gameNumber = state.gameNumber + 1;
+    const selectedQuestions = shuffledQuestions(TRIVIA_QUESTION_COUNT);
+    for (const [index, selectedQuestion] of selectedQuestions.entries()) {
+      await ctx.db.insert('triviaRounds', {
+        roomId: room._id,
+        gameNumber,
+        questionNumber: index + 1,
+        sourceType: 'bank',
+        sourceId: selectedQuestion.id,
+        category: selectedQuestion.category,
+        difficulty: 'hard',
+        prompt: selectedQuestion.prompt,
+        options: [...selectedQuestion.options],
+        answer: selectedQuestion.answer,
+        correctOptionIndex: selectedQuestion.correctOptionIndex,
+        scoreCommitMode: 'on_reveal',
+      });
+    }
+
+    const now = Date.now();
+    await ctx.db.patch('triviaGameStates', state._id, {
+      gameNumber,
+      phase: 'countdown',
+      currentQuestionNumber: 0,
+      totalQuestions: TRIVIA_QUESTION_COUNT,
+      phaseStartedAt: now,
+      phaseEndsAt: now + TRIVIA_COUNTDOWN_MS,
+    });
+    const scheduledId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(
+      TRIVIA_COUNTDOWN_MS,
+      internal.trivia.beginQuestion,
+      { stateId: state._id, gameNumber, questionNumber: 1 }
+    );
+    void scheduledId;
+    return { gameNumber };
+  },
+});
+
+export const submitAnswer = mutation({
+  args: { roomId: v.id('rooms'), sessionToken: v.string(), selectedOptionIndex: v.number() },
+  returns: v.object({ pointsAwarded: v.number(), responseTimeMs: v.number() }),
+  handler: async (ctx, args) => {
+    if (!Number.isInteger(args.selectedOptionIndex) || args.selectedOptionIndex < 0 || args.selectedOptionIndex > 3) {
+      fail('INVALID_TRIVIA_OPTION', 'Choose one of the four answer options.');
+    }
+    const { room, membership } = await requireTriviaMember(ctx, args.roomId, args.sessionToken, true);
+    if (room.status === 'closed') {
+      fail('ROOM_CLOSED', 'This room is closed.');
+    }
+    const now = Date.now();
+    const result = await recordTriviaAnswer(ctx, room, membership, args.selectedOptionIndex, now);
+    if (result.kind === 'not_running') {
+      fail('TRIVIA_GAME_NOT_RUNNING', 'There is no open trivia question.');
+    }
+    if (result.kind === 'closed') {
+      fail('TRIVIA_ANSWER_CLOSED', 'Time is up for this question.');
+    }
+    return { pointsAwarded: result.pointsAwarded, responseTimeMs: result.responseTimeMs };
+  },
+});
+
+export const beginQuestion = internalMutation({
+  args: { stateId: v.id('triviaGameStates'), gameNumber: v.number(), questionNumber: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const state = await ctx.db.get('triviaGameStates', args.stateId);
+    if (state === null || state.gameNumber !== args.gameNumber) {
+      return null;
+    }
+    const expectedPhase = args.questionNumber === 1 ? 'countdown' : 'reveal';
+    if (state.phase !== expectedPhase || state.currentQuestionNumber !== args.questionNumber - 1) {
+      return null;
+    }
+    const room = await ctx.db.get('rooms', state.roomId);
+    if (room === null || room.status === 'closed') {
+      await ctx.db.patch('triviaGameStates', state._id, {
+        phase: 'complete',
+        phaseStartedAt: Date.now(),
+        phaseEndsAt: null,
+      });
+      return null;
+    }
+    const round = await findTriviaRound(ctx, state.roomId, args.gameNumber, args.questionNumber);
+    if (round === null) {
+      throw new Error('Scheduled trivia round is missing.');
+    }
+
+    const now = Date.now();
+    await ctx.db.patch('triviaGameStates', state._id, {
+      phase: 'question',
+      currentQuestionNumber: args.questionNumber,
+      phaseStartedAt: now,
+      phaseEndsAt: now + TRIVIA_ANSWER_DURATION_MS,
+    });
+    const scheduledId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(
+      TRIVIA_ANSWER_DURATION_MS,
+      internal.trivia.closeQuestion,
+      { stateId: state._id, gameNumber: args.gameNumber, questionNumber: args.questionNumber }
+    );
+    void scheduledId;
+    return null;
+  },
+});
+
+export const closeQuestion = internalMutation({
+  args: { stateId: v.id('triviaGameStates'), gameNumber: v.number(), questionNumber: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const state = await ctx.db.get('triviaGameStates', args.stateId);
+    if (
+      state === null ||
+      state.gameNumber !== args.gameNumber ||
+      state.phase !== 'question' ||
+      state.currentQuestionNumber !== args.questionNumber
+    ) {
+      return null;
+    }
+
+    await revealTriviaQuestion(ctx, state, args.gameNumber, args.questionNumber);
+    return null;
+  },
+});
+
+export const finishGame = internalMutation({
+  args: { stateId: v.id('triviaGameStates'), gameNumber: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const state = await ctx.db.get('triviaGameStates', args.stateId);
+    if (
+      state === null ||
+      state.gameNumber !== args.gameNumber ||
+      state.phase !== 'reveal' ||
+      state.currentQuestionNumber !== state.totalQuestions
+    ) {
+      return null;
+    }
+    await ctx.db.patch('triviaGameStates', state._id, {
+      phase: 'complete',
+      phaseStartedAt: Date.now(),
+      phaseEndsAt: null,
+    });
+    return null;
+  },
+});

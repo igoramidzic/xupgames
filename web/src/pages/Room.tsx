@@ -5,6 +5,7 @@ import { Beaker, Check, Copy, Crown, DoorOpen, LoaderCircle, LockKeyhole, UsersR
 import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import DrawingCanvas from '@/components/DrawingCanvas';
+import TriviaRoom from '@/components/TriviaRoom';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +55,9 @@ export default function Room() {
   }
 
   if (guest && session?.kind === 'session' && session.currentMember.isActive) {
+    if (session.gameType === 'trivia') {
+      return <TriviaRoom guest={guest} session={session} />;
+    }
     return <CanvasRoom guest={guest} session={session} />;
   }
 
@@ -67,7 +71,7 @@ function RoomLoading() {
         X
       </div>
       <LoaderCircle className="spin" aria-hidden="true" />
-      <p>Unrolling the shared sheet…</p>
+      <p>Setting up the room…</p>
     </main>
   );
 }
@@ -110,6 +114,7 @@ function JoinRoom({
   const [error, setError] = useState<string | null>(null);
   const isClosed = preview.status === 'closed';
   const isFull = preview.activeMemberCount >= preview.maxPlayers;
+  const isTrivia = preview.gameType === 'trivia';
 
   async function handleJoin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -152,8 +157,16 @@ function JoinRoom({
               <path className="stroke-blue" d="M18 26 C 83 12, 108 94, 220 70" />
             </svg>
           </div>
-          <p className="eyebrow">{isClosed ? 'The drawing is finished' : `${preview.ownerName} invited you`}</p>
-          <h1>{isClosed ? 'This room is closed.' : 'Step up to the canvas.'}</h1>
+          <p className="eyebrow">
+            {isClosed
+              ? isTrivia
+                ? 'The trivia room is finished'
+                : 'The drawing is finished'
+              : `${preview.ownerName} invited you`}
+          </p>
+          <h1>
+            {isClosed ? 'This room is closed.' : isTrivia ? 'Take your place at the table.' : 'Step up to the canvas.'}
+          </h1>
           <div className="join-meta">
             <span>
               <UsersRound aria-hidden="true" /> {preview.activeMemberCount} / {preview.maxPlayers} people
@@ -170,7 +183,13 @@ function JoinRoom({
             <div className="join-blocked">
               <LockKeyhole aria-hidden="true" />
               <div>
-                <strong>{isClosed ? 'No more marks can be added.' : 'Every seat is taken.'}</strong>
+                <strong>
+                  {isClosed
+                    ? isTrivia
+                      ? 'No more answers can be added.'
+                      : 'No more marks can be added.'
+                    : 'Every seat is taken.'}
+                </strong>
                 <p>{isClosed ? 'Ask the owner to make a new room.' : 'Try this link again after someone leaves.'}</p>
               </div>
             </div>
@@ -206,7 +225,15 @@ function JoinRoom({
               ) : null}
               <button className="primary-action" type="submit" disabled={joining}>
                 {joining ? <LoaderCircle className="spin" aria-hidden="true" /> : null}
-                {joining ? 'Joining…' : guest ? 'Rejoin the canvas' : 'Join the canvas'}
+                {joining
+                  ? 'Joining…'
+                  : guest
+                    ? isTrivia
+                      ? 'Rejoin the quiz'
+                      : 'Rejoin the canvas'
+                    : isTrivia
+                      ? 'Join the quiz'
+                      : 'Join the canvas'}
               </button>
               {error ? (
                 <p className="form-error" id="join-error" role="alert">
