@@ -1,5 +1,6 @@
 import type { Id } from '../../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../../_generated/server';
+import { TRIVIA_CATEGORIES, TRIVIA_DEFAULT_ROUND_COUNT } from '../../triviaQuestions';
 
 type DatabaseReaderContext = Pick<QueryCtx, 'db'>;
 
@@ -9,7 +10,9 @@ export async function initializeTriviaGame(ctx: MutationCtx, roomId: Id<'rooms'>
     gameNumber: 0,
     phase: 'lobby',
     currentQuestionNumber: 0,
-    totalQuestions: 10,
+    totalQuestions: TRIVIA_DEFAULT_ROUND_COUNT,
+    configuredCategories: [...TRIVIA_CATEGORIES],
+    configuredRoundCount: TRIVIA_DEFAULT_ROUND_COUNT,
     phaseStartedAt: null,
     phaseEndsAt: null,
   });
@@ -27,6 +30,7 @@ export async function prepareTriviaGame(ctx: MutationCtx, roomId: Id<'rooms'>): 
   await ctx.db.patch('triviaGameStates', state._id, {
     phase: 'lobby',
     currentQuestionNumber: 0,
+    totalQuestions: state.configuredRoundCount ?? TRIVIA_DEFAULT_ROUND_COUNT,
     phaseStartedAt: null,
     phaseEndsAt: null,
   });

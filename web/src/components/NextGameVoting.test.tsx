@@ -63,14 +63,27 @@ const basePoll = {
   chosenGameType: null,
 };
 
-function renderVoting(isOwner = false, currentGameType: 'trivia' | 'typeRacer' | 'trendline' = 'trivia') {
+function renderVoting(isOwner = false, currentGameType: 'trivia' | 'typeRacer' | 'trendline' | null = 'trivia') {
+  return render(
+    <NextGameVoting
+      roomId={'room-1' as never}
+      currentGameId={currentGameType === null ? null : ('room-game-1' as never)}
+      currentGameType={currentGameType}
+      sessionToken={'a'.repeat(32)}
+      isOwner={isOwner}
+    />
+  );
+}
+
+function renderDialogVoting() {
   return render(
     <NextGameVoting
       roomId={'room-1' as never}
       currentGameId={'room-game-1' as never}
-      currentGameType={currentGameType}
+      currentGameType="trivia"
       sessionToken={'a'.repeat(32)}
-      isOwner={isOwner}
+      isOwner
+      layout="dialog"
     />
   );
 }
@@ -90,7 +103,7 @@ describe('NextGameVoting', () => {
     renderVoting();
 
     expect(screen.queryByRole('group', { name: 'Final vote count' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Switch to Type Racer/ }));
+    await user.click(screen.getByRole('button', { name: /Type Racer/ }));
 
     await waitFor(() =>
       expect(mocks.castVote).toHaveBeenCalledWith({
@@ -114,7 +127,7 @@ describe('NextGameVoting', () => {
     });
   });
 
-  it('shows the final tally and leaves the game selection to the owner', async () => {
+  it('restores white decision cards and tells the owner to make the final selection', async () => {
     const user = userEvent.setup();
     mocks.poll = {
       ...basePoll,
@@ -130,8 +143,19 @@ describe('NextGameVoting', () => {
     };
     renderVoting(true);
 
-    expect(screen.getByRole('group', { name: 'Final vote count' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Top votePlay Trivia Again/ }));
+    expect(screen.queryByRole('group', { name: 'Final vote count' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Players recommend Trivia.')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Pick the next game.' })).toBeInTheDocument();
+    expect(screen.getByText(/Pick one to continue/)).toBeInTheDocument();
+    const winner = screen.getByRole('button', { name: /Top voteTrivia/ });
+    const loser = screen.getByRole('button', { name: /Type Racer/ });
+    expect(winner).toHaveAttribute('data-variant', 'decision');
+    expect(loser).toHaveAttribute('data-variant', 'decision');
+    expect(winner).toHaveClass('bg-white');
+    expect(loser).toHaveClass('bg-white');
+    expect(loser).not.toHaveClass('opacity-40');
+
+    await user.click(winner);
     expect(mocks.chooseGame).toHaveBeenCalledWith({
       roomId: 'room-1',
       sessionToken: 'a'.repeat(32),
@@ -140,34 +164,103 @@ describe('NextGameVoting', () => {
     });
   });
 
-  it('puts the current mode first with its familiar replay action', () => {
+  it('shows non-owners the same completed cards in a read-only state', () => {
+    mocks.poll = {
+      ...basePoll,
+      status: 'awaitingOwner',
+      roundStatus: 'closed',
+      votesCast: 3,
+      selectedGameType: 'typeRacer',
+      recommendedGameType: 'trivia',
+      tallies: [
+        { gameType: 'trivia', votes: 2, percentage: 67 },
+        { gameType: 'typeRacer', votes: 1, percentage: 33 },
+      ],
+    };
+    renderVoting(false);
+
+    expect(screen.getByRole('button', { name: /Top voteTrivia/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Type Racer/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Type Racer/ })).toHaveClass('opacity-40');
+    expect(screen.getByText('Waiting for the room owner to choose.')).toBeInTheDocument();
+  });
+
+  it('puts the current mode first and keeps every label to the game name', () => {
     renderVoting(false, 'typeRacer');
 
     const choices = screen.getAllByRole('button');
-    expect(choices[0]).toHaveAccessibleName(/Race Again/);
-    expect(choices[0]).toHaveClass('flex-col', 'items-stretch', 'justify-start', 'gap-0');
-    expect(screen.getByRole('button', { name: /Switch to Trivia/ })).toHaveClass(
+    expect(choices[0]).toHaveAccessibleName(/Type Racer/);
+    expect(choices[0]).toHaveClass('flex-col', 'items-stretch', 'justify-start', 'gap-0!');
+    expect(screen.getByRole('button', { name: /Trivia/ })).toHaveClass(
       'flex-col',
       'items-stretch',
       'justify-start',
-      'gap-0'
+      'gap-0!'
     );
-    expect(screen.getByRole('button', { name: /Switch to Trivia/ }).querySelector('svg')).toHaveClass('size-6');
+    expect(screen.getByRole('button', { name: /Trivia/ }).querySelector('svg')).toHaveClass('size-6');
     expect(screen.queryByText('Official')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Race Again/ })).not.toHaveTextContent('by Xup Games');
+    expect(screen.getByRole('button', { name: /Type Racer/ })).not.toHaveTextContent('by Xup Games');
+    expect(screen.getByRole('button', { name: /Type Racer/ }).parentElement).toHaveClass('grid-cols-3');
+  });
+
+  it('uses compact first-game cards and lets the owner start a choice without an existing room game', async () => {
+    const user = userEvent.setup();
+    mocks.poll = {
+      ...basePoll,
+      roomGameId: null,
+      status: 'awaitingOwner',
+      roundStatus: 'closed',
+      options: ['trivia', 'typeRacer', 'trendline'],
+      votesCast: 1,
+      selectedGameType: 'trivia',
+      recommendedGameType: 'trivia',
+      tallies: [
+        { gameType: 'trivia', votes: 1, percentage: 100 },
+        { gameType: 'typeRacer', votes: 0, percentage: 0 },
+        { gameType: 'trendline', votes: 0, percentage: 0 },
+      ],
+    };
+    renderVoting(true, null);
+
+    expect(screen.getByRole('heading', { name: 'Pick the first game.' })).toBeInTheDocument();
+    const recommendedChoice = screen.getByRole('button', { name: /Top voteTrivia/ });
+    expect(recommendedChoice).toHaveClass('h-auto!', 'min-h-0', 'gap-0!');
+    expect(recommendedChoice).toHaveAttribute('data-variant', 'decision');
+    expect(recommendedChoice).toHaveClass('bg-white');
+    expect(screen.getByRole('button', { name: /Trendline/ })).toHaveTextContent('by Igor Amidzic');
+    expect(screen.getByRole('button', { name: /Trendline/ })).not.toHaveClass('opacity-40');
+
+    await user.click(recommendedChoice);
+    expect(mocks.chooseGame).toHaveBeenCalledWith({
+      roomId: 'room-1',
+      sessionToken: 'a'.repeat(32),
+      expectedRoomGameId: null,
+      gameType: 'trivia',
+    });
   });
 
   it('shows compact community metadata without a description', () => {
     mocks.poll = { ...basePoll, options: ['trivia', 'trendline'] };
     renderVoting();
 
-    const trendline = screen.getByRole('button', { name: /Switch to Trendline/ });
-    expect(trendline).toHaveClass('min-h-32');
-    expect(trendline).toHaveTextContent('Community game');
+    const trendline = screen.getByRole('button', { name: /Trendline/ });
+    expect(trendline).toHaveClass('aspect-[4/3]', 'min-w-0');
+    expect(trendline).toHaveTextContent('Community');
+    expect(trendline).not.toHaveTextContent('Community game');
     expect(trendline).not.toHaveTextContent('Draw the shape of real-world data, then compare your line with history.');
     expect(trendline).toHaveTextContent('by Igor Amidzic');
     expect(screen.queryByText('Official')).not.toBeInTheDocument();
     expect(screen.queryByText(/two-thirds majority/)).not.toBeInTheDocument();
+  });
+
+  it('uses content-sized cards in the game-change dialog', () => {
+    mocks.poll = { ...basePoll, options: ['trivia', 'typeRacer', 'trendline'] };
+    renderDialogVoting();
+
+    const trendline = screen.getByRole('button', { name: /Trendline/ });
+    expect(trendline).toHaveClass('h-auto!', 'min-h-0', 'p-3.5');
+    expect(trendline).not.toHaveClass('aspect-[4/3]');
+    expect(trendline.parentElement).toHaveClass('grid-cols-3', 'max-[700px]:grid-cols-1');
   });
 
   it('keeps every visible vote count aligned to the right edge of its card', () => {
@@ -182,7 +275,7 @@ describe('NextGameVoting', () => {
     };
     renderVoting(false, 'typeRacer');
 
-    expect(within(screen.getByRole('button', { name: /Race Again/ })).getByText('1')).toHaveClass('ml-auto');
-    expect(within(screen.getByRole('button', { name: /Switch to Trivia/ })).getByText('0')).toHaveClass('ml-auto');
+    expect(within(screen.getByRole('button', { name: /Type Racer/ })).getByText('1')).toHaveClass('ml-auto');
+    expect(within(screen.getByRole('button', { name: /Trivia/ })).getByText('0')).toHaveClass('ml-auto');
   });
 });

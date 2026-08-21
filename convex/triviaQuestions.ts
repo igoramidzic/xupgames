@@ -7,6 +7,29 @@ export type TriviaQuestion = Readonly<{
   correctOptionIndex: 0 | 1 | 2 | 3;
 }>;
 
+export const TRIVIA_CATEGORIES = [
+  'Science',
+  'History',
+  'Geography',
+  'Arts & Literature',
+  'Technology',
+  'Nature',
+  'Games & Culture',
+] as const;
+
+export type TriviaCategory = (typeof TRIVIA_CATEGORIES)[number];
+
+export const TRIVIA_ROUND_OPTIONS = [5, 10, 15, 20] as const;
+export const TRIVIA_DEFAULT_ROUND_COUNT = 10;
+
+export function isTriviaCategory(value: string): value is TriviaCategory {
+  return (TRIVIA_CATEGORIES as readonly string[]).includes(value);
+}
+
+export function isTriviaRoundCount(value: number): value is (typeof TRIVIA_ROUND_OPTIONS)[number] {
+  return (TRIVIA_ROUND_OPTIONS as readonly number[]).includes(value);
+}
+
 function question(
   id: string,
   category: string,
@@ -844,3 +867,20 @@ export const TRIVIA_QUESTIONS: readonly TriviaQuestion[] = [
     2
   ),
 ];
+
+export function selectTriviaQuestions(
+  categories: readonly TriviaCategory[],
+  count: number,
+  random: () => number = Math.random
+): TriviaQuestion[] {
+  const selectedCategories = new Set(categories);
+  const questions = TRIVIA_QUESTIONS.filter((question) => selectedCategories.has(question.category as TriviaCategory));
+  if (questions.length < count) {
+    throw new Error('The selected categories do not contain enough trivia questions.');
+  }
+  for (let index = questions.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [questions[index], questions[swapIndex]] = [questions[swapIndex], questions[index]];
+  }
+  return questions.slice(0, count);
+}

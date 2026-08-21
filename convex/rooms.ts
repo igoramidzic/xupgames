@@ -10,11 +10,11 @@ import {
   normalizeRoomPassword,
   validateSessionToken,
 } from './domain';
-import { initializeGameState, syncGameMembership } from './gameRouter';
-import { gameTypeValidator, requireAvailableGame } from './games';
+import { syncGameMembership } from './gameRouter';
+import { gameTypeValidator } from './games';
 import { createPasswordCredential, verifyPasswordCredential } from './passwords';
 import { stopActivePlaytestForRoom } from './playtestLifecycle';
-import { createInitialRoomGame } from './roomGames';
+import { createInitialGamePoll } from './roomGames';
 import { listActiveHumanRoomMembers, listRoomMembersForDisplay } from './roomMembers';
 
 const roomStatusValidator = v.union(v.literal('open'), v.literal('closed'));
@@ -25,7 +25,7 @@ const previewResultValidator = v.union(
   v.object({
     kind: v.literal('room'),
     code: v.string(),
-    gameType: gameTypeValidator,
+    gameType: v.union(gameTypeValidator, v.null()),
     status: roomStatusValidator,
     activeMemberCount: v.number(),
     maxPlayers: v.number(),
@@ -58,7 +58,7 @@ const sessionResultValidator = v.union(
     kind: v.literal('session'),
     roomId: v.id('rooms'),
     code: v.string(),
-    gameType: gameTypeValidator,
+    gameType: v.union(gameTypeValidator, v.null()),
     currentGameId: v.union(v.id('roomGames'), v.null()),
     status: roomStatusValidator,
     activeMemberCount: v.number(),
@@ -160,7 +160,7 @@ export const preview = query({
     return {
       kind: 'room' as const,
       code: room.code,
-      gameType: room.gameType,
+      gameType: room.gameType ?? null,
       status: room.status,
       activeMemberCount: room.activeMemberCount,
       maxPlayers: room.maxPlayers,
@@ -197,7 +197,7 @@ export const getSession = query({
       kind: 'session' as const,
       roomId: room._id,
       code: room.code,
-      gameType: room.gameType,
+      gameType: room.gameType ?? null,
       currentGameId: room.currentGameId ?? null,
       status: room.status,
       activeMemberCount: room.activeMemberCount,
@@ -226,6 +226,8 @@ export const getSession = query({
 
 export const create = mutation({
   args: {
+    // Kept optional while older web clients roll over; room creation no longer
+    // uses a preselected game.
     gameType: v.optional(gameTypeValidator),
     sessionToken: v.string(),
     displayName: v.string(),
@@ -235,8 +237,6 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const sessionToken = validateSessionToken(args.sessionToken);
     const displayName = normalizeDisplayName(args.displayName);
-    const gameType = args.gameType ?? 'trivia';
-    await requireAvailableGame(ctx, gameType);
     const password = args.password === undefined ? null : normalizeRoomPassword(args.password);
     const passwordCredential = password === null ? null : await createPasswordCredential(password);
     const now = Date.now();
@@ -256,7 +256,6 @@ export const create = mutation({
 
     const roomId = await ctx.db.insert('rooms', {
       code,
-      gameType,
       status: 'open',
       maxPlayers: MAX_PLAYERS,
       activeMemberCount: 1,
@@ -274,9 +273,6 @@ export const create = mutation({
       createdAt: now,
       closedAt: null,
     });
-    const roomGame = await createInitialRoomGame(ctx, roomId, gameType, now);
-    await ctx.db.patch('rooms', roomId, { currentGameId: roomGame._id });
-    await initializeGameState(ctx, roomId, gameType);
     await ctx.db.insert('roomMembers', {
       roomId,
       guestId: guest._id,
@@ -286,6 +282,7 @@ export const create = mutation({
       joinedAt: now,
       leftAt: null,
     });
+    await createInitialGamePoll(ctx, roomId, now);
 
     return { code };
   },
@@ -333,7 +330,9 @@ export const join = mutation({
           ownerChangedAt: now,
         });
       }
-      await syncGameMembership(ctx, room, { ...existingMembership, displayName }, now);
+      if (room.gameType !== undefined) {
+        await syncGameMembership(ctx, room, { ...existingMembership, displayName }, now);
+      }
       return { code: room.code };
     }
     if (room.activeMemberCount >= room.maxPlayers) {
@@ -373,7 +372,9 @@ export const join = mutation({
           }
         : { activeMemberCount: room.activeMemberCount + 1 }
     );
-    await syncGameMembership(ctx, room, membership, now);
+    if (room.gameType !== undefined) {
+      await syncGameMembership(ctx, room, membership, now);
+    }
 
     return { code: room.code };
   },

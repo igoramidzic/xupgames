@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import GameModeControl, { GameModeContent } from '@/components/GameModeControl';
 import GameSurfaceTransition from '@/components/GameSurfaceTransition';
 import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
 import {
@@ -190,6 +191,7 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<'leave' | 'close' | null>(null);
   const [actionPending, setActionPending] = useState<'leave' | 'close' | null>(null);
+  const [gameModeOpen, setGameModeOpen] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const typingRef = useRef(typing);
@@ -468,6 +470,16 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
         </Button>
 
         <div className="flex items-center justify-end gap-2">
+          <GameModeControl
+            roomId={session.roomId}
+            currentGameId={session.currentGameId}
+            currentGameType={session.gameType}
+            sessionToken={guest.sessionToken}
+            isOwner={session.isOwner}
+            isClosed={isClosed}
+            onOpen={() => setGameModeOpen(true)}
+            buttonVariant="type-paper"
+          />
           {session.isOwner && !isClosed && isLocalhost() ? (
             <Button
               asChild
@@ -507,154 +519,168 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
 
       <main className="mx-auto grid w-full max-w-360 grid-cols-[minmax(0,1fr)_390px] gap-4 p-4 max-[1060px]:grid-cols-[minmax(0,1fr)_330px] max-[820px]:grid-cols-1 max-[620px]:p-2.5">
         <section className="min-w-0">
-          <GameSurfaceTransition
-            showResults={game.phase === 'complete'}
-            results={
-              <PostGameBoard
-                eyebrow={`Race ${game.raceNumber} · Photo finish`}
-                title={winner ? `${winner.displayName} wins.` : 'Race complete.'}
-                detail={
-                  winner
-                    ? `${formatWpm(winner.wpm)} WPM · ${formatAccuracy(winner.accuracy)} accuracy · ${formatFinishTime(winner.finishTimeMs)}`
-                    : 'The final standings are locked in.'
-                }
-                icon={Trophy}
-                accent="#e54f50"
-                accentTint="#ffd65a"
-                roomId={session.roomId}
-                currentGameId={session.currentGameId}
-                currentGameType={session.gameType}
-                sessionToken={guest.sessionToken}
-                isOwner={session.isOwner}
-                isClosed={isClosed}
-                closedMessage="This room is closed. The final standings stay here to view."
-                summary={
-                  <PostGamePodium
-                    label="Final podium"
-                    entries={game.racers
-                      .filter((racer) => racer.isActive)
-                      .slice(0, 3)
-                      .map((racer, index) => ({
-                        id: racer.memberId,
-                        place: index + 1,
-                        name: racer.displayName,
-                        result: `${formatWpm(racer.wpm)} WPM · ${formatFinishTime(racer.finishTimeMs)}`,
-                      }))}
-                  />
-                }
-              />
-            }
+          <GameModeContent
+            roomId={session.roomId}
+            currentGameId={session.currentGameId}
+            currentGameType={session.gameType}
+            sessionToken={guest.sessionToken}
+            isOwner={session.isOwner}
+            isClosed={isClosed}
+            open={gameModeOpen}
+            onClose={() => setGameModeOpen(false)}
           >
-            {game.phase === 'lobby' ? (
-              <LobbyPanel
-                isOwner={session.isOwner}
-                isClosed={isClosed}
-                ownerName={ownerName}
-                playerCount={session.activeMemberCount}
-                starting={starting}
-                onStart={handleStart}
-                onCopy={copyRoomLink}
-              />
-            ) : game.phase === 'complete' ? null : (
-              <div className="relative overflow-hidden rounded-[14px_26px_16px_24px] border border-[#9faed5] bg-white shadow-[7px_8px_0_#c7d3ef]">
-                <div className="flex min-h-16 items-center justify-between gap-4 border-b border-[#d9e0f2] bg-[#f9fbff] px-6 py-3 max-[620px]:px-4">
-                  <div className="min-w-0">
-                    <p className="m-0 text-[9px] font-[820] tracking-[0.13em] text-[#766d89] uppercase">
-                      {game.passage?.kind ?? 'Passage'} · Race {game.raceNumber}
-                    </p>
-                    <p className="mt-1 mb-0 truncate text-xs font-[720] text-[#3c3152]" id="passage-source">
-                      {game.passage?.title} <span className="font-[520] text-[#817991]">by {game.passage?.author}</span>
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-5">
-                    <Stat
-                      label="WPM"
-                      value={String(formatWpm(localRacer?.wpm ?? 0))}
-                      icon={<Gauge aria-hidden="true" />}
+            <GameSurfaceTransition
+              showResults={game.phase === 'complete'}
+              results={({ playIntro }) => (
+                <PostGameBoard
+                  eyebrow={`Race ${game.raceNumber} · Photo finish`}
+                  title={winner ? `${winner.displayName} wins.` : 'Race complete.'}
+                  detail={
+                    winner
+                      ? `${formatWpm(winner.wpm)} WPM · ${formatAccuracy(winner.accuracy)} accuracy · ${formatFinishTime(winner.finishTimeMs)}`
+                      : 'The final standings are locked in.'
+                  }
+                  icon={Trophy}
+                  accent="#e54f50"
+                  accentTint="#ffd65a"
+                  roomId={session.roomId}
+                  currentGameId={session.currentGameId}
+                  currentGameType={session.gameType}
+                  sessionToken={guest.sessionToken}
+                  isOwner={session.isOwner}
+                  isClosed={isClosed}
+                  closedMessage="This room is closed. The final standings stay here to view."
+                  playIntro={playIntro}
+                  summary={
+                    <PostGamePodium
+                      label="Final podium"
+                      animate={playIntro}
+                      entries={game.racers
+                        .filter((racer) => racer.isActive)
+                        .slice(0, 3)
+                        .map((racer, index) => ({
+                          id: racer.memberId,
+                          place: index + 1,
+                          name: racer.displayName,
+                          result: `${formatWpm(racer.wpm)} WPM · ${formatFinishTime(racer.finishTimeMs)}`,
+                        }))}
                     />
-                    <Stat label="ACCURACY" value={formatAccuracy(localRacer?.accuracy ?? 100)} />
+                  }
+                />
+              )}
+            >
+              {game.phase === 'lobby' ? (
+                <LobbyPanel
+                  isOwner={session.isOwner}
+                  isClosed={isClosed}
+                  ownerName={ownerName}
+                  playerCount={session.activeMemberCount}
+                  starting={starting}
+                  onStart={handleStart}
+                  onCopy={copyRoomLink}
+                />
+              ) : game.phase === 'complete' ? null : (
+                <div className="relative overflow-hidden rounded-[14px_26px_16px_24px] border border-[#9faed5] bg-white shadow-[7px_8px_0_#c7d3ef]">
+                  <div className="flex min-h-16 items-center justify-between gap-4 border-b border-[#d9e0f2] bg-[#f9fbff] px-6 py-3 max-[620px]:px-4">
+                    <div className="min-w-0">
+                      <p className="m-0 text-[9px] font-[820] tracking-[0.13em] text-[#766d89] uppercase">
+                        {game.passage?.kind ?? 'Passage'} · Race {game.raceNumber}
+                      </p>
+                      <p className="mt-1 mb-0 truncate text-xs font-[720] text-[#3c3152]" id="passage-source">
+                        {game.passage?.title}{' '}
+                        <span className="font-[520] text-[#817991]">by {game.passage?.author}</span>
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-5">
+                      <Stat
+                        label="WPM"
+                        value={String(formatWpm(localRacer?.wpm ?? 0))}
+                        icon={<Gauge aria-hidden="true" />}
+                      />
+                      <Stat label="ACCURACY" value={formatAccuracy(localRacer?.accuracy ?? 100)} />
+                    </div>
+                  </div>
+
+                  <div
+                    className={cn(
+                      'relative min-h-[clamp(420px,calc(100dvh-245px),650px)] px-[clamp(22px,5vw,72px)] py-[clamp(42px,7vw,84px)]',
+                      inputFocused && isTypingEnabled && 'ring-3 ring-inset ring-[#ff5c57]/25'
+                    )}
+                  >
+                    <Passage text={passage} alignment={inputAlignment} showCaret={isTypingEnabled} />
+                    <textarea
+                      ref={inputRef}
+                      className="absolute inset-0 z-10 size-full cursor-text resize-none opacity-0 disabled:cursor-default"
+                      aria-label="Type the passage"
+                      aria-describedby="passage-source typing-guidance"
+                      value={typing.text}
+                      onChange={(event) => handleTyping(event.target.value)}
+                      onFocus={() => setInputFocused(true)}
+                      onBlur={() => setInputFocused(false)}
+                      onPaste={(event) => {
+                        event.preventDefault();
+                        setNotice('Pasting is off for races. Type the passage to move.');
+                      }}
+                      onSelect={(event) => {
+                        if (event.currentTarget.selectionEnd !== typing.text.length) {
+                          event.currentTarget.setSelectionRange(typing.text.length, typing.text.length);
+                        }
+                      }}
+                      autoCapitalize="off"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      disabled={!isTypingEnabled}
+                    />
+
+                    {effectivePhase === 'countdown' ? (
+                      <div className="absolute inset-0 z-20 grid place-items-center bg-[rgb(39_24_63/84%)] text-center text-white backdrop-blur-[3px]">
+                        <div>
+                          <p className="mb-3 text-[10px] font-[850] tracking-[0.18em] text-[#b9c9ff] uppercase">
+                            Hands on the keys
+                          </p>
+                          <strong className="block font-display text-[clamp(150px,26vw,300px)] leading-[0.72] tracking-[-0.1em] text-[#ffd65a] tabular-nums [text-shadow:8px_8px_0_rgb(0_0_0/22%)]">
+                            {countdown}
+                          </strong>
+                          <span className="mt-8 block text-sm text-[#d8ddf1]">The full passage unlocks at zero.</span>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {currentPlayer?.status === 'finished' ? (
+                      <div className="absolute inset-x-5 bottom-5 z-20 flex items-center justify-center gap-2 rounded-xl border border-[#82c7a8] bg-[#e4f8ef] px-4 py-3 text-xs font-[760] text-[#176b49] shadow-lg">
+                        <Check className="size-4" aria-hidden="true" /> Finished in{' '}
+                        {formatFinishTime(currentPlayer.finishTimeMs)}. The field has 15 seconds to follow.
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div
+                    className={cn(
+                      'flex min-h-14 items-center justify-between gap-4 border-t border-[#d9e0f2] bg-[#f9fbff] px-6 py-3 text-xs max-[620px]:px-4',
+                      hasTypingError ? 'text-[#ba383d]' : 'text-[#6f667f]'
+                    )}
+                    id="typing-guidance"
+                    aria-live="polite"
+                  >
+                    <span className="inline-flex items-center gap-2 font-[680]">
+                      <Keyboard className="size-4" aria-hidden="true" />
+                      {hasTypingError
+                        ? 'Backspace to the first red letter.'
+                        : isTypingEnabled
+                          ? inputFocused
+                            ? 'Typing is live. Keep your eyes on the line.'
+                            : 'Tap the passage to keep typing.'
+                          : 'Wait for the countdown.'}
+                    </span>
+                    <span className="shrink-0 font-mono text-[11px] tabular-nums">
+                      {correctChars}/{passage.length}
+                    </span>
                   </div>
                 </div>
-
-                <div
-                  className={cn(
-                    'relative min-h-[clamp(420px,calc(100dvh-245px),650px)] px-[clamp(22px,5vw,72px)] py-[clamp(42px,7vw,84px)]',
-                    inputFocused && isTypingEnabled && 'ring-3 ring-inset ring-[#ff5c57]/25'
-                  )}
-                >
-                  <Passage text={passage} alignment={inputAlignment} showCaret={isTypingEnabled} />
-                  <textarea
-                    ref={inputRef}
-                    className="absolute inset-0 z-10 size-full cursor-text resize-none opacity-0 disabled:cursor-default"
-                    aria-label="Type the passage"
-                    aria-describedby="passage-source typing-guidance"
-                    value={typing.text}
-                    onChange={(event) => handleTyping(event.target.value)}
-                    onFocus={() => setInputFocused(true)}
-                    onBlur={() => setInputFocused(false)}
-                    onPaste={(event) => {
-                      event.preventDefault();
-                      setNotice('Pasting is off for races. Type the passage to move.');
-                    }}
-                    onSelect={(event) => {
-                      if (event.currentTarget.selectionEnd !== typing.text.length) {
-                        event.currentTarget.setSelectionRange(typing.text.length, typing.text.length);
-                      }
-                    }}
-                    autoCapitalize="off"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    disabled={!isTypingEnabled}
-                  />
-
-                  {effectivePhase === 'countdown' ? (
-                    <div className="absolute inset-0 z-20 grid place-items-center bg-[rgb(39_24_63/84%)] text-center text-white backdrop-blur-[3px]">
-                      <div>
-                        <p className="mb-3 text-[10px] font-[850] tracking-[0.18em] text-[#b9c9ff] uppercase">
-                          Hands on the keys
-                        </p>
-                        <strong className="block font-display text-[clamp(150px,26vw,300px)] leading-[0.72] tracking-[-0.1em] text-[#ffd65a] tabular-nums [text-shadow:8px_8px_0_rgb(0_0_0/22%)]">
-                          {countdown}
-                        </strong>
-                        <span className="mt-8 block text-sm text-[#d8ddf1]">The full passage unlocks at zero.</span>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {currentPlayer?.status === 'finished' ? (
-                    <div className="absolute inset-x-5 bottom-5 z-20 flex items-center justify-center gap-2 rounded-xl border border-[#82c7a8] bg-[#e4f8ef] px-4 py-3 text-xs font-[760] text-[#176b49] shadow-lg">
-                      <Check className="size-4" aria-hidden="true" /> Finished in{' '}
-                      {formatFinishTime(currentPlayer.finishTimeMs)}. The field has 15 seconds to follow.
-                    </div>
-                  ) : null}
-                </div>
-
-                <div
-                  className={cn(
-                    'flex min-h-14 items-center justify-between gap-4 border-t border-[#d9e0f2] bg-[#f9fbff] px-6 py-3 text-xs max-[620px]:px-4',
-                    hasTypingError ? 'text-[#ba383d]' : 'text-[#6f667f]'
-                  )}
-                  id="typing-guidance"
-                  aria-live="polite"
-                >
-                  <span className="inline-flex items-center gap-2 font-[680]">
-                    <Keyboard className="size-4" aria-hidden="true" />
-                    {hasTypingError
-                      ? 'Backspace to the first red letter.'
-                      : isTypingEnabled
-                        ? inputFocused
-                          ? 'Typing is live. Keep your eyes on the line.'
-                          : 'Tap the passage to keep typing.'
-                        : 'Wait for the countdown.'}
-                  </span>
-                  <span className="shrink-0 font-mono text-[11px] tabular-nums">
-                    {correctChars}/{passage.length}
-                  </span>
-                </div>
-              </div>
-            )}
-          </GameSurfaceTransition>
+              )}
+            </GameSurfaceTransition>
+          </GameModeContent>
           {notice ? (
             <p
               className="mt-4 rounded-xl border border-[#e9a5a7] bg-[#fff1f1] px-4 py-3 text-xs font-[650] text-[#a83239]"

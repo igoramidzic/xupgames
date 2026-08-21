@@ -48,6 +48,9 @@ export async function syncGameMembership(
   membership: Pick<Doc<'roomMembers'>, '_id' | 'displayName'>,
   now: number
 ): Promise<void> {
+  if (room.gameType === undefined) {
+    return;
+  }
   switch (room.gameType) {
     case 'trivia':
       return;
@@ -83,6 +86,9 @@ export async function prepareGameState(ctx: MutationCtx, room: Doc<'rooms'>, gam
 }
 
 export async function gameStateIsComplete(ctx: DatabaseReaderContext, room: Doc<'rooms'>): Promise<boolean> {
+  if (room.gameType === undefined) {
+    return false;
+  }
   switch (room.gameType) {
     case 'trivia':
       return await triviaGameIsComplete(ctx, room._id);

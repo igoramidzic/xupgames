@@ -2,7 +2,7 @@ import { v } from 'convex/values';
 import type { Doc, Id } from './_generated/dataModel';
 import { type MutationCtx, mutation, type QueryCtx, query } from './_generated/server';
 import { fail, MAX_PLAYERS, validateSessionToken } from './domain';
-import { gameStateIsComplete, prepareGameState } from './gameRouter';
+import { gameStateIsComplete, initializeGameState, prepareGameState } from './gameRouter';
 import { type GameType, gameTypeValidator, listAvailableGameTypes, requireAvailableGame } from './games';
 import { resolveVotingRound } from './nextGameVoting';
 import { listActiveHumanRoomMembers } from './roomMembers';
@@ -13,12 +13,15 @@ const pollStatusValidator = v.union(
   v.literal('awaitingOwner'),
   v.literal('closed')
 );
+const pollTriggerValidator = v.union(v.literal('initial'), v.literal('gameComplete'), v.literal('owner'));
+type PollTrigger = 'initial' | 'gameComplete' | 'owner';
 
 const pollViewValidator = v.union(
   v.null(),
   v.object({
     pollId: v.id('nextGamePolls'),
-    roomGameId: v.id('roomGames'),
+    roomGameId: v.union(v.id('roomGames'), v.null()),
+    trigger: pollTriggerValidator,
     status: pollStatusValidator,
     roundId: v.id('nextGamePollRounds'),
     roundNumber: v.number(),
@@ -44,6 +47,7 @@ const pollViewValidator = v.union(
 );
 
 type DatabaseReaderContext = Pick<QueryCtx, 'db'>;
+const ACTIVE_POLL_STATUSES = ['round1', 'round2', 'awaitingOwner'] as const;
 
 async function findGuestByToken(ctx: DatabaseReaderContext, sessionToken: string) {
   return await ctx.db
@@ -101,27 +105,69 @@ async function getCurrentRoomGame(ctx: DatabaseReaderContext, room: Doc<'rooms'>
   return roomGame;
 }
 
-async function createPollForRoomGame(
+async function findCurrentRoomPoll(
+  ctx: DatabaseReaderContext,
+  roomId: Id<'rooms'>
+): Promise<Doc<'nextGamePolls'> | null> {
+  for (const status of ACTIVE_POLL_STATUSES) {
+    const poll = await ctx.db
+      .query('nextGamePolls')
+      .withIndex('by_roomId_and_status', (index) => index.eq('roomId', roomId).eq('status', status))
+      .unique();
+    if (poll !== null) {
+      return poll;
+    }
+  }
+  return null;
+}
+
+async function getSelectionPoll(
+  ctx: DatabaseReaderContext,
+  room: Doc<'rooms'>,
+  roomGame: Doc<'roomGames'> | null
+): Promise<Doc<'nextGamePolls'> | null> {
+  if (roomGame !== null) {
+    if (roomGame.status !== 'complete') {
+      return null;
+    }
+    return await ctx.db
+      .query('nextGamePolls')
+      .withIndex('by_roomGameId', (index) => index.eq('roomGameId', roomGame._id))
+      .unique();
+  }
+  if (room.gameType !== undefined) {
+    return null;
+  }
+  return await findCurrentRoomPoll(ctx, room._id);
+}
+
+async function createSelectionPoll(
   ctx: MutationCtx,
-  roomGame: Doc<'roomGames'>,
+  roomId: Id<'rooms'>,
+  roomGameId: Id<'roomGames'> | undefined,
+  trigger: PollTrigger,
   now: number
 ): Promise<Id<'nextGamePolls'>> {
-  const existing = await ctx.db
-    .query('nextGamePolls')
-    .withIndex('by_roomGameId', (index) => index.eq('roomGameId', roomGame._id))
-    .unique();
+  const existing =
+    roomGameId === undefined
+      ? await findCurrentRoomPoll(ctx, roomId)
+      : await ctx.db
+          .query('nextGamePolls')
+          .withIndex('by_roomGameId', (index) => index.eq('roomGameId', roomGameId))
+          .unique();
   if (existing !== null) {
     return existing._id;
   }
 
-  const eligibleMembers = await listActiveHumanRoomMembers(ctx, roomGame.roomId);
+  const eligibleMembers = roomGameId === undefined ? [] : await listActiveHumanRoomMembers(ctx, roomId);
   const availableGameTypes = await listAvailableGameTypes(ctx);
   if (availableGameTypes.length < 2) {
     fail('NEXT_GAME_NOT_AVAILABLE', 'At least two games must be enabled before starting a next-game vote.');
   }
   const pollId = await ctx.db.insert('nextGamePolls', {
-    roomId: roomGame.roomId,
-    roomGameId: roomGame._id,
+    roomId,
+    ...(roomGameId === undefined ? {} : { roomGameId }),
+    trigger,
     status: 'round1',
     currentRoundId: null,
     recommendedGameType: null,
@@ -143,27 +189,22 @@ async function createPollForRoomGame(
   return pollId;
 }
 
-export async function createInitialRoomGame(
+export async function createInitialGamePoll(
   ctx: MutationCtx,
   roomId: Id<'rooms'>,
-  gameType: GameType,
   now: number
-): Promise<Doc<'roomGames'>> {
-  const status = 'lobby';
-  const roomGameId = await ctx.db.insert('roomGames', {
-    roomId,
-    gameType,
-    sequence: 1,
-    status,
-    createdAt: now,
-    startedAt: null,
-    completedAt: null,
-  });
-  const roomGame = await ctx.db.get('roomGames', roomGameId);
-  if (roomGame === null) {
-    throw new Error('The initial room game could not be loaded.');
+): Promise<Id<'nextGamePolls'>> {
+  return await createSelectionPoll(ctx, roomId, undefined, 'initial', now);
+}
+
+async function requireNoActivePlaytest(ctx: MutationCtx, roomId: Id<'rooms'>): Promise<void> {
+  const activePlaytest = await ctx.db
+    .query('playtestRuns')
+    .withIndex('by_roomId_and_isActive', (index) => index.eq('roomId', roomId).eq('isActive', true))
+    .unique();
+  if (activePlaytest !== null) {
+    fail('PLAYTEST_ALREADY_RUNNING', 'Stop the current playtest before changing games.');
   }
-  return roomGame;
 }
 
 async function ensureCurrentRoomGame(
@@ -175,6 +216,9 @@ async function ensureCurrentRoomGame(
   const existing = await getCurrentRoomGame(ctx, room);
   if (existing !== null) {
     return existing;
+  }
+  if (room.gameType === undefined) {
+    fail('GAME_NOT_SELECTED', 'Choose a game before starting the room.');
   }
   const roomGameId = await ctx.db.insert('roomGames', {
     roomId: room._id,
@@ -237,7 +281,7 @@ export async function completeCurrentRoomGame(
       completedAt: now,
     });
   }
-  await createPollForRoomGame(ctx, { ...roomGame, status: 'complete', completedAt: now }, now);
+  await createSelectionPoll(ctx, room._id, roomGame._id, 'gameComplete', now);
 }
 
 export const openNextGameVoting = mutation({
@@ -249,6 +293,13 @@ export const openNextGameVoting = mutation({
       fail('ROOM_CLOSED', 'This room is closed.');
     }
     const roomGame = await getCurrentRoomGame(ctx, room);
+    if (roomGame === null && room.gameType === undefined) {
+      await createInitialGamePoll(ctx, room._id, Date.now());
+      return null;
+    }
+    if (room.gameType === undefined) {
+      fail('GAME_NOT_SELECTED', 'Choose a game before opening another vote.');
+    }
     if (roomGame?.status !== 'complete' && !(await gameStateIsComplete(ctx, room))) {
       fail('ROOM_GAME_NOT_COMPLETE', 'Finish the current game before opening the vote.');
     }
@@ -263,13 +314,7 @@ export const getNextGamePoll = query({
   handler: async (ctx, args) => {
     const { room, membership } = await requireRoomPlayer(ctx, args.roomId, args.sessionToken, false);
     const roomGame = await getCurrentRoomGame(ctx, room);
-    if (roomGame === null || roomGame.status !== 'complete') {
-      return null;
-    }
-    const poll = await ctx.db
-      .query('nextGamePolls')
-      .withIndex('by_roomGameId', (index) => index.eq('roomGameId', roomGame._id))
-      .unique();
+    const poll = await getSelectionPoll(ctx, room, roomGame);
     if (poll === null || poll.currentRoundId === null) {
       return null;
     }
@@ -286,21 +331,28 @@ export const getNextGamePoll = query({
     }
     const selectedVote = votes.find((vote) => vote.memberId === membership._id) ?? null;
     const talliesVisible = round.status === 'closed' || selectedVote !== null;
+    const isInitialPoll = poll.roomGameId === undefined;
+    const activeMembers = isInitialPoll ? await listActiveHumanRoomMembers(ctx, room._id) : [];
+    const eligibleVoterCount = isInitialPoll
+      ? new Set([...activeMembers.map((member) => member._id), ...votes.map((vote) => vote.memberId)]).size
+      : round.eligibleMemberIds.length;
     const voteCounts = new Map<GameType, number>();
     for (const vote of votes) {
       voteCounts.set(vote.gameType, (voteCounts.get(vote.gameType) ?? 0) + 1);
     }
     return {
       pollId: poll._id,
-      roomGameId: roomGame._id,
+      roomGameId: roomGame?._id ?? null,
+      trigger: poll.trigger ?? (poll.roomGameId === undefined ? ('initial' as const) : ('gameComplete' as const)),
       status: poll.status,
       roundId: round._id,
       roundNumber: round.roundNumber,
       roundStatus: round.status,
       options: round.options,
-      eligibleVoterCount: round.eligibleMemberIds.length,
+      eligibleVoterCount,
       votesCast: votes.length,
-      isEligible: round.eligibleMemberIds.length === 0 || round.eligibleMemberIds.includes(membership._id),
+      isEligible:
+        isInitialPoll || round.eligibleMemberIds.length === 0 || round.eligibleMemberIds.includes(membership._id),
       selectedGameType: selectedVote?.gameType ?? null,
       tallies: talliesVisible
         ? round.options.map((gameType) => ({
@@ -315,6 +367,88 @@ export const getNextGamePoll = query({
   },
 });
 
+export const startGameModeVote = mutation({
+  args: {
+    roomId: v.id('rooms'),
+    sessionToken: v.string(),
+    expectedRoomGameId: v.id('roomGames'),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { room } = await requireRoomPlayer(ctx, args.roomId, args.sessionToken, true);
+    if (room.status === 'closed') {
+      fail('ROOM_CLOSED', 'This room is closed.');
+    }
+    const currentRoomGame = await getCurrentRoomGame(ctx, room);
+    if (currentRoomGame?._id !== args.expectedRoomGameId) {
+      fail('STALE_ROOM_GAME', 'The room already moved to another game.');
+    }
+    const existingPoll = await findCurrentRoomPoll(ctx, room._id);
+    if (existingPoll !== null) {
+      return null;
+    }
+    await requireNoActivePlaytest(ctx, room._id);
+
+    const now = Date.now();
+    if (currentRoomGame.status !== 'complete') {
+      await ctx.db.patch('roomGames', currentRoomGame._id, {
+        status: 'complete',
+        completedAt: now,
+      });
+    }
+    await createSelectionPoll(ctx, room._id, currentRoomGame._id, 'owner', now);
+    return null;
+  },
+});
+
+export const changeGameNow = mutation({
+  args: {
+    roomId: v.id('rooms'),
+    sessionToken: v.string(),
+    expectedRoomGameId: v.id('roomGames'),
+    gameType: gameTypeValidator,
+  },
+  returns: v.object({ roomGameId: v.id('roomGames'), gameType: gameTypeValidator }),
+  handler: async (ctx, args) => {
+    const { room } = await requireRoomPlayer(ctx, args.roomId, args.sessionToken, true);
+    if (room.status === 'closed') {
+      fail('ROOM_CLOSED', 'This room is closed.');
+    }
+    const currentRoomGame = await getCurrentRoomGame(ctx, room);
+    if (currentRoomGame?._id !== args.expectedRoomGameId) {
+      fail('STALE_ROOM_GAME', 'The room already moved to another game.');
+    }
+    if ((await findCurrentRoomPoll(ctx, room._id)) !== null) {
+      fail('NEXT_GAME_VOTING_CLOSED', 'Finish the active game vote before picking directly.');
+    }
+    await requireNoActivePlaytest(ctx, room._id);
+    await requireAvailableGame(ctx, args.gameType);
+
+    const now = Date.now();
+    if (currentRoomGame.status !== 'complete') {
+      await ctx.db.patch('roomGames', currentRoomGame._id, {
+        status: 'complete',
+        completedAt: now,
+      });
+    }
+    const roomGameId = await ctx.db.insert('roomGames', {
+      roomId: room._id,
+      gameType: args.gameType,
+      sequence: currentRoomGame.sequence + 1,
+      status: 'lobby',
+      createdAt: now,
+      startedAt: null,
+      completedAt: null,
+    });
+    await ctx.db.patch('rooms', room._id, {
+      gameType: args.gameType,
+      currentGameId: roomGameId,
+    });
+    await prepareGameState(ctx, room, args.gameType);
+    return { roomGameId, gameType: args.gameType };
+  },
+});
+
 export const castNextGameVote = mutation({
   args: { roomId: v.id('rooms'), sessionToken: v.string(), gameType: gameTypeValidator },
   returns: v.null(),
@@ -324,14 +458,11 @@ export const castNextGameVote = mutation({
       fail('ROOM_CLOSED', 'This room is closed.');
     }
     const roomGame = await getCurrentRoomGame(ctx, room);
-    if (roomGame === null || roomGame.status !== 'complete') {
+    const poll = await getSelectionPoll(ctx, room, roomGame);
+    if (poll === null) {
       fail('ROOM_GAME_NOT_COMPLETE', 'Finish the current game before voting for the next one.');
     }
-    const poll = await ctx.db
-      .query('nextGamePolls')
-      .withIndex('by_roomGameId', (index) => index.eq('roomGameId', roomGame._id))
-      .unique();
-    if (poll === null || poll.currentRoundId === null) {
+    if (poll.currentRoundId === null) {
       fail('NEXT_GAME_POLL_NOT_FOUND', 'The next-game vote is not available yet.');
     }
     const round = await ctx.db.get('nextGamePollRounds', poll.currentRoundId);
@@ -341,7 +472,8 @@ export const castNextGameVote = mutation({
     if (!round.options.includes(args.gameType)) {
       fail('NEXT_GAME_INVALID_OPTION', 'That game is not an option in this round.');
     }
-    if (!round.eligibleMemberIds.includes(membership._id)) {
+    const isInitialPoll = poll.roomGameId === undefined;
+    if (!isInitialPoll && !round.eligibleMemberIds.includes(membership._id)) {
       if (round.eligibleMemberIds.length !== 0) {
         fail('NEXT_GAME_NOT_ELIGIBLE', 'You joined after this voting round began.');
       }
@@ -383,14 +515,11 @@ export const closeNextGameVotingRound = mutation({
       fail('ROOM_CLOSED', 'This room is closed.');
     }
     const roomGame = await getCurrentRoomGame(ctx, room);
-    if (roomGame === null || roomGame.status !== 'complete') {
+    const poll = await getSelectionPoll(ctx, room, roomGame);
+    if (poll === null) {
       fail('ROOM_GAME_NOT_COMPLETE', 'Finish the current game before closing the vote.');
     }
-    const poll = await ctx.db
-      .query('nextGamePolls')
-      .withIndex('by_roomGameId', (index) => index.eq('roomGameId', roomGame._id))
-      .unique();
-    if (poll === null || poll.currentRoundId !== args.roundId) {
+    if (poll.currentRoundId !== args.roundId) {
       fail('NEXT_GAME_POLL_NOT_FOUND', 'This voting round is no longer current.');
     }
     const round = await ctx.db.get('nextGamePollRounds', args.roundId);
@@ -416,7 +545,7 @@ export const closeNextGameVotingRound = mutation({
     await ctx.db.patch('nextGamePollRounds', round._id, { status: 'closed', closedAt: now });
 
     if (resolution.kind === 'runoff') {
-      const eligibleMembers = await listActiveHumanRoomMembers(ctx, room._id);
+      const eligibleMembers = poll.roomGameId === undefined ? [] : await listActiveHumanRoomMembers(ctx, room._id);
       const secondRoundId = await ctx.db.insert('nextGamePollRounds', {
         pollId: poll._id,
         roundNumber: 2,
@@ -446,7 +575,7 @@ export const chooseNextGame = mutation({
   args: {
     roomId: v.id('rooms'),
     sessionToken: v.string(),
-    expectedRoomGameId: v.id('roomGames'),
+    expectedRoomGameId: v.union(v.id('roomGames'), v.null()),
     gameType: gameTypeValidator,
   },
   returns: v.object({ roomGameId: v.id('roomGames'), gameType: gameTypeValidator }),
@@ -456,26 +585,18 @@ export const chooseNextGame = mutation({
       fail('ROOM_CLOSED', 'This room is closed.');
     }
     const currentRoomGame = await getCurrentRoomGame(ctx, room);
-    if (currentRoomGame === null || currentRoomGame._id !== args.expectedRoomGameId) {
+    if ((currentRoomGame?._id ?? null) !== args.expectedRoomGameId) {
       fail('STALE_ROOM_GAME', 'The room already moved to another game.');
     }
-    if (currentRoomGame.status !== 'complete') {
+    const isInitialSelection = currentRoomGame === null && room.gameType === undefined;
+    if (!isInitialSelection && currentRoomGame?.status !== 'complete') {
       fail('ROOM_GAME_NOT_COMPLETE', 'Finish the current game before choosing another.');
     }
-    const poll = await ctx.db
-      .query('nextGamePolls')
-      .withIndex('by_roomGameId', (index) => index.eq('roomGameId', currentRoomGame._id))
-      .unique();
+    const poll = await getSelectionPoll(ctx, room, currentRoomGame);
     if (poll === null || poll.status !== 'awaitingOwner') {
       fail('NEXT_GAME_VOTING_CLOSED', 'Finish next-game voting before choosing.');
     }
-    const activePlaytest = await ctx.db
-      .query('playtestRuns')
-      .withIndex('by_roomId_and_isActive', (index) => index.eq('roomId', room._id).eq('isActive', true))
-      .unique();
-    if (activePlaytest !== null) {
-      fail('PLAYTEST_ALREADY_RUNNING', 'Stop the current playtest before changing games.');
-    }
+    await requireNoActivePlaytest(ctx, room._id);
     await requireAvailableGame(ctx, args.gameType);
 
     const now = Date.now();
@@ -483,17 +604,21 @@ export const chooseNextGame = mutation({
     const roomGameId = await ctx.db.insert('roomGames', {
       roomId: room._id,
       gameType: args.gameType,
-      sequence: currentRoomGame.sequence + 1,
+      sequence: currentRoomGame === null ? 1 : currentRoomGame.sequence + 1,
       status,
       createdAt: now,
       startedAt: null,
       completedAt: null,
     });
-    await prepareGameState(ctx, room, args.gameType);
     await ctx.db.patch('rooms', room._id, {
       gameType: args.gameType,
       currentGameId: roomGameId,
     });
+    if (isInitialSelection) {
+      await initializeGameState(ctx, room._id, args.gameType);
+    } else {
+      await prepareGameState(ctx, room, args.gameType);
+    }
     await ctx.db.patch('nextGamePolls', poll._id, {
       status: 'closed',
       chosenGameType: args.gameType,

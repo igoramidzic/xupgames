@@ -6,11 +6,25 @@ import { fail, MAX_PLAYERS } from './domain';
 import { requireRoomMember } from './roomAccess';
 import { activateCurrentRoomGame, completeCurrentRoomGame } from './roomGames';
 import { listActiveRoomMembers, listRoomMembersForDisplay } from './roomMembers';
-import { findTriviaGameState, findTriviaRound, recordTriviaAnswer, revealTriviaQuestion } from './triviaEngine';
-import { TRIVIA_QUESTIONS, type TriviaQuestion } from './triviaQuestions';
+import {
+  findTriviaGameState,
+  findTriviaRound,
+  recordTriviaAnswer,
+  revealTriviaQuestion,
+  TRIVIA_REVEAL_DURATION_MS,
+} from './triviaEngine';
+import {
+  isTriviaCategory,
+  isTriviaRoundCount,
+  selectTriviaQuestions,
+  TRIVIA_CATEGORIES,
+  TRIVIA_DEFAULT_ROUND_COUNT,
+  TRIVIA_QUESTIONS,
+  TRIVIA_ROUND_OPTIONS,
+  type TriviaCategory,
+} from './triviaQuestions';
 import { TRIVIA_ANSWER_DURATION_MS } from './triviaScoring';
 
-export const TRIVIA_QUESTION_COUNT = 10;
 export const TRIVIA_COUNTDOWN_MS = 3_000;
 
 const triviaPhaseValidator = v.union(
@@ -64,6 +78,14 @@ const gameViewValidator = v.object({
   round: v.union(roundViewValidator, v.null()),
   playerAnswer: v.union(playerAnswerValidator, v.null()),
   leaderboard: v.array(leaderboardEntryValidator),
+  configuration: v.object({
+    categories: v.array(v.string()),
+    roundCount: v.number(),
+    availableCategories: v.array(v.string()),
+    categoryQuestionCounts: v.array(v.object({ category: v.string(), count: v.number() })),
+    roundOptions: v.array(v.object({ roundCount: v.number(), estimatedMinutes: v.number() })),
+    estimatedMinutes: v.number(),
+  }),
 });
 
 type DatabaseReaderContext = Pick<QueryCtx, 'db'>;
@@ -80,13 +102,37 @@ async function requireTriviaMember(
   });
 }
 
-function shuffledQuestions(count: number): TriviaQuestion[] {
-  const questions = [...TRIVIA_QUESTIONS];
-  for (let index = questions.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [questions[index], questions[swapIndex]] = [questions[swapIndex], questions[index]];
-  }
-  return questions.slice(0, count);
+function triviaConfiguration(state: Doc<'triviaGameStates'>) {
+  const configuredCategories = state.configuredCategories?.filter(isTriviaCategory) ?? [];
+  const categories =
+    configuredCategories.length > 0 ? [...new Set(configuredCategories)] : ([...TRIVIA_CATEGORIES] as TriviaCategory[]);
+  const availableQuestionCount = TRIVIA_QUESTIONS.filter((question) =>
+    categories.includes(question.category as TriviaCategory)
+  ).length;
+  const configuredRoundCount = state.configuredRoundCount ?? TRIVIA_DEFAULT_ROUND_COUNT;
+  const roundCount =
+    isTriviaRoundCount(configuredRoundCount) && configuredRoundCount <= availableQuestionCount
+      ? configuredRoundCount
+      : TRIVIA_DEFAULT_ROUND_COUNT;
+  const estimatedMinutes = (rounds: number) =>
+    Math.max(
+      1,
+      Math.ceil((TRIVIA_COUNTDOWN_MS + rounds * (TRIVIA_ANSWER_DURATION_MS + TRIVIA_REVEAL_DURATION_MS)) / 60_000)
+    );
+  return {
+    categories,
+    roundCount,
+    availableCategories: [...TRIVIA_CATEGORIES],
+    categoryQuestionCounts: TRIVIA_CATEGORIES.map((category) => ({
+      category,
+      count: TRIVIA_QUESTIONS.filter((question) => question.category === category).length,
+    })),
+    roundOptions: TRIVIA_ROUND_OPTIONS.map((option) => ({
+      roundCount: option,
+      estimatedMinutes: estimatedMinutes(option),
+    })),
+    estimatedMinutes: estimatedMinutes(roundCount),
+  };
 }
 
 export const getGame = query({
@@ -98,6 +144,7 @@ export const getGame = query({
     if (state === null) {
       throw new Error('Trivia game state is missing.');
     }
+    const configuration = triviaConfiguration(state);
 
     const activeMembers = await listActiveRoomMembers(ctx, args.roomId);
     const scores = await ctx.db
@@ -170,6 +217,7 @@ export const getGame = query({
         round: null,
         playerAnswer: null,
         leaderboard,
+        configuration,
       };
     }
 
@@ -228,7 +276,54 @@ export const getGame = query({
         ...entry,
         pointsGained: pointsGainedByMemberId?.get(entry.memberId) ?? null,
       })),
+      configuration,
     };
+  },
+});
+
+export const configureGame = mutation({
+  args: {
+    roomId: v.id('rooms'),
+    sessionToken: v.string(),
+    categories: v.array(v.string()),
+    roundCount: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { room, membership } = await requireTriviaMember(ctx, args.roomId, args.sessionToken, true);
+    if (membership.guestId !== room.ownerGuestId) {
+      fail('NOT_ROOM_OWNER', 'Only the room owner can configure trivia.');
+    }
+    if (room.status === 'closed') {
+      fail('ROOM_CLOSED', 'This room is closed.');
+    }
+    const state = await findTriviaGameState(ctx, room._id);
+    if (state === null) {
+      throw new Error('Trivia game state is missing.');
+    }
+    if (state.phase !== 'lobby') {
+      fail('TRIVIA_GAME_IN_PROGRESS', 'Trivia settings can only be changed before the game starts.');
+    }
+    const uniqueCategories = [...new Set(args.categories)];
+    if (
+      uniqueCategories.length === 0 ||
+      uniqueCategories.length !== args.categories.length ||
+      !uniqueCategories.every(isTriviaCategory)
+    ) {
+      fail('INVALID_TRIVIA_CONFIGURATION', 'Choose at least one available trivia category.');
+    }
+    const availableQuestionCount = TRIVIA_QUESTIONS.filter((question) =>
+      uniqueCategories.includes(question.category as TriviaCategory)
+    ).length;
+    if (!isTriviaRoundCount(args.roundCount) || args.roundCount > availableQuestionCount) {
+      fail('INVALID_TRIVIA_CONFIGURATION', 'Choose an available number of rounds for those categories.');
+    }
+    await ctx.db.patch('triviaGameStates', state._id, {
+      configuredCategories: uniqueCategories,
+      configuredRoundCount: args.roundCount,
+      totalQuestions: args.roundCount,
+    });
+    return null;
   },
 });
 
@@ -272,7 +367,8 @@ export const startGame = mutation({
         updatedAt: now,
       });
     }
-    const selectedQuestions = shuffledQuestions(TRIVIA_QUESTION_COUNT);
+    const configuration = triviaConfiguration(state);
+    const selectedQuestions = selectTriviaQuestions(configuration.categories, configuration.roundCount);
     for (const [index, selectedQuestion] of selectedQuestions.entries()) {
       await ctx.db.insert('triviaRounds', {
         roomId: room._id,
@@ -294,7 +390,7 @@ export const startGame = mutation({
       gameNumber,
       phase: 'countdown',
       currentQuestionNumber: 0,
-      totalQuestions: TRIVIA_QUESTION_COUNT,
+      totalQuestions: configuration.roundCount,
       phaseStartedAt: now,
       phaseEndsAt: now + TRIVIA_COUNTDOWN_MS,
     });

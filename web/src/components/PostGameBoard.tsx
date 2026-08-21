@@ -1,6 +1,6 @@
 import type { Id } from '@convex/_generated/dataModel';
 import { type LucideIcon, Timer } from 'lucide-react';
-import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import NextGameVoting from '@/components/NextGameVoting';
 import type { GameType } from '@/games/registry';
 import { cn } from '@/lib/utils';
@@ -13,9 +13,11 @@ type PostGamePhase = 'winner' | 'countdown' | 'voting';
 export function PostGamePodium({
   entries,
   label,
+  animate = true,
 }: {
   entries: ReadonlyArray<{ id: string; place: number; name: string; result: string }>;
   label: string;
+  animate?: boolean;
 }) {
   if (entries.length === 0) {
     return null;
@@ -25,11 +27,15 @@ export function PostGamePodium({
     <ol className="m-0 flex w-full list-none items-end justify-center gap-2.25 p-0" aria-label={label}>
       {entries.slice(0, 3).map((entry, index) => (
         <li
-          className="order-3 flex min-h-20 w-[31%] flex-col items-center justify-center rounded-[12px_6px_13px_7px] border border-[#b9c8d6] bg-[#edf4f8] px-2 py-3 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:fill-mode-both motion-safe:duration-500 data-[place='1']:order-2 data-[place='1']:min-h-24 data-[place='1']:border-[#c9a21f] data-[place='1']:bg-[#fff3bd] data-[place='2']:order-1"
+          className={cn(
+            "order-3 flex min-h-20 w-[31%] flex-col items-center justify-center rounded-[12px_6px_13px_7px] border border-[#b9c8d6] bg-[#edf4f8] px-2 py-3 text-center data-[place='1']:order-2 data-[place='1']:min-h-24 data-[place='1']:border-[#c9a21f] data-[place='1']:bg-[#fff3bd] data-[place='2']:order-1",
+            animate &&
+              'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:fill-mode-both motion-safe:duration-500'
+          )}
           key={entry.id}
           data-place={entry.place}
           data-post-game-place={entry.place}
-          style={{ animationDelay: `${180 + index * 110}ms` }}
+          style={animate ? { animationDelay: `${180 + index * 110}ms` } : undefined}
         >
           <span className="mb-1.5 grid size-6 place-items-center rounded-full bg-[#17203a] text-[9px] font-[850] text-white">
             {entry.place}
@@ -62,6 +68,7 @@ export default function PostGameBoard({
   closedMessage,
   summary,
   className,
+  playIntro = false,
 }: {
   eyebrow: string;
   title: string;
@@ -71,19 +78,21 @@ export default function PostGameBoard({
   accentTint: string;
   roomId: Id<'rooms'>;
   currentGameId: Id<'roomGames'> | null;
-  currentGameType: GameType;
+  currentGameType: GameType | null;
   sessionToken: string;
   isOwner: boolean;
   isClosed: boolean;
   closedMessage: string;
   summary?: ReactNode;
   className?: string;
+  playIntro?: boolean;
 }) {
-  const [phase, setPhase] = useState<PostGamePhase>('winner');
-  const [ballotDelayRemaining, setBallotDelayRemaining] = useState(NEXT_GAME_BALLOT_DELAY_MS);
+  const shouldPlayIntro = useRef(playIntro).current;
+  const [phase, setPhase] = useState<PostGamePhase>(shouldPlayIntro ? 'winner' : 'voting');
+  const [ballotDelayRemaining, setBallotDelayRemaining] = useState(shouldPlayIntro ? NEXT_GAME_BALLOT_DELAY_MS : 0);
 
   useEffect(() => {
-    if (isClosed) {
+    if (isClosed || !shouldPlayIntro) {
       return;
     }
     const countdownStartsAt = Date.now() + WINNER_SPOTLIGHT_DURATION_MS;
@@ -110,7 +119,7 @@ export default function PostGameBoard({
       window.clearTimeout(countdownTimeout);
       window.clearTimeout(ballotTimeout);
     };
-  }, [isClosed]);
+  }, [isClosed, shouldPlayIntro]);
 
   const ballotCountdownSeconds = Math.ceil(ballotDelayRemaining / 1_000);
   const ballotProgress = Math.min(
@@ -122,7 +131,8 @@ export default function PostGameBoard({
   return (
     <section
       className={cn(
-        'relative flex min-h-[clamp(600px,calc(100dvh-112px),768px)] items-start overflow-hidden rounded-[22px_14px_24px_16px] border border-[#b8c4d6] bg-[#f8faff] p-[clamp(24px,4vw,54px)] text-[#17203a] shadow-[7px_8px_0_#d2dbea] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500 max-[760px]:min-h-150 max-[620px]:p-4',
+        'relative flex min-h-[clamp(600px,calc(100dvh-112px),768px)] items-start overflow-hidden rounded-[22px_14px_24px_16px] border border-[#b8c4d6] bg-[#f8faff] p-[clamp(24px,4vw,54px)] text-[#17203a] shadow-[7px_8px_0_#d2dbea] max-[760px]:min-h-150 max-[620px]:p-4',
+        shouldPlayIntro && 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500',
         className
       )}
       style={{ '--post-game-accent': accent, '--post-game-tint': accentTint } as CSSProperties}
@@ -138,7 +148,13 @@ export default function PostGameBoard({
           data-dimmed={phase === 'voting'}
           data-post-game-results
         >
-          <div className="mb-6 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-both motion-safe:duration-500 max-[520px]:items-start">
+          <div
+            className={cn(
+              'mb-6 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 max-[520px]:items-start',
+              shouldPlayIntro &&
+                'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-both motion-safe:duration-500'
+            )}
+          >
             <span className="grid size-14 -rotate-3 place-items-center rounded-[18px_12px_20px_14px] border-2 border-[#17203a] bg-[var(--post-game-tint)] text-[var(--post-game-accent)] shadow-[4px_4px_0_#17203a] [&_svg]:size-6">
               <Icon aria-hidden="true" />
             </span>

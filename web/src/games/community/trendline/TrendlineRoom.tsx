@@ -21,6 +21,7 @@ import {
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import GameModeControl, { GameModeContent } from '@/components/GameModeControl';
 import GameSurfaceTransition from '@/components/GameSurfaceTransition';
 import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
 import {
@@ -112,6 +113,7 @@ export default function TrendlineRoom({ guest, session }: { guest: GuestIdentity
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<'leave' | 'close' | null>(null);
   const [actionPending, setActionPending] = useState<'leave' | 'close' | null>(null);
+  const [gameModeOpen, setGameModeOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const pointerActiveRef = useRef(false);
   const lastPointRef = useRef<{ index: number; value: number } | null>(null);
@@ -281,6 +283,15 @@ export default function TrendlineRoom({ guest, session }: { guest: GuestIdentity
           ROOM {session.code} {copied ? <Check /> : <Copy />}
         </Button>
         <div className="flex items-center justify-end gap-2">
+          <GameModeControl
+            roomId={session.roomId}
+            currentGameId={session.currentGameId}
+            currentGameType={session.gameType}
+            sessionToken={guest.sessionToken}
+            isOwner={session.isOwner}
+            isClosed={isClosed}
+            onOpen={() => setGameModeOpen(true)}
+          />
           {session.isOwner && !isClosed && isLocalhost() ? (
             <Button asChild variant="paper" size="sm" className="no-underline max-[760px]:w-9 max-[760px]:px-0">
               <Link to={`/admin/${session.code}`}>
@@ -315,184 +326,199 @@ export default function TrendlineRoom({ guest, session }: { guest: GuestIdentity
 
       <main className="mx-auto grid w-full max-w-360 grid-cols-[minmax(0,1fr)_360px] gap-4 p-4 max-[1040px]:grid-cols-[minmax(0,1fr)_310px] max-[820px]:grid-cols-1 max-[620px]:p-2.5">
         <section className="min-w-0">
-          <GameSurfaceTransition
-            showResults={game.phase === 'complete'}
-            results={
-              <PostGameBoard
-                eyebrow={`Trendline · ${game.totalRounds} real-world series`}
-                title={winner ? `${winner.displayName} reads the curve.` : 'The lines are in.'}
-                detail={
-                  winner
-                    ? `${winner.totalPoints.toLocaleString()} points across ${winner.roundsSubmitted} rounds.`
-                    : 'The final standings are locked in.'
-                }
-                icon={Trophy}
-                accent="#158067"
-                accentTint="#f4cd54"
-                roomId={session.roomId}
-                currentGameId={session.currentGameId}
-                currentGameType={session.gameType}
-                sessionToken={guest.sessionToken}
-                isOwner={session.isOwner}
-                isClosed={isClosed}
-                closedMessage="This room is closed. The final standings stay here to view."
-                summary={
-                  <PostGamePodium
-                    label="Final podium"
-                    entries={game.leaderboard
-                      .filter((entry) => entry.isActive)
-                      .slice(0, 3)
-                      .map((entry) => ({
-                        id: entry.memberId,
-                        place: entry.rank,
-                        name: entry.displayName,
-                        result: `${entry.totalPoints.toLocaleString()} pts`,
-                      }))}
-                  />
-                }
-              />
-            }
+          <GameModeContent
+            roomId={session.roomId}
+            currentGameId={session.currentGameId}
+            currentGameType={session.gameType}
+            sessionToken={guest.sessionToken}
+            isOwner={session.isOwner}
+            isClosed={isClosed}
+            open={gameModeOpen}
+            onClose={() => setGameModeOpen(false)}
           >
-            {game.phase === 'lobby' ? (
-              <TrendlineLobby
-                isOwner={session.isOwner}
-                isClosed={isClosed}
-                ownerName={ownerName}
-                playerCount={session.activeMemberCount}
-                starting={starting}
-                onStart={handleStart}
-                onCopy={copyRoomLink}
-              />
-            ) : game.phase === 'complete' ? null : game.phase === 'preparing' ? (
-              <div className="grid min-h-[calc(100dvh-104px)] place-items-center rounded-[20px_28px_22px_26px] border border-[#9bc4b9] bg-white text-center shadow-[7px_8px_0_#c6e1da] max-[820px]:min-h-130">
-                <div className="px-6">
-                  <Globe2 className="mx-auto mb-5 size-14 animate-pulse text-[#158067] motion-reduce:animate-none" />
-                  <h1 className="font-display text-4xl font-[850] tracking-[-0.05em]">Calling the World Bank…</h1>
-                  <p className="mx-auto max-w-100 text-sm leading-6 text-[#647d76]">
-                    Selecting six complete historical series and fixing their axes for fair play.
-                  </p>
-                </div>
-              </div>
-            ) : game.round ? (
-              <div className="relative overflow-hidden rounded-[20px_28px_22px_26px] border border-[#9bc4b9] bg-white shadow-[7px_8px_0_#c6e1da]">
-                <div className="flex min-h-18 items-center justify-between gap-4 border-b border-[#d6e8e2] bg-[#f8fffc] px-6 py-3 max-[620px]:px-4">
-                  <div className="min-w-0">
-                    <p className="m-0 text-[9px] font-[850] tracking-[0.13em] text-[#158067] uppercase">
-                      {game.round.category} · Round {game.currentRoundNumber}/{game.totalRounds}
-                    </p>
-                    <h1 className="mt-1 mb-0 text-balance font-display text-[clamp(20px,3vw,32px)] leading-[1.02] font-[850] tracking-[-0.045em]">
-                      {game.round.indicatorName} in {game.round.countryName}
-                    </h1>
-                    <p className="mt-1 mb-0 text-xs text-[#647d76]">{game.round.unitLabel}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <small className="block text-[8px] font-[820] tracking-[0.1em] text-[#789188]">
-                      {game.phase.toUpperCase()}
-                    </small>
-                    <strong className="font-display text-3xl font-[850] tabular-nums text-[#f06449]">{seconds}s</strong>
-                  </div>
-                </div>
-                <TrendlineChart
-                  game={game}
-                  lineValues={lineValues}
-                  canDraw={canDraw}
-                  svgRef={svgRef}
-                  onPointerDown={(event) => {
-                    pointerActiveRef.current = true;
-                    lastPointRef.current = null;
-                    event.currentTarget.setPointerCapture(event.pointerId);
-                    applyPointer(event);
-                  }}
-                  onPointerMove={(event) => {
-                    if (pointerActiveRef.current) applyPointer(event);
-                  }}
-                  onPointerUp={(event) => {
-                    pointerActiveRef.current = false;
-                    lastPointRef.current = null;
-                    event.currentTarget.releasePointerCapture(event.pointerId);
-                  }}
+            <GameSurfaceTransition
+              showResults={game.phase === 'complete'}
+              results={({ playIntro }) => (
+                <PostGameBoard
+                  eyebrow={`Trendline · ${game.totalRounds} real-world series`}
+                  title={winner ? `${winner.displayName} reads the curve.` : 'The lines are in.'}
+                  detail={
+                    winner
+                      ? `${winner.totalPoints.toLocaleString()} points across ${winner.roundsSubmitted} rounds.`
+                      : 'The final standings are locked in.'
+                  }
+                  icon={Trophy}
+                  accent="#158067"
+                  accentTint="#f4cd54"
+                  roomId={session.roomId}
+                  currentGameId={session.currentGameId}
+                  currentGameType={session.gameType}
+                  sessionToken={guest.sessionToken}
+                  isOwner={session.isOwner}
+                  isClosed={isClosed}
+                  closedMessage="This room is closed. The final standings stay here to view."
+                  playIntro={playIntro}
+                  summary={
+                    <PostGamePodium
+                      label="Final podium"
+                      animate={playIntro}
+                      entries={game.leaderboard
+                        .filter((entry) => entry.isActive)
+                        .slice(0, 3)
+                        .map((entry) => ({
+                          id: entry.memberId,
+                          place: entry.rank,
+                          name: entry.displayName,
+                          result: `${entry.totalPoints.toLocaleString()} pts`,
+                        }))}
+                    />
+                  }
                 />
-                {game.phase === 'countdown' ? (
-                  <div className="absolute inset-0 z-20 grid place-items-center bg-[rgb(24_58_54/86%)] text-center text-white backdrop-blur-[3px]">
-                    <div>
-                      <p className="mb-3 text-[10px] font-[850] tracking-[0.18em] text-[#a8e0d0] uppercase">
-                        Study the axes
+              )}
+            >
+              {game.phase === 'lobby' ? (
+                <TrendlineLobby
+                  isOwner={session.isOwner}
+                  isClosed={isClosed}
+                  ownerName={ownerName}
+                  playerCount={session.activeMemberCount}
+                  starting={starting}
+                  onStart={handleStart}
+                  onCopy={copyRoomLink}
+                />
+              ) : game.phase === 'complete' ? null : game.phase === 'preparing' ? (
+                <div className="grid min-h-[calc(100dvh-104px)] place-items-center rounded-[20px_28px_22px_26px] border border-[#9bc4b9] bg-white text-center shadow-[7px_8px_0_#c6e1da] max-[820px]:min-h-130">
+                  <div className="px-6">
+                    <Globe2 className="mx-auto mb-5 size-14 animate-pulse text-[#158067] motion-reduce:animate-none" />
+                    <h1 className="font-display text-4xl font-[850] tracking-[-0.05em]">Calling the World Bank…</h1>
+                    <p className="mx-auto max-w-100 text-sm leading-6 text-[#647d76]">
+                      Selecting six complete historical series and fixing their axes for fair play.
+                    </p>
+                  </div>
+                </div>
+              ) : game.round ? (
+                <div className="relative overflow-hidden rounded-[20px_28px_22px_26px] border border-[#9bc4b9] bg-white shadow-[7px_8px_0_#c6e1da]">
+                  <div className="flex min-h-18 items-center justify-between gap-4 border-b border-[#d6e8e2] bg-[#f8fffc] px-6 py-3 max-[620px]:px-4">
+                    <div className="min-w-0">
+                      <p className="m-0 text-[9px] font-[850] tracking-[0.13em] text-[#158067] uppercase">
+                        {game.round.category} · Round {game.currentRoundNumber}/{game.totalRounds}
                       </p>
-                      <strong className="block font-display text-[clamp(130px,24vw,270px)] leading-[0.72] tracking-[-0.1em] text-[#f4cd54] tabular-nums">
-                        {Math.max(1, seconds)}
+                      <h1 className="mt-1 mb-0 text-balance font-display text-[clamp(20px,3vw,32px)] leading-[1.02] font-[850] tracking-[-0.045em]">
+                        {game.round.indicatorName} in {game.round.countryName}
+                      </h1>
+                      <p className="mt-1 mb-0 text-xs text-[#647d76]">{game.round.unitLabel}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <small className="block text-[8px] font-[820] tracking-[0.1em] text-[#789188]">
+                        {game.phase.toUpperCase()}
+                      </small>
+                      <strong className="font-display text-3xl font-[850] tabular-nums text-[#f06449]">
+                        {seconds}s
                       </strong>
-                      <span className="mt-8 block text-sm text-[#d6eee7]">
-                        The first value is anchored. Draw the next 23 years.
-                      </span>
                     </div>
                   </div>
-                ) : null}
-                <div className="border-t border-[#d6e8e2] bg-[#f8fffc] px-5 py-4">
-                  {canDraw ? (
-                    <div className="flex justify-end">
-                      <Button variant="brand" type="button" onClick={handleSubmit} disabled={!hasDrawn || submitting}>
-                        {submitting ? <LoaderCircle className="animate-spin" /> : <Pencil />}
-                        {submitting ? 'Locking…' : 'Lock line'}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex min-h-11 flex-wrap items-center justify-between gap-3 text-xs text-[#5e756e]">
-                      <span className="inline-flex items-center gap-2">
-                        {game.playerPrediction ? (
-                          <>
-                            <Check className="size-4 text-[#158067]" /> Line locked · {game.round.submittedCount}{' '}
-                            submitted
-                          </>
-                        ) : game.phase === 'reveal' ? (
-                          'Round closed'
-                        ) : (
-                          'Waiting for the drawing phase'
-                        )}
-                      </span>
-                      {game.playerPrediction?.pointsAwarded !== null &&
-                      game.playerPrediction?.pointsAwarded !== undefined ? (
-                        <strong className="font-display text-xl text-[#158067]">
-                          +{game.playerPrediction.pointsAwarded} pts
+                  <TrendlineChart
+                    game={game}
+                    lineValues={lineValues}
+                    canDraw={canDraw}
+                    svgRef={svgRef}
+                    onPointerDown={(event) => {
+                      pointerActiveRef.current = true;
+                      lastPointRef.current = null;
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      applyPointer(event);
+                    }}
+                    onPointerMove={(event) => {
+                      if (pointerActiveRef.current) applyPointer(event);
+                    }}
+                    onPointerUp={(event) => {
+                      pointerActiveRef.current = false;
+                      lastPointRef.current = null;
+                      event.currentTarget.releasePointerCapture(event.pointerId);
+                    }}
+                  />
+                  {game.phase === 'countdown' ? (
+                    <div className="absolute inset-0 z-20 grid place-items-center bg-[rgb(24_58_54/86%)] text-center text-white backdrop-blur-[3px]">
+                      <div>
+                        <p className="mb-3 text-[10px] font-[850] tracking-[0.18em] text-[#a8e0d0] uppercase">
+                          Study the axes
+                        </p>
+                        <strong className="block font-display text-[clamp(130px,24vw,270px)] leading-[0.72] tracking-[-0.1em] text-[#f4cd54] tabular-nums">
+                          {Math.max(1, seconds)}
                         </strong>
-                      ) : null}
-                    </div>
-                  )}
-                  {game.phase === 'drawing' && game.playerPrediction === null ? (
-                    <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#dcebe6] pt-3 text-[10px] text-[#71877f]">
-                      <span>Draw directly on the chart.</span>
-                      <Button
-                        variant="paper"
-                        size="sm"
-                        type="button"
-                        onClick={handleHint}
-                        disabled={hinting || game.round.hintedEndValue !== null}
-                      >
-                        <Eye />
-                        {game.round.hintedEndValue === null
-                          ? 'Reveal ending · max 700'
-                          : `Ends at ${formatValue(game.round.hintedEndValue, game.round.axisMin, game.round.axisMax, game.round.valueDecimals)}`}
-                      </Button>
+                        <span className="mt-8 block text-sm text-[#d6eee7]">
+                          The first value is anchored. Draw the next 23 years.
+                        </span>
+                      </div>
                     </div>
                   ) : null}
-                  {game.round.source ? (
-                    <p className="mt-3 mb-0 text-[9px] text-[#71877f]">
-                      Source:{' '}
-                      <a
-                        className="font-[750] text-[#158067]"
-                        href={game.round.source.url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {game.round.source.name}
-                      </a>{' '}
-                      · {game.round.source.organization} · {game.round.source.licenseName} · retrieved{' '}
-                      {new Date(game.round.source.retrievedAt).toLocaleDateString()}
-                    </p>
-                  ) : null}
+                  <div className="border-t border-[#d6e8e2] bg-[#f8fffc] px-5 py-4">
+                    {canDraw ? (
+                      <div className="flex justify-end">
+                        <Button variant="brand" type="button" onClick={handleSubmit} disabled={!hasDrawn || submitting}>
+                          {submitting ? <LoaderCircle className="animate-spin" /> : <Pencil />}
+                          {submitting ? 'Locking…' : 'Lock line'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex min-h-11 flex-wrap items-center justify-between gap-3 text-xs text-[#5e756e]">
+                        <span className="inline-flex items-center gap-2">
+                          {game.playerPrediction ? (
+                            <>
+                              <Check className="size-4 text-[#158067]" /> Line locked · {game.round.submittedCount}{' '}
+                              submitted
+                            </>
+                          ) : game.phase === 'reveal' ? (
+                            'Round closed'
+                          ) : (
+                            'Waiting for the drawing phase'
+                          )}
+                        </span>
+                        {game.playerPrediction?.pointsAwarded !== null &&
+                        game.playerPrediction?.pointsAwarded !== undefined ? (
+                          <strong className="font-display text-xl text-[#158067]">
+                            +{game.playerPrediction.pointsAwarded} pts
+                          </strong>
+                        ) : null}
+                      </div>
+                    )}
+                    {game.phase === 'drawing' && game.playerPrediction === null ? (
+                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#dcebe6] pt-3 text-[10px] text-[#71877f]">
+                        <span>Draw directly on the chart.</span>
+                        <Button
+                          variant="paper"
+                          size="sm"
+                          type="button"
+                          onClick={handleHint}
+                          disabled={hinting || game.round.hintedEndValue !== null}
+                        >
+                          <Eye />
+                          {game.round.hintedEndValue === null
+                            ? 'Reveal ending · max 700'
+                            : `Ends at ${formatValue(game.round.hintedEndValue, game.round.axisMin, game.round.axisMax, game.round.valueDecimals)}`}
+                        </Button>
+                      </div>
+                    ) : null}
+                    {game.round.source ? (
+                      <p className="mt-3 mb-0 text-[9px] text-[#71877f]">
+                        Source:{' '}
+                        <a
+                          className="font-[750] text-[#158067]"
+                          href={game.round.source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {game.round.source.name}
+                        </a>{' '}
+                        · {game.round.source.organization} · {game.round.source.licenseName} · retrieved{' '}
+                        {new Date(game.round.source.retrievedAt).toLocaleDateString()}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ) : null}
-          </GameSurfaceTransition>
+              ) : null}
+            </GameSurfaceTransition>
+          </GameModeContent>
           {notice ? (
             <p
               className="mt-4 rounded-xl border border-[#e9a5a7] bg-[#fff1f1] px-4 py-3 text-xs font-[650] text-[#a83239]"

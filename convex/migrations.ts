@@ -20,7 +20,7 @@ export const initializeRoomGameLifecycle = migrations.define({
       roomPatch.ownerChangedAt = room.createdAt;
     }
 
-    if (room.currentGameId === undefined) {
+    if (room.currentGameId === undefined && room.gameType !== undefined) {
       let status: 'lobby' | 'active' | 'complete';
       switch (room.gameType) {
         case 'trivia': {

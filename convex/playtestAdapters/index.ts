@@ -5,6 +5,9 @@ import { initializeTriviaBot, runTriviaBotTick, stopTriviaBot } from './trivia';
 import { initializeTypeRacerBot, runTypeRacerBotTick, stopTypeRacerBot } from './typeRacer';
 
 export async function initializeGameBot(ctx: MutationCtx, room: Doc<'rooms'>, bot: Doc<'playtestBots'>): Promise<void> {
+  if (room.gameType === undefined) {
+    throw new Error('A playtest cannot start before the room selects a game.');
+  }
   switch (room.gameType) {
     case 'trivia':
       await initializeTriviaBot(ctx, bot);
@@ -27,6 +30,9 @@ export async function runGameBotTick(
   room: Doc<'rooms'>,
   bot: Doc<'playtestBots'>
 ): Promise<{ cursor: { x: number; y: number } }> {
+  if (room.gameType === undefined) {
+    throw new Error('A playtest cannot run before the room selects a game.');
+  }
   switch (room.gameType) {
     case 'trivia':
       return await runTriviaBotTick(ctx, room, bot);

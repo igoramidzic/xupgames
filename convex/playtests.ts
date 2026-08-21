@@ -43,7 +43,7 @@ const inspectResultValidator = v.union(
     room: v.object({
       roomId: v.id('rooms'),
       code: v.string(),
-      gameType: gameTypeValidator,
+      gameType: v.union(gameTypeValidator, v.null()),
       status: v.union(v.literal('open'), v.literal('closed')),
       activeMemberCount: v.number(),
       humanMemberCount: v.number(),
@@ -149,7 +149,7 @@ export const inspect = query({
       room: {
         roomId: room._id,
         code: room.code,
-        gameType: room.gameType,
+        gameType: room.gameType ?? null,
         status: room.status,
         activeMemberCount: room.activeMemberCount,
         humanMemberCount: Math.max(0, room.activeMemberCount - activeBotCount),
@@ -176,6 +176,9 @@ export const start = mutation({
     await requireRoomOwner(ctx, room, args.sessionToken);
     if (room.status === 'closed') {
       fail('ROOM_CLOSED', 'Open a new room before starting a playtest.');
+    }
+    if (room.gameType === undefined) {
+      fail('GAME_NOT_SELECTED', 'Finish the first game vote before starting a playtest.');
     }
     if (await currentRoomGameIsComplete(ctx, room)) {
       fail('ROOM_GAME_NOT_COMPLETE', 'Choose the next game before starting a playtest.');

@@ -11,6 +11,9 @@ import { cn } from '@/lib/utils';
 
 type InspectResult = FunctionReturnType<typeof api.playtests.inspect>;
 type PlaytestRoom = Extract<InspectResult, { kind: 'room' }>;
+type ReadyPlaytestRoom = PlaytestRoom & {
+  room: PlaytestRoom['room'] & { gameType: Exclude<PlaytestRoom['room']['gameType'], null> };
+};
 
 const ROOM_CODE_PATTERN = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/;
 const TARGETS = [10, 25, 50] as const;
@@ -59,8 +62,18 @@ export default function Admin() {
       />
     );
   }
+  if (result.room.gameType === null) {
+    return (
+      <AdminGate
+        eyebrow="Game vote in progress"
+        title="Pick the first game before adding bots."
+        detail="Return to the room, finish the ballot, and let the owner start the selected game."
+        code={code}
+      />
+    );
+  }
 
-  return <PlaytestPanel panel={result} sessionToken={guest.sessionToken} />;
+  return <PlaytestPanel panel={result as ReadyPlaytestRoom} sessionToken={guest.sessionToken} />;
 }
 
 function AdminRoomPicker({ initialCode = '' }: { initialCode?: string }) {
@@ -193,7 +206,7 @@ function AdminLoading() {
   );
 }
 
-function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionToken: string }) {
+function PlaytestPanel({ panel, sessionToken }: { panel: ReadyPlaytestRoom; sessionToken: string }) {
   const startPlaytest = useMutation(api.playtests.start);
   const stopPlaytest = useMutation(api.playtests.stop);
   const [target, setTarget] = useState<(typeof TARGETS)[number]>(10);
@@ -448,7 +461,7 @@ function PlaytestPanel({ panel, sessionToken }: { panel: PlaytestRoom; sessionTo
   );
 }
 
-function SeatMap({ panel, target }: { panel: PlaytestRoom; target: number }) {
+function SeatMap({ panel, target }: { panel: ReadyPlaytestRoom; target: number }) {
   const liveBots = panel.latestRun?.isActive ? panel.latestRun.activeBotCount : 0;
   const humans = panel.room.humanMemberCount;
   return (
@@ -490,7 +503,7 @@ function SeatMap({ panel, target }: { panel: PlaytestRoom; target: number }) {
   );
 }
 
-function gameAdapterCopy(gameType: PlaytestRoom['room']['gameType']) {
+function gameAdapterCopy(gameType: ReadyPlaytestRoom['room']['gameType']) {
   switch (gameType) {
     case 'trivia':
       return {

@@ -17,6 +17,8 @@ export default function GameRoom({ guest, session }: { guest: GuestIdentity; ses
       return <TypeRacerRoom guest={guest} session={session} />;
     case 'trendline':
       return <TrendlineRoom guest={guest} session={session} />;
+    case null:
+      throw new Error('The room must select a game before rendering a game surface.');
     default: {
       const unsupportedGameType: never = session.gameType;
       throw new Error(`Unsupported game type: ${unsupportedGameType}`);

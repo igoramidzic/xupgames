@@ -32,6 +32,7 @@ describe('PostGameBoard', () => {
         isOwner
         isClosed={false}
         closedMessage="Room closed."
+        playIntro
       />
     );
 
@@ -74,6 +75,37 @@ describe('PostGameBoard', () => {
     expect(ballot).toHaveAttribute('aria-hidden', 'false');
     expect(ballot).not.toHaveAttribute('inert');
     expect(results).toHaveAttribute('data-dimmed', 'true');
+  });
+
+  it('shows the winner and ballot immediately when restored after completion', () => {
+    render(
+      <PostGameBoard
+        eyebrow="Game 1 · Final"
+        title="Ada wins."
+        icon={Trophy}
+        accent="#087fa7"
+        accentTint="#ffda55"
+        roomId={'room-1' as never}
+        currentGameId={'room-game-1' as never}
+        currentGameType="trivia"
+        sessionToken={'a'.repeat(32)}
+        isOwner
+        isClosed={false}
+        closedMessage="Room closed."
+      />
+    );
+
+    const board = screen.getByRole('region', { name: 'Ada wins.' });
+    const ballot = screen.getByText('Loaded next-game ballot').closest('[data-active]');
+    const timer = board.querySelector('[data-countdown-card]');
+    const results = board.querySelector('[data-post-game-results]');
+
+    expect(ballot).toHaveAttribute('data-active', 'true');
+    expect(ballot).toHaveAttribute('aria-hidden', 'false');
+    expect(ballot).not.toHaveAttribute('inert');
+    expect(timer).toHaveAttribute('data-visible', 'false');
+    expect(results).toHaveAttribute('data-dimmed', 'true');
+    expect(board).not.toHaveClass('motion-safe:animate-in');
   });
 
   it('renders at most the top three podium places', () => {

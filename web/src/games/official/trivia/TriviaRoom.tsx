@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import GameModeControl, { GameModeContent } from '@/components/GameModeControl';
 import GameSurfaceTransition from '@/components/GameSurfaceTransition';
 import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
 import {
@@ -38,6 +39,7 @@ import { useListReorderAnimation } from '@/lib/useListReorderAnimation';
 import { useRoomPresence } from '@/lib/useRoomPresence';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
+import TriviaConfigurationDialog from './TriviaConfigurationDialog';
 
 type SessionResult = FunctionReturnType<typeof api.rooms.getSession>;
 type ActiveSession = Extract<SessionResult, { kind: 'session' }>;
@@ -79,6 +81,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
   const game = useQuery(api.trivia.getGame, { roomId: session.roomId, sessionToken: guest.sessionToken });
   const startGame = useMutation(api.trivia.startGame);
   const submitAnswer = useMutation(api.trivia.submitAnswer);
+  const configureGame = useMutation(api.trivia.configureGame);
   const leaveRoom = useMutation(api.rooms.leave);
   const closeRoom = useMutation(api.rooms.close);
   const { onlineByMemberId } = useRoomPresence({ roomId: session.roomId, sessionToken: guest.sessionToken });
@@ -92,6 +95,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<'leave' | 'close' | null>(null);
   const [actionPending, setActionPending] = useState<'leave' | 'close' | null>(null);
+  const [gameModeOpen, setGameModeOpen] = useState(false);
   const timerEnabled = game?.phase === 'countdown' || game?.phase === 'question' || game?.phase === 'reveal';
   const now = useClock(timerEnabled);
   const isClosed = session.status === 'closed';
@@ -176,6 +180,15 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
     }
   }
 
+  async function handleConfigure(categories: string[], roundCount: number) {
+    await configureGame({
+      roomId: session.roomId,
+      sessionToken: guest.sessionToken,
+      categories,
+      roundCount,
+    });
+  }
+
   async function handleLeave() {
     setConfirmation(null);
     setActionPending('leave');
@@ -213,7 +226,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
 
   return (
     <div className="min-h-dvh bg-[#edf5fb] bg-[radial-gradient(circle_at_18%_20%,rgb(35_157_211/10%)_0_13rem,transparent_28rem),linear-gradient(rgb(35_74_116/7%)_1px,transparent_1px),linear-gradient(90deg,rgb(35_74_116/7%)_1px,transparent_1px)] bg-size-[auto,40px_40px,40px_40px,auto] font-trivia text-[#10213d]">
-      <header className="sticky top-0 z-10 grid h-19 grid-cols-[1fr_auto_1fr] items-center border-b border-[#b9cada] bg-[rgb(244_249_253/92%)] px-5.5 backdrop-blur-[15px] max-[760px]:h-17 max-[760px]:grid-cols-[auto_1fr_auto] max-[760px]:px-3">
+      <header className="sticky top-0 z-10 grid h-19 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-[#b9cada] bg-[rgb(244_249_253/92%)] px-5.5 backdrop-blur-[15px] max-[760px]:h-17 max-[760px]:px-3">
         <Link
           className="inline-flex items-center gap-2.75 font-display text-lg font-extrabold tracking-[-0.03em] text-[#17203a] no-underline"
           to="/"
@@ -229,7 +242,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
         </Link>
 
         <Button
-          className="-rotate-1 px-4 text-[10px] tracking-[0.12em] max-[760px]:w-fit max-[760px]:justify-self-center max-[760px]:px-2.5 max-[760px]:text-[8px] [&_svg]:size-3.25"
+          className="-rotate-1 justify-self-center px-4 text-[10px] tracking-[0.12em] max-[760px]:w-fit max-[760px]:px-2.5 max-[760px]:text-[8px] [&_svg]:size-3.25"
           variant="trivia-code"
           size="sm"
           type="button"
@@ -252,6 +265,15 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
             />{' '}
             {isClosed ? 'Closed' : 'Live'}
           </span>
+          <GameModeControl
+            roomId={session.roomId}
+            currentGameId={session.currentGameId}
+            currentGameType={session.gameType}
+            sessionToken={guest.sessionToken}
+            isOwner={session.isOwner}
+            isClosed={isClosed}
+            onOpen={() => setGameModeOpen(true)}
+          />
           {session.isOwner && !isClosed && isLocalhost() ? (
             <Button asChild variant="paper" size="sm" className="max-[760px]:w-8.5 max-[760px]:px-0 [&_svg]:size-3.75">
               <Link to={`/admin/${session.code}`}>
@@ -288,54 +310,68 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
 
       <main className="mx-auto grid min-h-[calc(100dvh-76px)] w-full max-w-345 grid-cols-[minmax(0,1fr)_300px] gap-4.5 p-4.5 [--trivia-question-min-height:clamp(560px,calc(100dvh-230px),720px)] max-[980px]:grid-cols-[minmax(0,1fr)_240px] max-[760px]:min-h-[calc(100dvh-68px)] max-[760px]:grid-cols-1 max-[760px]:p-2.25 max-[760px]:[--trivia-question-min-height:clamp(590px,calc(100dvh-180px),680px)]">
         <section className="grid min-h-0 min-w-0 place-items-stretch content-start" aria-live="polite">
-          <GameSurfaceTransition
-            showResults={game.phase === 'complete'}
-            results={
-              <CompletePanel
-                leaderboard={game.leaderboard}
-                gameNumber={game.gameNumber}
-                session={session}
-                sessionToken={guest.sessionToken}
-              />
-            }
+          <GameModeContent
+            roomId={session.roomId}
+            currentGameId={session.currentGameId}
+            currentGameType={session.gameType}
+            sessionToken={guest.sessionToken}
+            isOwner={session.isOwner}
+            isClosed={isClosed}
+            open={gameModeOpen}
+            onClose={() => setGameModeOpen(false)}
           >
-            {game.phase === 'lobby' ? (
-              <LobbyPanel
-                isOwner={session.isOwner}
-                ownerName={ownerName}
-                playerCount={session.activeMemberCount}
-                starting={starting}
-                isClosed={isClosed}
-                onStart={handleStart}
-                onCopy={copyRoomLink}
-              />
-            ) : null}
+            <GameSurfaceTransition
+              showResults={game.phase === 'complete'}
+              results={({ playIntro }) => (
+                <CompletePanel
+                  leaderboard={game.leaderboard}
+                  gameNumber={game.gameNumber}
+                  session={session}
+                  sessionToken={guest.sessionToken}
+                  playIntro={playIntro}
+                />
+              )}
+            >
+              {game.phase === 'lobby' ? (
+                <LobbyPanel
+                  isOwner={session.isOwner}
+                  ownerName={ownerName}
+                  playerCount={session.activeMemberCount}
+                  starting={starting}
+                  isClosed={isClosed}
+                  configuration={game.configuration}
+                  onStart={handleStart}
+                  onCopy={copyRoomLink}
+                  onConfigure={handleConfigure}
+                />
+              ) : null}
 
-            {game.phase === 'countdown' ? (
-              <div className="relative flex h-[clamp(640px,calc(100dvh-112px),768px)] max-h-192 min-h-0 flex-col items-center justify-center overflow-hidden rounded-[24px_10px_26px_12px] border border-[#aebfd0] bg-[#10213d] p-[clamp(50px,7vw,100px)] text-center text-white shadow-[8px_9px_0_#ccdae6] max-[760px]:min-h-150 max-[760px]:px-6 max-[760px]:py-8.5">
-                <p className="m-0 text-[11px] font-extrabold tracking-[0.16em] text-[#67c9e8] uppercase">
-                  Game {game.gameNumber}
-                </p>
-                <strong className="mt-4 mb-1.5 text-[clamp(150px,24vw,310px)] leading-[0.78] font-[850] tracking-[-0.1em] text-[#ffda55] tabular-nums [text-shadow:9px_9px_0_rgb(0_0_0/24%)]">
-                  {Math.max(1, Math.ceil(remainingMs / 1_000))}
-                </strong>
-                <h1 className="mt-6.5 mb-2 text-[clamp(24px,4vw,48px)] tracking-[-0.04em]">
-                  Eyes up. First question incoming.
-                </h1>
-                <span className="text-[13px] text-[#9eb2c9]">Fast and right beats merely right.</span>
-              </div>
-            ) : null}
+              {game.phase === 'countdown' ? (
+                <div className="relative flex h-[clamp(640px,calc(100dvh-112px),768px)] max-h-192 min-h-0 flex-col items-center justify-center overflow-hidden rounded-[24px_10px_26px_12px] border border-[#aebfd0] bg-[#10213d] p-[clamp(50px,7vw,100px)] text-center text-white shadow-[8px_9px_0_#ccdae6] max-[760px]:min-h-150 max-[760px]:px-6 max-[760px]:py-8.5">
+                  <p className="m-0 text-[11px] font-extrabold tracking-[0.16em] text-[#67c9e8] uppercase">
+                    Game {game.gameNumber}
+                  </p>
+                  <strong className="mt-4 mb-1.5 text-[clamp(150px,24vw,310px)] leading-[0.78] font-[850] tracking-[-0.1em] text-[#ffda55] tabular-nums [text-shadow:9px_9px_0_rgb(0_0_0/24%)]">
+                    {Math.max(1, Math.ceil(remainingMs / 1_000))}
+                  </strong>
+                  <h1 className="mt-6.5 mb-2 text-[clamp(24px,4vw,48px)] tracking-[-0.04em]">
+                    Eyes up. First question incoming.
+                  </h1>
+                  <span className="text-[13px] text-[#9eb2c9]">Fast and right beats merely right.</span>
+                </div>
+              ) : null}
 
-            {game.phase === 'question' || game.phase === 'reveal' ? (
-              <QuestionPanel
-                game={game}
-                remainingMs={remainingMs}
-                timeProgress={timeProgress}
-                selectedOption={selectedOption}
-                onAnswer={handleAnswer}
-              />
-            ) : null}
-          </GameSurfaceTransition>
+              {game.phase === 'question' || game.phase === 'reveal' ? (
+                <QuestionPanel
+                  game={game}
+                  remainingMs={remainingMs}
+                  timeProgress={timeProgress}
+                  selectedOption={selectedOption}
+                  onAnswer={handleAnswer}
+                />
+              ) : null}
+            </GameSurfaceTransition>
+          </GameModeContent>
         </section>
 
         <aside className="flex h-[max(680px,calc(100dvh-112px))] min-h-0 flex-col self-start overflow-hidden rounded-[15px_7px_17px_9px] border border-[#aebfd0] bg-[rgb(250_252_254/96%)] shadow-[5px_6px_0_#ccdae6] max-[760px]:h-107.5 max-[760px]:min-h-107.5">
@@ -453,19 +489,28 @@ function LobbyPanel({
   playerCount,
   starting,
   isClosed,
+  configuration,
   onStart,
   onCopy,
+  onConfigure,
 }: {
   isOwner: boolean;
   ownerName: string;
   playerCount: number;
   starting: boolean;
   isClosed: boolean;
+  configuration: GameView['configuration'];
   onStart: () => void;
   onCopy: () => void;
+  onConfigure: (categories: string[], roundCount: number) => Promise<void>;
 }) {
+  const categorySummary =
+    configuration.categories.length === configuration.availableCategories.length
+      ? 'All categories'
+      : configuration.categories.join(', ');
+
   return (
-    <div className="relative flex h-[clamp(640px,calc(100dvh-112px),768px)] max-h-192 min-h-0 flex-col items-start justify-center overflow-hidden rounded-[24px_10px_26px_12px] border border-[#aebfd0] bg-[rgb(249_252_255/96%)] p-[clamp(50px,7vw,100px)] shadow-[8px_9px_0_#ccdae6] max-[760px]:min-h-150 max-[760px]:px-6 max-[760px]:py-8.5">
+    <div className="relative flex h-[clamp(640px,calc(100dvh-112px),768px)] max-h-192 min-h-0 flex-col overflow-hidden rounded-[24px_10px_26px_12px] border border-[#aebfd0] bg-[rgb(249_252_255/96%)] shadow-[8px_9px_0_#ccdae6] max-[760px]:h-auto max-[760px]:min-h-150">
       <div
         className="absolute top-[clamp(40px,8vw,90px)] right-[clamp(36px,8vw,110px)] aspect-square w-[clamp(140px,18vw,240px)] animate-spin rounded-full border border-[#99c8db] [animation-duration:18s] motion-reduce:animate-none before:absolute before:inset-[15%] before:rounded-full before:border before:border-dashed before:border-[#b6cfdb] before:content-[''] after:absolute after:inset-[34%] after:rounded-full after:border after:border-dashed after:border-[#b6cfdb] after:bg-[#12a8d4] after:content-[''] max-[980px]:opacity-40 max-[760px]:top-9 max-[760px]:right-6.25 max-[760px]:w-32.5"
         aria-hidden="true"
@@ -478,57 +523,74 @@ function LobbyPanel({
         </span>
         <BrainCircuit className="absolute inset-[41%] z-2 size-[18%] text-white" />
       </div>
-      <p className="mb-4.5 text-[11px] font-[850] tracking-[0.15em] text-[#087fa7]">10 QUESTIONS · 15 SECONDS EACH</p>
-      <h1 className="m-0 max-w-187.5 font-trivia text-[clamp(66px,8vw,118px)] leading-[0.78] font-[820] tracking-[-0.075em] text-[#10213d] [font-stretch:condensed] max-[760px]:text-[clamp(58px,20vw,84px)]">
-        Know it.
-        <br />
-        Hit it first.
-      </h1>
-      <p className="mt-8 max-w-142.5 text-[clamp(16px,1.6vw,20px)] leading-[1.55] text-[#5c6f87] max-[760px]:max-w-[84%] max-[760px]:text-[15px]">
-        Every question has four choices. Accuracy keeps you alive; speed takes you to the top of the table.
-      </p>
-      <div className="my-9 flex flex-wrap gap-6.5 border-y border-[#cfdae5] py-4.5 text-[11px] font-[650] text-[#75869a] max-[760px]:gap-x-5 max-[760px]:gap-y-3 [&_strong]:mr-1 [&_strong]:text-[15px] [&_strong]:text-[#10213d]">
-        <span>
-          <strong>115</strong> launch questions
-        </span>
-        <span>
-          <strong>{playerCount}</strong> {playerCount === 1 ? 'player' : 'players'} ready
-        </span>
-        <span>
-          <strong>1,000</strong> max points
-        </span>
+      <div className="relative z-1 flex flex-1 flex-col items-start justify-center px-[clamp(42px,7vw,100px)] pt-[clamp(38px,6vw,80px)] pb-7 max-[760px]:px-6 max-[760px]:pt-13 max-[760px]:pb-8.5">
+        <h1 className="m-0 max-w-187.5 font-trivia text-[clamp(66px,8vw,118px)] leading-[0.78] font-[820] tracking-[-0.075em] text-[#10213d] [font-stretch:condensed] max-[760px]:text-[clamp(58px,20vw,84px)]">
+          Know it.
+          <br />
+          Hit it first.
+        </h1>
+        <p className="mt-7 max-w-142.5 text-[clamp(16px,1.6vw,20px)] leading-[1.55] text-[#5c6f87] max-[760px]:max-w-[84%] max-[760px]:text-[15px]">
+          Every question has four choices. Accuracy keeps you alive; speed takes you to the top of the table.
+        </p>
+        <div className="my-7 flex flex-wrap gap-6.5 border-y border-[#cfdae5] py-4 text-[11px] font-[650] text-[#75869a] max-[760px]:gap-x-5 max-[760px]:gap-y-3 [&_strong]:mr-1 [&_strong]:text-[15px] [&_strong]:text-[#10213d]">
+          <span>
+            <strong>{playerCount}</strong> {playerCount === 1 ? 'player' : 'players'} ready
+          </span>
+          <span>
+            <strong>1,000</strong> max points
+          </span>
+        </div>
+        {isClosed ? (
+          <p className="m-0 inline-flex items-center gap-2.25 rounded-[10px_6px_11px_7px] border border-[#c2cfdb] bg-[#eef4f8] px-4.25 py-3.5 text-xs font-bold text-[#53677c] [&_svg]:size-4">
+            <LockKeyhole aria-hidden="true" /> This room is closed.
+          </p>
+        ) : isOwner ? (
+          <Button
+            className="h-13.5 min-w-47.5 disabled:cursor-wait disabled:opacity-65"
+            variant="trivia-primary"
+            size="xl"
+            type="button"
+            onClick={onStart}
+            disabled={starting}
+          >
+            {starting ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Play aria-hidden="true" />}
+            {starting ? 'Building game…' : 'Start the game'}
+          </Button>
+        ) : (
+          <p className="m-0 inline-flex items-center gap-2.25 rounded-[10px_6px_11px_7px] border border-[#c2cfdb] bg-[#eef4f8] px-4.25 py-3.5 text-xs font-bold text-[#53677c] [&_svg]:size-4">
+            <LoaderCircle className="animate-spin" aria-hidden="true" /> Waiting for {ownerName} to start
+          </p>
+        )}
+        {!isClosed ? (
+          <Button
+            className="mt-4.5 ml-0.75 h-9 px-3 text-[11px] font-[720] text-[#51677e] focus-visible:outline-[rgb(18_168_212/32%)]"
+            variant="paper"
+            type="button"
+            onClick={onCopy}
+          >
+            Copy invite link
+          </Button>
+        ) : null}
       </div>
-      {isClosed ? (
-        <p className="m-0 inline-flex items-center gap-2.25 rounded-[10px_6px_11px_7px] border border-[#c2cfdb] bg-[#eef4f8] px-4.25 py-3.5 text-xs font-bold text-[#53677c] [&_svg]:size-4">
-          <LockKeyhole aria-hidden="true" /> This room is closed.
-        </p>
-      ) : isOwner ? (
-        <Button
-          className="h-13.5 min-w-47.5 disabled:cursor-wait disabled:opacity-65"
-          variant="trivia-primary"
-          size="xl"
-          type="button"
-          onClick={onStart}
-          disabled={starting}
-        >
-          {starting ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Play aria-hidden="true" />}
-          {starting ? 'Building game…' : 'Start the game'}
-        </Button>
-      ) : (
-        <p className="m-0 inline-flex items-center gap-2.25 rounded-[10px_6px_11px_7px] border border-[#c2cfdb] bg-[#eef4f8] px-4.25 py-3.5 text-xs font-bold text-[#53677c] [&_svg]:size-4">
-          <LoaderCircle className="animate-spin" aria-hidden="true" /> Waiting for {ownerName} to start
-        </p>
-      )}
-      {!isClosed ? (
-        <Button
-          className="mt-4.5 ml-0.75 h-9 px-3 text-[11px] font-[720] text-[#51677e] focus-visible:outline-[rgb(18_168_212/32%)]"
-          variant="paper"
-          type="button"
-          onClick={onCopy}
-        >
-          Copy invite link
-        </Button>
-      ) : null}
+
+      <section
+        className="relative z-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-t border-[#cfdae5] bg-[rgb(239_247_251/82%)] px-[clamp(24px,4vw,52px)] py-4.5 max-[520px]:grid-cols-1 max-[520px]:gap-3.5"
+        aria-label="Trivia rules and game configuration"
+      >
+        <div className="min-w-0">
+          <h2 className="m-0 text-[11px] font-[850] tracking-[0.12em] text-[#087fa7] uppercase">
+            Rules &amp; game setup
+          </h2>
+          <p className="mt-1.5 mb-0 text-xs leading-5 text-[#667a90]">
+            <strong className="text-[#31465f]">{configuration.roundCount} rounds</strong>
+            {' · '}
+            About {configuration.estimatedMinutes} min
+            {' · '}
+            <span title={configuration.categories.join(', ')}>{categorySummary}</span>
+          </p>
+        </div>
+        {isOwner && !isClosed ? <TriviaConfigurationDialog configuration={configuration} onSave={onConfigure} /> : null}
+      </section>
     </div>
   );
 }
@@ -662,7 +724,7 @@ function QuestionContent({
           </span>
         </strong>
       </div>
-      <h1 className="m-0 max-w-245 text-[clamp(32px,4.4cqw,58px)] leading-[1.02] font-[790] tracking-[-0.055em] text-[#10213d] [font-stretch:condensed] max-[760px]:text-[clamp(30px,8.5vw,46px)]">
+      <h1 className="m-0 max-w-245 font-sans text-[clamp(32px,4.4cqw,58px)] leading-[1.08] font-[720] tracking-[-0.025em] text-[#10213d] max-[760px]:text-[clamp(30px,8.5vw,46px)]">
         {round.prompt}
       </h1>
       <div className="mt-auto mb-6 grid grid-cols-2 gap-3 pt-[clamp(28px,4cqw,48px)] max-[760px]:grid-cols-1 max-[760px]:gap-2 max-[760px]:pt-6">
@@ -713,11 +775,13 @@ function CompletePanel({
   gameNumber,
   session,
   sessionToken,
+  playIntro,
 }: {
   leaderboard: GameView['leaderboard'];
   gameNumber: number;
   session: ActiveSession;
   sessionToken: string;
+  playIntro: boolean;
 }) {
   const eligibleLeaderboard = leaderboard
     .filter((entry) => entry.isActive)
@@ -742,9 +806,11 @@ function CompletePanel({
       isOwner={session.isOwner}
       isClosed={session.status === 'closed'}
       closedMessage="This room is closed. The final scoreboard stays here to view."
+      playIntro={playIntro}
       summary={
         <PostGamePodium
           label="Final podium"
+          animate={playIntro}
           entries={eligibleLeaderboard.slice(0, 3).map((entry) => ({
             id: entry.memberId,
             place: entry.rank,

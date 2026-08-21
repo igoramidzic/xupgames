@@ -17,6 +17,7 @@ vi.mock('convex/react', () => ({
 }));
 
 vi.mock('@/games/GameRoom', () => ({ default: () => <div>Trivia room</div> }));
+vi.mock('@/components/InitialGameLobby', () => ({ default: () => <div>First game vote</div> }));
 vi.mock('sonner', () => ({ toast: { success: mocks.toastSuccess } }));
 
 describe('Room join flow', () => {
@@ -55,7 +56,7 @@ describe('Room join flow', () => {
     expect(screen.getByText('Password protected')).toBeInTheDocument();
     await user.type(screen.getByLabelText('Your name'), 'Grace');
     await user.type(screen.getByLabelText('Room password'), 'secret phrase');
-    await user.click(screen.getByRole('button', { name: 'Join the quiz' }));
+    await user.click(screen.getByRole('button', { name: 'Join the room' }));
 
     await waitFor(() =>
       expect(mocks.joinRoom).toHaveBeenCalledWith({
@@ -136,5 +137,61 @@ describe('Room join flow', () => {
         expect.objectContaining({ description: expect.stringContaining('previous owner left') })
       )
     );
+  });
+
+  it('routes a newly created room to the first-game vote', () => {
+    saveGuest('Ada');
+    mocks.query
+      .mockReset()
+      .mockReturnValueOnce({
+        kind: 'room',
+        code: 'ABCDEFGH',
+        gameType: null,
+        status: 'open',
+        activeMemberCount: 1,
+        maxPlayers: 50,
+        ownerName: 'Ada',
+        isPasswordProtected: false,
+      })
+      .mockReturnValueOnce({
+        kind: 'session',
+        roomId: 'room-1',
+        code: 'ABCDEFGH',
+        gameType: null,
+        currentGameId: null,
+        status: 'open',
+        activeMemberCount: 1,
+        maxPlayers: 50,
+        isOwner: true,
+        ownershipVersion: 0,
+        ownershipReason: 'created',
+        currentMember: {
+          memberId: 'member-ada',
+          displayName: 'Ada',
+          isActive: true,
+          joinedAt: 1,
+          leftAt: null,
+        },
+        members: [
+          {
+            memberId: 'member-ada',
+            displayName: 'Ada',
+            isOwner: true,
+            isActive: true,
+            joinedAt: 1,
+            leftAt: null,
+          },
+        ],
+      });
+
+    render(
+      <MemoryRouter initialEntries={['/r/ABCDEFGH']}>
+        <Routes>
+          <Route path="/r/:code" element={<Room />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('First game vote')).toBeInTheDocument();
   });
 });

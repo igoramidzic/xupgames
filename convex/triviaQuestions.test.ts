@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TRIVIA_QUESTIONS } from './triviaQuestions';
+import { selectTriviaQuestions, TRIVIA_CATEGORIES, TRIVIA_QUESTIONS } from './triviaQuestions';
 
 describe('trivia question bank', () => {
   it('ships a large, structurally valid launch bank', () => {
@@ -17,8 +17,20 @@ describe('trivia question bank', () => {
 
   it('covers several kinds of knowledge', () => {
     const categories = new Set(TRIVIA_QUESTIONS.map((question) => question.category));
-    expect(categories).toEqual(
-      new Set(['Science', 'History', 'Geography', 'Arts & Literature', 'Technology', 'Nature', 'Games & Culture'])
+    expect(categories).toEqual(new Set(TRIVIA_CATEGORIES));
+  });
+
+  it('selects the requested number of questions only from the configured categories', () => {
+    const selected = selectTriviaQuestions(['Science', 'Nature'], 15, () => 0.25);
+
+    expect(selected).toHaveLength(15);
+    expect(new Set(selected.map((question) => question.id)).size).toBe(15);
+    expect(selected.every((question) => question.category === 'Science' || question.category === 'Nature')).toBe(true);
+  });
+
+  it('refuses configurations with too few questions', () => {
+    expect(() => selectTriviaQuestions(['Nature'], 15)).toThrow(
+      'The selected categories do not contain enough trivia questions.'
     );
   });
 });

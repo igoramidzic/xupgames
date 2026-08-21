@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   game: null as unknown,
   startGame: vi.fn(),
   submitAnswer: vi.fn(),
+  configureGame: vi.fn(),
   leaveRoom: vi.fn(),
   closeRoom: vi.fn(),
   mutationIndex: 0,
@@ -16,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('convex/react', () => ({
   useMutation: () => {
-    const mutations = [mocks.startGame, mocks.submitAnswer, mocks.leaveRoom, mocks.closeRoom];
+    const mutations = [mocks.startGame, mocks.submitAnswer, mocks.configureGame, mocks.leaveRoom, mocks.closeRoom];
     const mutation = mutations[mocks.mutationIndex % mutations.length];
     mocks.mutationIndex += 1;
     return mutation;
@@ -36,6 +37,11 @@ vi.mock('@/components/PostGameBoard', () => ({
     </section>
   ),
   PostGamePodium: () => <ol aria-label="Final podium" />,
+}));
+
+vi.mock('@/components/GameModeControl', () => ({
+  default: () => <button type="button">Change game</button>,
+  GameModeContent: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 const guest = { sessionToken: 'a'.repeat(32), displayName: 'Ada' };
@@ -98,11 +104,44 @@ function leaderboard() {
   ];
 }
 
+function triviaConfiguration() {
+  return {
+    categories: ['Science', 'History', 'Geography', 'Arts & Literature', 'Technology', 'Nature', 'Games & Culture'],
+    roundCount: 10,
+    availableCategories: [
+      'Science',
+      'History',
+      'Geography',
+      'Arts & Literature',
+      'Technology',
+      'Nature',
+      'Games & Culture',
+    ],
+    categoryQuestionCounts: [
+      { category: 'Science', count: 20 },
+      { category: 'History', count: 15 },
+      { category: 'Geography', count: 15 },
+      { category: 'Arts & Literature', count: 15 },
+      { category: 'Technology', count: 19 },
+      { category: 'Nature', count: 10 },
+      { category: 'Games & Culture', count: 20 },
+    ],
+    roundOptions: [
+      { roundCount: 5, estimatedMinutes: 2 },
+      { roundCount: 10, estimatedMinutes: 4 },
+      { roundCount: 15, estimatedMinutes: 6 },
+      { roundCount: 20, estimatedMinutes: 8 },
+    ],
+    estimatedMinutes: 4,
+  };
+}
+
 describe('TriviaRoom', () => {
   beforeEach(() => {
     mocks.mutationIndex = 0;
     mocks.startGame.mockReset();
     mocks.submitAnswer.mockReset();
+    mocks.configureGame.mockReset();
     mocks.leaveRoom.mockReset();
     mocks.closeRoom.mockReset();
     mocks.onlineByMemberId.clear();
@@ -119,6 +158,7 @@ describe('TriviaRoom', () => {
       round: null,
       playerAnswer: null,
       leaderboard: leaderboard(),
+      configuration: triviaConfiguration(),
     };
     mocks.startGame.mockResolvedValue({ gameNumber: 1 });
     const user = userEvent.setup();
@@ -128,17 +168,68 @@ describe('TriviaRoom', () => {
         <TriviaRoom guest={guest} session={session} />
       </MemoryRouter>
     );
-    expect(screen.getByText(/launch questions/)).toBeInTheDocument();
+    expect(screen.getByRole('banner')).toHaveClass('grid-cols-[auto_minmax(0,1fr)_auto]', 'gap-3');
+    expect(screen.getByText(/players ready/)).toHaveTextContent('2 players ready');
+    expect(screen.queryByText('10 QUESTIONS · 15 SECONDS EACH')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Trivia rules and game configuration' })).toHaveTextContent(
+      '10 rounds · About 4 min · All categories'
+    );
     expect(screen.getByRole('link', { name: 'Playtest' })).toHaveAttribute('href', '/admin/ABCDEFGH');
     expect(screen.getByRole('button', { name: 'Copy room link' })).toHaveClass(
       'max-[760px]:w-fit',
-      'max-[760px]:justify-self-center'
+      'justify-self-center'
     );
     await user.click(screen.getByRole('button', { name: 'Start the game' }));
 
     await waitFor(() =>
       expect(mocks.startGame).toHaveBeenCalledWith({ roomId: 'room-id', sessionToken: guest.sessionToken })
     );
+  });
+
+  it('lets only the owner configure categories and rounds', async () => {
+    mocks.game = {
+      gameNumber: 0,
+      phase: 'lobby',
+      currentQuestionNumber: 0,
+      totalQuestions: 10,
+      phaseStartedAt: null,
+      phaseEndsAt: null,
+      round: null,
+      playerAnswer: null,
+      leaderboard: leaderboard(),
+      configuration: triviaConfiguration(),
+    };
+    mocks.configureGame.mockResolvedValue(null);
+    const user = userEvent.setup();
+
+    const view = render(
+      <MemoryRouter>
+        <TriviaRoom guest={guest} session={session} />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Configure' }));
+    expect(screen.getByRole('dialog', { name: 'Configure trivia' })).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: 'History' }));
+    expect(screen.getByRole('button', { name: '15 rounds, about 6 minutes' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '15 rounds, about 6 minutes' }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() =>
+      expect(mocks.configureGame).toHaveBeenCalledWith({
+        roomId: 'room-id',
+        sessionToken: guest.sessionToken,
+        categories: ['Science', 'Geography', 'Arts & Literature', 'Technology', 'Nature', 'Games & Culture'],
+        roundCount: 15,
+      })
+    );
+
+    view.rerender(
+      <MemoryRouter>
+        <TriviaRoom guest={guest} session={{ ...session, isOwner: false }} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('button', { name: 'Configure' })).not.toBeInTheDocument();
   });
 
   it('locks one answer for the active question', async () => {
@@ -175,6 +266,11 @@ describe('TriviaRoom', () => {
     const timer = screen.getByRole('timer', { name: /seconds left to answer/ });
     expect(timer).toHaveAttribute('data-phase', 'question');
     expect(timer.closest('.trivia-question-content')).not.toBeNull();
+    expect(screen.getByRole('heading', { name: 'Which element has atomic number 74?' })).toHaveClass(
+      'font-sans',
+      'leading-[1.08]',
+      'tracking-[-0.025em]'
+    );
     expect(document.querySelector('.trivia-question-timer-ring')).not.toBeInTheDocument();
     const standings = screen.getByRole('list', { name: 'Player standings' });
     expect(standings.closest('[data-slot="scroll-area-viewport"]')).toHaveClass('scroll-fade');

@@ -6,6 +6,7 @@ const roomStatus = v.union(v.literal('open'), v.literal('closed'));
 const roomGameStatus = v.union(v.literal('lobby'), v.literal('active'), v.literal('complete'));
 const ownershipReason = v.union(v.literal('created'), v.literal('transferred'), v.literal('claimed'));
 const pollStatus = v.union(v.literal('round1'), v.literal('round2'), v.literal('awaitingOwner'), v.literal('closed'));
+const pollTrigger = v.union(v.literal('initial'), v.literal('gameComplete'), v.literal('owner'));
 const pollRoundStatus = v.union(v.literal('open'), v.literal('closed'));
 const triviaPhase = v.union(
   v.literal('lobby'),
@@ -49,7 +50,7 @@ export default defineSchema({
 
   rooms: defineTable({
     code: v.string(),
-    gameType: gameTypeValidator,
+    gameType: v.optional(gameTypeValidator),
     currentGameId: v.optional(v.id('roomGames')),
     status: roomStatus,
     maxPlayers: v.number(),
@@ -91,7 +92,8 @@ export default defineSchema({
 
   nextGamePolls: defineTable({
     roomId: v.id('rooms'),
-    roomGameId: v.id('roomGames'),
+    roomGameId: v.optional(v.id('roomGames')),
+    trigger: v.optional(pollTrigger),
     status: pollStatus,
     currentRoundId: v.union(v.id('nextGamePollRounds'), v.null()),
     recommendedGameType: v.union(gameTypeValidator, v.null()),
@@ -129,6 +131,8 @@ export default defineSchema({
     phase: triviaPhase,
     currentQuestionNumber: v.number(),
     totalQuestions: v.number(),
+    configuredCategories: v.optional(v.array(v.string())),
+    configuredRoundCount: v.optional(v.number()),
     phaseStartedAt: v.union(v.number(), v.null()),
     phaseEndsAt: v.union(v.number(), v.null()),
   }).index('by_roomId', ['roomId']),

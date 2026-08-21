@@ -5,6 +5,7 @@ import { LoaderCircle, LockKeyhole, UsersRound } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import InitialGameLobby from '@/components/InitialGameLobby';
 import { Button } from '@/components/ui/button';
 import GameRoom from '@/games/GameRoom';
 import { type GuestIdentity, readGuest, saveGuest, validateDisplayName } from '@/lib/guest';
@@ -59,6 +60,10 @@ function ActiveRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
       duration: 7_000,
     });
   }, [session.isOwner, session.ownershipReason, session.ownershipVersion, session.roomId]);
+
+  if (session.gameType === null || session.currentGameId === null) {
+    return <InitialGameLobby guest={guest} session={session} />;
+  }
 
   return <GameRoom guest={guest} session={session} />;
 }
@@ -126,7 +131,6 @@ function JoinRoom({
   const [error, setError] = useState<string | null>(null);
   const isClosed = preview.status === 'closed';
   const isFull = preview.activeMemberCount >= preview.maxPlayers;
-  const isTypeRacer = preview.gameType === 'typeRacer';
 
   async function handleJoin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -188,9 +192,7 @@ function JoinRoom({
           </div>
           <p className="mb-5 text-xs font-[780] tracking-[0.12em] text-[#3155d9] uppercase max-[520px]:max-w-40">
             {isClosed
-              ? isTypeRacer
-                ? 'The type race is finished'
-                : 'The trivia room is finished'
+              ? 'This room is finished'
               : preview.ownerName
                 ? `${preview.ownerName} invited you`
                 : 'This room is waiting for an owner'}
@@ -198,8 +200,8 @@ function JoinRoom({
           <h1 className="m-0 font-display text-[clamp(40px,6vw,58px)] leading-[0.98] font-[820] tracking-[-0.055em] text-[#17203a]">
             {isClosed
               ? 'This room is closed.'
-              : isTypeRacer
-                ? 'Take your place on the line.'
+              : preview.gameType === null
+                ? 'Join the vote.'
                 : 'Take your place at the table.'}
           </h1>
           <div className="my-7 flex items-center justify-between border-y border-[#e1e6ef] py-3.5 text-[13px] text-[#687389] max-[520px]:gap-3">
@@ -227,11 +229,7 @@ function JoinRoom({
               <LockKeyhole className="size-5.25 shrink-0 text-[#707b90]" aria-hidden="true" />
               <div>
                 <strong className="mb-0.75 block text-sm text-[#29344c]">
-                  {isClosed
-                    ? isTypeRacer
-                      ? 'No more progress can be added.'
-                      : 'No more answers can be added.'
-                    : 'Every seat is taken.'}
+                  {isClosed ? 'No more players can join.' : 'Every seat is taken.'}
                 </strong>
                 <p className="m-0 text-[13px] leading-[1.45]">
                   {isClosed ? 'Ask the owner to make a new room.' : 'Try this link again after someone leaves.'}
@@ -285,15 +283,7 @@ function JoinRoom({
                 disabled={joining}
               >
                 {joining ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
-                {joining
-                  ? 'Joining…'
-                  : guest
-                    ? isTypeRacer
-                      ? 'Rejoin the race'
-                      : 'Rejoin the quiz'
-                    : isTypeRacer
-                      ? 'Join the race'
-                      : 'Join the quiz'}
+                {joining ? 'Joining…' : guest ? 'Rejoin the room' : 'Join the room'}
               </Button>
               {error ? (
                 <p

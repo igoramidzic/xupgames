@@ -39,6 +39,11 @@ vi.mock('@/components/PostGameBoard', () => ({
   PostGamePodium: () => <ol aria-label="Final podium" />,
 }));
 
+vi.mock('@/components/GameModeControl', () => ({
+  default: () => <button type="button">Change game</button>,
+  GameModeContent: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 vi.mock('@/lib/environment', () => ({ isLocalhost: () => false }));
 
 const guest = { sessionToken: 'a'.repeat(32), displayName: 'Ada' };

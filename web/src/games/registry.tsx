@@ -74,7 +74,15 @@ export function GamePreview({ gameType }: { gameType: GameType }) {
   );
 }
 
-export function GameSourceBadge({ source, className }: { source: GameSource; className?: string }) {
+export function GameSourceBadge({
+  source,
+  className,
+  label = 'Community game',
+}: {
+  source: GameSource;
+  className?: string;
+  label?: 'Community' | 'Community game';
+}) {
   if (source === 'official') return null;
   return (
     <span
@@ -84,15 +92,15 @@ export function GameSourceBadge({ source, className }: { source: GameSource; cla
         className
       )}
     >
-      Community game
+      {label}
     </span>
   );
 }
 
-export function GameAuthor({ game }: { game: GameCatalogEntry }) {
+export function GameAuthor({ game, className }: { game: GameCatalogEntry; className?: string }) {
   if (game.source === 'official') return null;
   return (
-    <span className="text-[10px] text-[#7a8499]">
+    <span className={cn('min-w-0 truncate text-[10px] text-[#7a8499]', className)}>
       by <span className="font-[680] text-[#536079]">{game.author.name}</span>
     </span>
   );
