@@ -3,9 +3,16 @@ import { v } from 'convex/values';
 import { components, internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, type MutationCtx, mutation, query } from './_generated/server';
-import { fail, normalizeRoomCode, validateSessionToken } from './domain';
+import { fail, MAX_PLAYERS, normalizeRoomCode, validateSessionToken } from './domain';
 import { gameTypeValidator } from './games';
 import { initializeGameBot, runGameBotTick, stopGameBot } from './playtestAdapters';
+import {
+  beginStoppingPlaytest,
+  DISCONNECTED_HUMAN_GRACE_MS,
+  hasHumanDisconnectedBeyondGrace,
+  shouldCheckRoomLifecycle,
+} from './playtestLifecycle';
+import { listActiveHumanRoomMembers } from './roomMembers';
 
 const playtestStatusValidator = v.union(
   v.literal('provisioning'),
@@ -52,6 +59,7 @@ const CLEANUP_BATCH_SIZE = 10;
 const BOT_TICK_INTERVAL_MS = 75;
 const BOT_HEARTBEAT_INTERVAL_MS = 5_000;
 const BOT_HEARTBEAT_REFRESH_MS = 4_000;
+const ROOM_PRESENCE_SCAN_LIMIT = MAX_PLAYERS * 4 + 4;
 const presence = new Presence<Id<'rooms'>, Id<'roomMembers'>>(components.presence);
 
 function summarizeRun(run: Doc<'playtestRuns'>) {
@@ -105,20 +113,6 @@ async function currentRoomGameIsComplete(ctx: Pick<MutationCtx, 'db'>, room: Doc
     throw new Error('The room current-game pointer is invalid.');
   }
   return roomGame.status === 'complete';
-}
-
-async function beginStopping(ctx: MutationCtx, run: Doc<'playtestRuns'>, reason: string): Promise<void> {
-  if (!run.isActive || run.status === 'stopping') {
-    return;
-  }
-  await ctx.db.patch('playtestRuns', run._id, {
-    status: 'stopping',
-    stopReason: reason,
-  });
-  const scheduledId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(0, internal.playtests.cleanup, {
-    runId: run._id,
-  });
-  void scheduledId;
 }
 
 export const inspect = query({
@@ -243,7 +237,7 @@ export const stop = mutation({
       fail('ROOM_NOT_FOUND', 'Room not found.');
     }
     await requireRoomOwner(ctx, room, args.sessionToken);
-    await beginStopping(ctx, run, 'Stopped by the room owner.');
+    await beginStoppingPlaytest(ctx, run, 'Stopped by the room owner.');
     return null;
   },
 });
@@ -258,15 +252,15 @@ export const provision = internalMutation({
     }
     const room = await ctx.db.get('rooms', run.roomId);
     if (room === null || room.status === 'closed') {
-      await beginStopping(ctx, run, 'The room closed.');
+      await beginStoppingPlaytest(ctx, run, 'The room closed.');
       return null;
     }
     if (room.gameType !== run.gameType) {
-      await beginStopping(ctx, run, 'The room changed games.');
+      await beginStoppingPlaytest(ctx, run, 'The room changed games.');
       return null;
     }
     if (await currentRoomGameIsComplete(ctx, room)) {
-      await beginStopping(ctx, run, 'The game finished.');
+      await beginStoppingPlaytest(ctx, run, 'The game finished.');
       return null;
     }
 
@@ -366,18 +360,40 @@ export const tick = internalMutation({
     }
     const room = await ctx.db.get('rooms', run.roomId);
     if (room === null || room.status === 'closed') {
-      await beginStopping(ctx, run, 'The room closed.');
+      await beginStoppingPlaytest(ctx, run, 'The room closed.');
       return null;
     }
     if (room.gameType !== run.gameType) {
-      await beginStopping(ctx, run, 'The room changed games.');
+      await beginStoppingPlaytest(ctx, run, 'The room changed games.');
       return null;
     }
     if (await currentRoomGameIsComplete(ctx, room)) {
-      await beginStopping(ctx, run, 'The game finished.');
+      await beginStoppingPlaytest(ctx, run, 'The game finished.');
       return null;
     }
     const now = Date.now();
+    if (shouldCheckRoomLifecycle(run.lastTickAt, now)) {
+      const activeHumanMembers = await listActiveHumanRoomMembers(ctx, room._id);
+      if (activeHumanMembers.length < 1) {
+        await beginStoppingPlaytest(ctx, run, 'The last player left the room.');
+        return null;
+      }
+      const presenceStates = await presence.listRoom(ctx, room._id, false, ROOM_PRESENCE_SCAN_LIMIT);
+      if (
+        hasHumanDisconnectedBeyondGrace(
+          activeHumanMembers.map((member) => member._id),
+          presenceStates,
+          now
+        )
+      ) {
+        await beginStoppingPlaytest(
+          ctx,
+          run,
+          `A player was disconnected for more than ${DISCONNECTED_HUMAN_GRACE_MS / 1_000} seconds.`
+        );
+        return null;
+      }
+    }
     const tail = await ctx.db
       .query('playtestBots')
       .withIndex('by_runId_and_botNumber', (index) => index.eq('runId', run._id).gte('botNumber', run.tickCursor))
@@ -391,7 +407,7 @@ export const tick = internalMutation({
         : [];
     const bots = [...tail, ...head].filter((bot) => bot.isActive);
     if (bots.length < 1) {
-      await beginStopping(ctx, run, 'No active bots remained.');
+      await beginStoppingPlaytest(ctx, run, 'No active bots remained.');
       return null;
     }
 
@@ -450,6 +466,9 @@ export const cleanup = internalMutation({
     let activeMembershipsRemoved = 0;
     for (const bot of bots) {
       await stopGameBot(ctx, room, bot);
+      if (room !== null) {
+        await presence.removeRoomUser(ctx, room._id, bot.memberId);
+      }
       const membership = await ctx.db.get('roomMembers', bot.memberId);
       if (membership?.isActive) {
         await ctx.db.patch('roomMembers', membership._id, { isActive: false, leftAt: now });

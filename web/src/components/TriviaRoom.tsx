@@ -274,7 +274,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
         </Link>
 
         <button
-          className="inline-flex h-9 -rotate-1 cursor-pointer items-center gap-2 rounded-[7px_3px] border border-[#10213d] bg-[#ffda55] px-4 text-[10px] font-[820] tracking-[0.12em] text-[#10213d] shadow-[3px_3px_0_#10213d] hover:-translate-y-px focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(18_168_212/32%)] max-[760px]:justify-self-center max-[760px]:px-2.5 max-[760px]:text-[8px] [&_svg]:size-3.25"
+          className="inline-flex h-9 -rotate-1 cursor-pointer items-center gap-2 rounded-[7px_3px] border border-[#10213d] bg-[#ffda55] px-4 text-[10px] font-[820] tracking-[0.12em] text-[#10213d] shadow-[3px_3px_0_#10213d] hover:-translate-y-px focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(18_168_212/32%)] max-[760px]:w-fit max-[760px]:justify-self-center max-[760px]:px-2.5 max-[760px]:text-[8px] [&_svg]:size-3.25"
           type="button"
           onClick={copyRoomLink}
           aria-label="Copy room link"

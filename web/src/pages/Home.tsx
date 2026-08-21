@@ -58,10 +58,6 @@ export default function Home() {
           </span>
           <span>Xup Games</span>
         </a>
-        <div className="flex items-center gap-2.25 text-[13px] font-[620] text-[#59647b] max-[620px]:text-[0]">
-          <span className="size-2 shrink-0 rounded-full bg-[#35b87f] shadow-[0_0_0_4px_rgb(53_184_127/13%)]" />
-          Realtime game rooms
-        </div>
       </header>
 
       <main className="mx-auto grid min-h-[calc(100vh-136px)] w-[min(100%-96px,1360px)] animate-in grid-cols-[minmax(390px,0.88fr)_minmax(520px,1.12fr)] items-center gap-[clamp(56px,7vw,120px)] py-8 pb-20 fade-in slide-in-from-bottom-4 duration-500 motion-reduce:animate-none max-[1040px]:w-[min(100%-56px,760px)] max-[1040px]:grid-cols-1 max-[1040px]:gap-20.5 max-[1040px]:pt-18 max-[620px]:w-[calc(100%-32px)] max-[620px]:py-10.5 max-[620px]:pb-14">

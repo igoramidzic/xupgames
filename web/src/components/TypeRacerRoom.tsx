@@ -381,7 +381,7 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
         </Link>
 
         <button
-          className="inline-flex h-9 -rotate-1 cursor-pointer items-center gap-2 rounded-[5px_9px_6px_8px] border border-[#27183f] bg-[#ffd65a] px-4 text-[10px] font-[850] tracking-[0.13em] text-[#27183f] shadow-[3px_3px_0_#27183f] transition-transform hover:-translate-y-px focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(255_92_87/35%)] max-[760px]:px-2.5 max-[760px]:text-[8px] [&_svg]:size-3.25"
+          className="inline-flex h-9 -rotate-1 cursor-pointer items-center gap-2 rounded-[5px_9px_6px_8px] border border-[#27183f] bg-[#ffd65a] px-4 text-[10px] font-[850] tracking-[0.13em] text-[#27183f] shadow-[3px_3px_0_#27183f] transition-transform hover:-translate-y-px focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(255_92_87/35%)] max-[760px]:w-fit max-[760px]:justify-self-center max-[760px]:px-2.5 max-[760px]:text-[8px] [&_svg]:size-3.25"
           type="button"
           onClick={copyRoomLink}
           aria-label="Copy room link"

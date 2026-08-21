@@ -129,6 +129,10 @@ describe('TriviaRoom', () => {
     );
     expect(screen.getByText(/launch questions/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Playtest' })).toHaveAttribute('href', '/admin/ABCDEFGH');
+    expect(screen.getByRole('button', { name: 'Copy room link' })).toHaveClass(
+      'max-[760px]:w-fit',
+      'max-[760px]:justify-self-center'
+    );
     await user.click(screen.getByRole('button', { name: 'Start the game' }));
 
     await waitFor(() =>

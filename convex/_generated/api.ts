@@ -19,6 +19,7 @@ import type * as passwords from "../passwords.js";
 import type * as playtestAdapters_index from "../playtestAdapters/index.js";
 import type * as playtestAdapters_trivia from "../playtestAdapters/trivia.js";
 import type * as playtestAdapters_typeRacer from "../playtestAdapters/typeRacer.js";
+import type * as playtestLifecycle from "../playtestLifecycle.js";
 import type * as playtests from "../playtests.js";
 import type * as roomGames from "../roomGames.js";
 import type * as roomMembers from "../roomMembers.js";
@@ -51,6 +52,7 @@ const fullApi: ApiFromModules<{
   "playtestAdapters/index": typeof playtestAdapters_index;
   "playtestAdapters/trivia": typeof playtestAdapters_trivia;
   "playtestAdapters/typeRacer": typeof playtestAdapters_typeRacer;
+  playtestLifecycle: typeof playtestLifecycle;
   playtests: typeof playtests;
   roomGames: typeof roomGames;
   roomMembers: typeof roomMembers;

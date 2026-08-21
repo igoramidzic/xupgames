@@ -118,6 +118,10 @@ describe('TypeRacerRoom', () => {
       </MemoryRouter>
     );
 
+    expect(screen.getByRole('button', { name: 'Copy room link' })).toHaveClass(
+      'max-[760px]:w-fit',
+      'max-[760px]:justify-self-center'
+    );
     await user.click(screen.getByRole('button', { name: 'Start the countdown' }));
     expect(mocks.startRace).toHaveBeenCalledWith({ roomId: 'room-1', sessionToken: guest.sessionToken });
   });

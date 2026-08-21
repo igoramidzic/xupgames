@@ -12,6 +12,7 @@ import {
 } from './domain';
 import { gameTypeValidator } from './games';
 import { createPasswordCredential, verifyPasswordCredential } from './passwords';
+import { stopActivePlaytestForRoom } from './playtestLifecycle';
 import { createInitialRoomGame } from './roomGames';
 import { listActiveHumanRoomMembers, listRoomMembersForDisplay } from './roomMembers';
 import { enrollTypeRacerMemberInActiveRace } from './typeRacer';
@@ -468,6 +469,9 @@ export const leave = mutation({
           }
         : {}),
     });
+    if (ownerIsLeaving && successor === null) {
+      await stopActivePlaytestForRoom(ctx, room._id, 'The last player left the room.');
+    }
     return null;
   },
 });
