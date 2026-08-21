@@ -2774,6 +2774,8 @@
 }
 
 .trivia-round-timer {
+  --timer-color: #12a8d4;
+  --timer-shadow: #9acfe0;
   display: grid;
   width: 72px;
   height: 72px;
@@ -2781,9 +2783,19 @@
   padding: 5px;
   place-items: center;
   border-radius: 50%;
-  background: conic-gradient(from -90deg, #16855c var(--round-progress), #cbd9e5 0);
-  box-shadow: 0 3px 0 #a8c8ba;
+  background: conic-gradient(from -90deg, var(--timer-color) var(--round-progress), #cbd9e5 0);
+  box-shadow: 0 3px 0 var(--timer-shadow);
   transition: --round-progress 120ms linear;
+}
+
+.trivia-round-timer[data-phase="reveal"] {
+  --timer-color: #16855c;
+  --timer-shadow: #a8c8ba;
+}
+
+.trivia-round-timer[data-urgent="true"] {
+  --timer-color: #d7433d;
+  --timer-shadow: #e8b2ae;
 }
 
 .trivia-round-timer::before,
@@ -2821,40 +2833,17 @@
   border-radius: 25px 11px 27px 13px;
   background: #cbd9e5;
   box-shadow: 8px 9px 0 #c7d7e3;
-}
-
-.trivia-question-timer-ring {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.trivia-question-timer-ring path {
-  fill: none;
-  stroke: #12a8d4;
-  stroke-width: 8px;
-  stroke-dasharray: 100 100;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-  transition: stroke-dashoffset 120ms linear;
+  transition: background-color 260ms ease-in;
 }
 
 .trivia-question-stage[data-answer-result="correct"] {
   background: #42b884;
+  transition-duration: 0ms;
 }
 
 .trivia-question-stage[data-answer-result="incorrect"] {
   background: #df625a;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .trivia-question-timer-ring path {
-    transition: none;
-  }
+  transition-duration: 0ms;
 }
 
 .trivia-question-card {
@@ -2883,12 +2872,12 @@
   flex: 1;
   flex-direction: column;
   opacity: 1;
-  transition: opacity 180ms ease-out;
+  transition: opacity 320ms ease-out;
 }
 
 .trivia-question-content[data-transition="out"] {
   opacity: 0;
-  transition-duration: 140ms;
+  transition-duration: 260ms;
   transition-timing-function: ease-in;
 }
 
@@ -2897,7 +2886,15 @@
   transition: none;
 }
 
+.trivia-question-content[data-transition="in"] .trivia-round-timer {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .trivia-question-stage {
+    transition: none;
+  }
+
   .trivia-question-content {
     opacity: 1;
     transition: none;

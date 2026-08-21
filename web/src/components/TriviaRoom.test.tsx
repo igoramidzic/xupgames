@@ -140,10 +140,10 @@ describe('TriviaRoom', () => {
         <TriviaRoom guest={guest} session={session} />
       </MemoryRouter>
     );
-    const timerRing = document.querySelector<SVGPathElement>('.trivia-question-timer-ring path');
-    expect(timerRing).toHaveAttribute('pathLength', '100');
-    expect(timerRing?.getAttribute('d')).not.toMatch(/[zZ]/);
-    expect(timerRing?.style.strokeDashoffset).not.toBe('');
+    const timer = screen.getByRole('timer', { name: /seconds left to answer/ });
+    expect(timer).toHaveAttribute('data-phase', 'question');
+    expect(timer.closest('.trivia-question-content')).not.toBeNull();
+    expect(document.querySelector('.trivia-question-timer-ring')).not.toBeInTheDocument();
     const standings = screen.getByRole('list', { name: 'Player standings' });
     expect(standings.closest('[data-slot="scroll-area-viewport"]')).toHaveClass('scroll-fade');
     const guidance = document.querySelector<HTMLElement>('.trivia-question-guidance');
@@ -285,10 +285,16 @@ describe('TriviaRoom', () => {
       expect(screen.getByText('Outgoing question')).toBeInTheDocument();
       expect(screen.queryByText('Incoming question')).not.toBeInTheDocument();
       expect(document.querySelector('.trivia-question-content')).toHaveAttribute('data-transition', 'out');
+      const outgoingTimer = screen.getByRole('timer');
+      expect(outgoingTimer).toHaveAttribute('data-phase', 'reveal');
 
-      act(() => vi.advanceTimersByTime(140));
+      act(() => vi.advanceTimersByTime(260));
       expect(screen.getByText('Incoming question')).toBeInTheDocument();
       expect(document.querySelector('.trivia-question-content')).toHaveAttribute('data-transition', 'in');
+      const incomingTimer = screen.getByRole('timer');
+      expect(incomingTimer).toHaveAttribute('data-phase', 'question');
+      expect(incomingTimer).not.toBe(outgoingTimer);
+      expect(incomingTimer.style.getPropertyValue('--round-progress')).toBe('360deg');
 
       act(() => vi.advanceTimersByTime(40));
       expect(document.querySelector('.trivia-question-content')).toHaveAttribute('data-transition', 'visible');

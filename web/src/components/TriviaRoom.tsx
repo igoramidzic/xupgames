@@ -38,7 +38,7 @@ const ANSWER_LABELS = ['A', 'B', 'C', 'D'];
 const ANSWER_DURATION_MS = 15_000;
 const COUNTDOWN_DURATION_MS = 3_000;
 const REVEAL_DURATION_MS = 7_000;
-const QUESTION_FADE_OUT_MS = 140;
+const QUESTION_FADE_OUT_MS = 260;
 
 function errorMessage(error: unknown, fallback: string) {
   if (!(error instanceof Error)) {
@@ -506,9 +506,6 @@ function QuestionPanel({
     return null;
   }
   const isReveal = game.phase === 'reveal';
-  const isFinalRound = round.questionNumber >= game.totalQuestions;
-  const transitionSeconds = Math.min(REVEAL_DURATION_MS / 1_000, Math.max(0, Math.ceil(remainingMs / 1_000)));
-  const roundTimerStyle = { '--round-progress': `${timeProgress * 360}deg` } as CSSProperties;
   const answerResult = !isReveal ? 'pending' : game.playerAnswer?.isCorrect ? 'correct' : 'incorrect';
 
   return (
@@ -523,38 +520,24 @@ function QuestionPanel({
             <Check aria-hidden="true" /> Round over
           </strong>
         ) : (
-          <strong data-urgent={remainingMs <= 5_000}>
-            <Timer aria-hidden="true" />
-            {(remainingMs / 1_000).toFixed(1)}
-          </strong>
+          <span aria-hidden="true" />
         )}
       </div>
 
       <div className="trivia-question-stage" data-answer-result={answerResult}>
-        {!isReveal ? <QuestionTimerRing progress={timeProgress} /> : null}
         <div className="trivia-question-card">
-          <div className="trivia-question-card-heading">
-            {isReveal ? (
-              <strong
-                className="trivia-round-timer"
-                style={roundTimerStyle}
-                role="timer"
-                aria-label={`${isFinalRound ? 'Final results' : 'Next question'} in ${transitionSeconds} seconds`}
-              >
-                <span className="trivia-round-timer-value">{transitionSeconds}</span>
-              </strong>
-            ) : null}
-          </div>
           <QuestionContentTransition
             round={round}
             isReveal={isReveal}
             selectedOption={selectedOption}
             phase={game.phase}
+            remainingMs={remainingMs}
+            timeProgress={timeProgress}
+            totalQuestions={game.totalQuestions}
             onAnswer={onAnswer}
           />
           <div className="trivia-question-footer">
             <span>{round.answeredCount} locked in</span>
-            {game.playerAnswer && !isReveal ? <strong>Answer locked. Watch the clock.</strong> : null}
             {isReveal && game.playerAnswer?.isCorrect ? (
               <strong className="trivia-result-correct">
                 <Check aria-hidden="true" /> +{game.playerAnswer.pointsAwarded} points
@@ -579,68 +562,15 @@ function QuestionPanel({
   );
 }
 
-function questionTimerPath(width: number, height: number): string {
-  const inset = 4;
-  const left = inset;
-  const top = inset;
-  const right = Math.max(left, width - inset);
-  const bottom = Math.max(top, height - inset);
-  const radius = Math.max(0, Math.min(22, (right - left) / 2, (bottom - top) / 2));
-  const middle = left + (right - left) / 2;
-
-  return [
-    `M ${middle} ${top}`,
-    `H ${right - radius}`,
-    `Q ${right} ${top} ${right} ${top + radius}`,
-    `V ${bottom - radius}`,
-    `Q ${right} ${bottom} ${right - radius} ${bottom}`,
-    `H ${left + radius}`,
-    `Q ${left} ${bottom} ${left} ${bottom - radius}`,
-    `V ${top + radius}`,
-    `Q ${left} ${top} ${left + radius} ${top}`,
-    `H ${middle}`,
-  ].join(' ');
-}
-
-function QuestionTimerRing({ progress }: { progress: number }) {
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const [path, setPath] = useState(() => questionTimerPath(100, 100));
-  const timerStyle = { strokeDashoffset: 100 - progress * 100 };
-
-  useLayoutEffect(() => {
-    const svg = svgRef.current;
-    if (svg === null) {
-      return;
-    }
-    const updatePath = () => {
-      const bounds = svg.getBoundingClientRect();
-      if (bounds.width > 0 && bounds.height > 0) {
-        setPath(questionTimerPath(bounds.width, bounds.height));
-      }
-    };
-    updatePath();
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', updatePath);
-      return () => window.removeEventListener('resize', updatePath);
-    }
-    const observer = new ResizeObserver(updatePath);
-    observer.observe(svg);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <svg ref={svgRef} className="trivia-question-timer-ring" aria-hidden="true">
-      <path d={path} pathLength="100" style={timerStyle} />
-    </svg>
-  );
-}
-
 type QuestionRound = NonNullable<GameView['round']>;
 type QuestionContentSnapshot = {
   round: QuestionRound;
   isReveal: boolean;
   selectedOption: number | null;
   phase: GameView['phase'];
+  remainingMs: number;
+  timeProgress: number;
+  totalQuestions: number;
 };
 
 function QuestionContentTransition({
@@ -648,23 +578,32 @@ function QuestionContentTransition({
   isReveal,
   selectedOption,
   phase,
+  remainingMs,
+  timeProgress,
+  totalQuestions,
   onAnswer,
 }: QuestionContentSnapshot & { onAnswer: (index: number) => void }) {
   const snapshot = useMemo(
-    () => ({ round, isReveal, selectedOption, phase }),
-    [round, isReveal, selectedOption, phase]
+    () => ({ round, isReveal, selectedOption, phase, remainingMs, timeProgress, totalQuestions }),
+    [round, isReveal, selectedOption, phase, remainingMs, timeProgress, totalQuestions]
   );
   const latestSnapshotRef = useRef<QuestionContentSnapshot>(snapshot);
   latestSnapshotRef.current = snapshot;
   const displayedRoundIdRef = useRef(round.roundId);
   const [displayed, setDisplayed] = useState<QuestionContentSnapshot>(latestSnapshotRef.current);
   const [transitionPhase, setTransitionPhase] = useState<'visible' | 'out' | 'in'>('visible');
+  const visibleSnapshotRef = useRef(snapshot);
+
+  if (transitionPhase === 'visible' && displayedRoundIdRef.current === round.roundId) {
+    visibleSnapshotRef.current = snapshot;
+  }
 
   useLayoutEffect(() => {
     if (displayedRoundIdRef.current === round.roundId) {
       return;
     }
 
+    setDisplayed(visibleSnapshotRef.current);
     setTransitionPhase('out');
     let firstFrame = 0;
     let secondFrame = 0;
@@ -688,7 +627,19 @@ function QuestionContentTransition({
   }, [round.roundId]);
 
   const activeSnapshot =
-    transitionPhase === 'visible' && displayedRoundIdRef.current === round.roundId ? snapshot : displayed;
+    transitionPhase === 'visible' && displayedRoundIdRef.current === round.roundId
+      ? snapshot
+      : transitionPhase === 'visible'
+        ? visibleSnapshotRef.current
+        : displayed;
+  const timerSeconds = Math.max(0, Math.ceil(activeSnapshot.remainingMs / 1_000));
+  const displayedSeconds = activeSnapshot.isReveal
+    ? Math.min(REVEAL_DURATION_MS / 1_000, timerSeconds)
+    : Math.min(ANSWER_DURATION_MS / 1_000, timerSeconds);
+  const timerStyle = { '--round-progress': `${activeSnapshot.timeProgress * 360}deg` } as CSSProperties;
+  const timerLabel = activeSnapshot.isReveal
+    ? `${activeSnapshot.round.questionNumber >= activeSnapshot.totalQuestions ? 'Final results' : 'Next question'} in ${displayedSeconds} seconds`
+    : `${displayedSeconds} seconds left to answer`;
   const totalAnswerCount = Math.max(
     1,
     (activeSnapshot.round.optionAnswerCounts ?? []).reduce((total, count) => total + count, 0)
@@ -696,6 +647,19 @@ function QuestionContentTransition({
 
   return (
     <div className="trivia-question-content" data-transition={transitionPhase}>
+      <div className="trivia-question-card-heading">
+        <strong
+          key={`${activeSnapshot.round.roundId}:${activeSnapshot.phase}`}
+          className="trivia-round-timer"
+          data-phase={activeSnapshot.isReveal ? 'reveal' : 'question'}
+          data-urgent={!activeSnapshot.isReveal && activeSnapshot.remainingMs <= 5_000}
+          style={timerStyle}
+          role="timer"
+          aria-label={timerLabel}
+        >
+          <span className="trivia-round-timer-value">{displayedSeconds}</span>
+        </strong>
+      </div>
       <h1>{activeSnapshot.round.prompt}</h1>
       <div className="trivia-answer-grid">
         {activeSnapshot.round.options.map((option, index) => {
