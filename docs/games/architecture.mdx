@@ -1,0 +1,87 @@
+---
+title: Game architecture
+description: 'The platform, official-game, and isolated community-game boundaries'
+---
+
+## The rule: route once, isolate state
+
+`rooms.gameType` is the stable routing key. Shared infrastructure may use it to
+choose an adapter, but it must not absorb game-specific state or behavior.
+
+| Layer | Owns | Must not own |
+| --- | --- | --- |
+| Shared platform | Rooms, guest identity, membership, capacity, passwords, presence, game history, voting, playtests | Trivia rounds, race progress, or any other game model |
+| Official game | Its typed state tables, lifecycle, public actions, room UI, and tests | Another game's state or copies of room authorization |
+| Community game | Its Convex Component schema/functions and colocated web module | Parent tables, raw session tokens, shared credentials, or another component's data |
+
+The backend routes game lifecycle hooks only in `convex/gameRouter.ts`. The web
+routes active rooms only in `web/src/games/GameRoom.tsx` and presentation only
+in `web/src/games/registry.tsx`.
+
+## Why each community game is a Convex Component
+
+A local [Convex Component](https://docs.convex.dev/components) is a small,
+self-contained backend mounted by the main app. It has isolated tables,
+functions, file storage, scheduling, generated types, and environment. Component
+code cannot directly read the parent app's tables or another component's data.
+
+That makes one component per community game a stronger boundary than a shared
+`communityGameState` table:
+
+- schemas evolve independently;
+- one game cannot accidentally query or mutate another game's tables;
+- arguments and returns are validated at the boundary;
+- component mutations still participate transactionally in the calling app
+  mutation;
+- a game can later be packaged and reused without pulling platform tables with it.
+
+The main app still owns browser-facing authorization. A thin app wrapper calls
+`roomAccess.requireRoomMember`, confirms the expected `gameType` and owner/active
+requirements, then passes only the minimal string IDs and game input to the
+component. Never pass a guest session token, password, broad function handle, or
+unrelated room document through the boundary.
+
+Component isolation is not a marketplace runtime for arbitrary unreviewed code.
+Every contribution is still source-reviewed for network access, secrets,
+resource use, authorization, and the narrowness of its app bridge.
+
+## Catalog and rollout boundary
+
+`convex/gameRegistry.ts` contains a source-controlled manifest for every
+compiled game. `convex/games.ts` exposes the catalog query and sync. The
+`gameDefinitions` table is the runtime catalog consumed by the web picker and
+next-game voting. It records:
+
+- stable `gameType`;
+- display name and description;
+- author name and optional URL;
+- `official` or `community` source;
+- enabled state and sort order.
+
+The source manifest is a safe fallback during rollout. After deploying, run the
+idempotent sync so the database becomes current:
+
+```bash
+pnpm exec convex run games:syncCatalog
+```
+
+A game must remain disabled until its backend lifecycle, authorized app bridge,
+web route, preview/presentation, metadata, and tests all ship together.
+
+## Directory map
+
+```text
+convex/
+├── gameRegistry.ts              # source-controlled implementation manifest
+├── games.ts                     # database catalog API + sync
+├── gameRouter.ts                # one lifecycle switch
+├── roomAccess.ts                # shared wrapper authorization
+├── officialGames/<gameType>/    # official lifecycle helpers
+└── communityGames/<gameType>/   # one local Component per community game
+
+web/src/games/
+├── registry.tsx                 # icon, accent, preview, supported type
+├── GameRoom.tsx                 # one active-room switch
+├── official/<game-slug>/
+└── community/<game-slug>/
+```

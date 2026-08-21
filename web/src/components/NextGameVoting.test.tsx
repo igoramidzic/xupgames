@@ -5,6 +5,22 @@ import NextGameVoting from './NextGameVoting';
 
 const mocks = vi.hoisted(() => ({
   poll: null as Record<string, unknown> | null,
+  catalog: [
+    {
+      gameType: 'trivia',
+      name: 'Trivia',
+      description: 'Take on another ten questions.',
+      author: { name: 'Xup Games', url: 'https://xup.games' },
+      source: 'official',
+    },
+    {
+      gameType: 'typeRacer',
+      name: 'Type Racer',
+      description: 'Line up for a new passage.',
+      author: { name: 'Xup Games', url: 'https://xup.games' },
+      source: 'official',
+    },
+  ],
   mutationIndex: 0,
   openVoting: vi.fn(),
   castVote: vi.fn(),
@@ -13,7 +29,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('convex/react', () => ({
-  useQuery: () => mocks.poll,
+  useQuery: (_reference: unknown, args: unknown) =>
+    typeof args === 'object' && args !== null && 'roomId' in args ? mocks.poll : mocks.catalog,
   useMutation: () => {
     const mutations = [mocks.openVoting, mocks.castVote, mocks.closeRound, mocks.chooseGame];
     const mutation = mutations[mocks.mutationIndex % mutations.length];

@@ -16,7 +16,7 @@ vi.mock('convex/react', () => ({
   useQuery: (...args: unknown[]) => mocks.query(...args),
 }));
 
-vi.mock('@/components/TriviaRoom', () => ({ default: () => <div>Trivia room</div> }));
+vi.mock('@/games/GameRoom', () => ({ default: () => <div>Trivia room</div> }));
 vi.mock('sonner', () => ({ toast: { success: mocks.toastSuccess } }));
 
 describe('Room join flow', () => {

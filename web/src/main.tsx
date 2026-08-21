@@ -20,9 +20,10 @@ if (!convexUrl) {
       <p className="mb-5 text-xs font-[780] tracking-[0.12em] text-[#3155d9] uppercase">Xup Games</p>
       <h1 className="mb-2.5 font-display text-5xl tracking-[-0.04em]">Connect the game room.</h1>
       <p className="max-w-135 leading-[1.6] text-[#59647b]">
-        Add <code className="rounded-[5px] bg-[#e1e7f3] px-1.5 py-0.5 text-[#243db0]">VITE_CONVEX_URL</code> to{' '}
-        <code className="rounded-[5px] bg-[#e1e7f3] px-1.5 py-0.5 text-[#243db0]">web/.env.local</code>, then restart
-        the app.
+        Run <code className="rounded-[5px] bg-[#e1e7f3] px-1.5 py-0.5 text-[#243db0]">pnpm setup:convex</code> from the
+        repository root, then restart the app. You may also provide{' '}
+        <code className="rounded-[5px] bg-[#e1e7f3] px-1.5 py-0.5 text-[#243db0]">VITE_CONVEX_URL</code> in{' '}
+        <code className="rounded-[5px] bg-[#e1e7f3] px-1.5 py-0.5 text-[#243db0]">web/.env.local</code>.
       </p>
     </main>
   );

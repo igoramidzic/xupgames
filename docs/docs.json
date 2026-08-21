@@ -5,7 +5,7 @@
     "default": "system",
     "strict": false
   },
-  "name": "Docs",
+  "name": "Xup Games",
   "colors": {
     "primary": "#6e7ae5",
     "light": "#8b95ef",
@@ -20,6 +20,10 @@
           {
             "group": "Getting Started",
             "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Building Games",
+            "pages": ["games/architecture", "games/create-a-game"]
           }
         ]
       }
@@ -32,8 +36,8 @@
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:hello@example.com"
+        "label": "GitHub",
+        "href": "https://github.com/igoramidzic/xupgames"
       }
     ]
   },

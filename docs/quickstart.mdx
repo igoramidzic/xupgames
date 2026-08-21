@@ -1,6 +1,69 @@
 ---
 title: Quickstart
-description: 'Get started quickly'
+description: 'Run the web app and a development Convex deployment'
 ---
 
-Replace this with your quickstart guide.
+## Requirements
+
+- Node.js 24
+- pnpm 10
+- A free Convex account, or the local anonymous deployment offered by the CLI
+
+## Install and configure
+
+```bash
+git clone <your-fork-url>
+cd xupgames
+corepack enable
+pnpm install
+pnpm setup:convex
+```
+
+The first `setup:convex` run asks you to sign in and create or choose a Convex
+project, or to run Convex locally without an account. It pushes the backend,
+generates types, and runs the idempotent game-catalog sync. Convex writes the
+deployment name and URL to the ignored root `.env.local`; the nested Vite app
+already reads that file.
+
+## Run the app
+
+```bash
+pnpm dev
+```
+
+Open the Vite URL printed by the `web` process, normally
+`http://localhost:5173`.
+
+To run the two processes separately:
+
+```bash
+# Terminal 1
+pnpm dev:convex
+
+# Terminal 2
+pnpm dev:web
+```
+
+Use `web/.env.local` with `VITE_CONVEX_URL` only when you intentionally want the
+web client to override the deployment URL generated at the root. Never put
+backend secrets in a `VITE_` variable because Vite exposes those values to the
+browser.
+
+## Verify a change
+
+```bash
+pnpm check
+pnpm test:ci
+pnpm build:web
+git diff --check
+```
+
+For Convex changes, also run:
+
+```bash
+pnpm exec convex codegen --typecheck enable
+pnpm exec tsc --noEmit -p convex/tsconfig.json
+```
+
+See the official [Convex development workflow](https://docs.convex.dev/understanding/workflow)
+for deployment details.

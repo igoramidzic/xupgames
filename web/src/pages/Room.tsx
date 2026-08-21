@@ -5,9 +5,8 @@ import { LoaderCircle, LockKeyhole, UsersRound } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import TriviaRoom from '@/components/TriviaRoom';
-import TypeRacerRoom from '@/components/TypeRacerRoom';
 import { Button } from '@/components/ui/button';
+import GameRoom from '@/games/GameRoom';
 import { type GuestIdentity, readGuest, saveGuest, validateDisplayName } from '@/lib/guest';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
@@ -61,14 +60,7 @@ function ActiveRoom({ guest, session }: { guest: GuestIdentity; session: ActiveS
     });
   }, [session.isOwner, session.ownershipReason, session.ownershipVersion, session.roomId]);
 
-  if (session.gameType === 'trivia') {
-    return <TriviaRoom guest={guest} session={session} />;
-  }
-  if (session.gameType === 'typeRacer') {
-    return <TypeRacerRoom guest={guest} session={session} />;
-  }
-  const unsupportedGameType: never = session.gameType;
-  throw new Error(`Unsupported game type: ${unsupportedGameType}`);
+  return <GameRoom guest={guest} session={session} />;
 }
 
 function RoomLoading() {

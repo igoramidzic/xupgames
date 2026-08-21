@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
-import { gameTypeValidator } from './games';
+import { gameSourceValidator, gameTypeValidator } from './gameRegistry';
 
 const roomStatus = v.union(v.literal('open'), v.literal('closed'));
 const roomGameStatus = v.union(v.literal('lobby'), v.literal('active'), v.literal('complete'));
@@ -25,6 +25,21 @@ const playtestStatus = v.union(
 );
 
 export default defineSchema({
+  gameDefinitions: defineTable({
+    gameType: gameTypeValidator,
+    name: v.string(),
+    description: v.string(),
+    authorName: v.string(),
+    authorUrl: v.optional(v.string()),
+    source: gameSourceValidator,
+    isEnabled: v.boolean(),
+    sortOrder: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_gameType', ['gameType'])
+    .index('by_isEnabled_and_sortOrder', ['isEnabled', 'sortOrder']),
+
   guestSessions: defineTable({
     sessionToken: v.string(),
     displayName: v.string(),

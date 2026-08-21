@@ -2,7 +2,8 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, type QueryCtx, query } from './_generated/server';
-import { fail, MAX_PLAYERS, validateSessionToken } from './domain';
+import { fail, MAX_PLAYERS } from './domain';
+import { requireRoomMember } from './roomAccess';
 import { activateCurrentRoomGame, completeCurrentRoomGame } from './roomGames';
 import { listActiveRoomMembers, listRoomMembersForDisplay } from './roomMembers';
 import { findTriviaGameState, findTriviaRound, recordTriviaAnswer, revealTriviaQuestion } from './triviaEngine';
@@ -67,46 +68,16 @@ const gameViewValidator = v.object({
 
 type DatabaseReaderContext = Pick<QueryCtx, 'db'>;
 
-async function findGuestByToken(ctx: DatabaseReaderContext, sessionToken: string) {
-  return await ctx.db
-    .query('guestSessions')
-    .withIndex('by_sessionToken', (index) => index.eq('sessionToken', sessionToken))
-    .unique();
-}
-
-async function findMembership(ctx: DatabaseReaderContext, roomId: Id<'rooms'>, guestId: Id<'guestSessions'>) {
-  return await ctx.db
-    .query('roomMembers')
-    .withIndex('by_roomId_and_guestId', (index) => index.eq('roomId', roomId).eq('guestId', guestId))
-    .unique();
-}
-
 async function requireTriviaMember(
   ctx: DatabaseReaderContext,
   roomId: Id<'rooms'>,
   rawSessionToken: string,
   requireActive: boolean
 ): Promise<{ room: Doc<'rooms'>; membership: Doc<'roomMembers'> }> {
-  const sessionToken = validateSessionToken(rawSessionToken);
-  const room = await ctx.db.get('rooms', roomId);
-  if (room === null) {
-    fail('ROOM_NOT_FOUND', 'Room not found.');
-  }
-  if (room.gameType !== 'trivia') {
-    fail('WRONG_GAME_TYPE', 'This room does not support trivia.');
-  }
-  const guest = await findGuestByToken(ctx, sessionToken);
-  if (guest === null) {
-    fail('NOT_A_MEMBER', 'You are not a member of this room.');
-  }
-  const membership = await findMembership(ctx, room._id, guest._id);
-  if (membership === null) {
-    fail('NOT_A_MEMBER', 'You are not a member of this room.');
-  }
-  if (requireActive && !membership.isActive) {
-    fail('MEMBER_INACTIVE', 'Rejoin the room before answering.');
-  }
-  return { room, membership };
+  return await requireRoomMember(ctx, roomId, rawSessionToken, {
+    gameType: 'trivia',
+    requireActive,
+  });
 }
 
 function shuffledQuestions(count: number): TriviaQuestion[] {

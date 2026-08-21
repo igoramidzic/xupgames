@@ -2,7 +2,8 @@ import { v } from 'convex/values';
 import type { Doc, Id } from './_generated/dataModel';
 import { type MutationCtx, mutation, type QueryCtx, query } from './_generated/server';
 import { fail, MAX_PLAYERS, validateSessionToken } from './domain';
-import { GAME_TYPES, type GameType, gameTypeValidator } from './games';
+import { gameStateIsComplete, prepareGameState } from './gameRouter';
+import { type GameType, gameTypeValidator, listAvailableGameTypes, requireAvailableGame } from './games';
 import { resolveVotingRound } from './nextGameVoting';
 import { listActiveHumanRoomMembers } from './roomMembers';
 
@@ -114,6 +115,10 @@ async function createPollForRoomGame(
   }
 
   const eligibleMembers = await listActiveHumanRoomMembers(ctx, roomGame.roomId);
+  const availableGameTypes = await listAvailableGameTypes(ctx);
+  if (availableGameTypes.length < 2) {
+    fail('NEXT_GAME_NOT_AVAILABLE', 'At least two games must be enabled before starting a next-game vote.');
+  }
   const pollId = await ctx.db.insert('nextGamePolls', {
     roomId: roomGame.roomId,
     roomGameId: roomGame._id,
@@ -129,7 +134,7 @@ async function createPollForRoomGame(
     pollId,
     roundNumber: 1,
     status: 'open',
-    options: [...GAME_TYPES],
+    options: availableGameTypes,
     eligibleMemberIds: eligibleMembers.map((member) => member._id),
     openedAt: now,
     closedAt: null,
@@ -233,94 +238,6 @@ export async function completeCurrentRoomGame(
     });
   }
   await createPollForRoomGame(ctx, { ...roomGame, status: 'complete', completedAt: now }, now);
-}
-
-async function prepareGameState(ctx: MutationCtx, room: Doc<'rooms'>, gameType: GameType): Promise<void> {
-  switch (gameType) {
-    case 'trivia': {
-      const state = await ctx.db
-        .query('triviaGameStates')
-        .withIndex('by_roomId', (index) => index.eq('roomId', room._id))
-        .unique();
-      if (state === null) {
-        await ctx.db.insert('triviaGameStates', {
-          roomId: room._id,
-          gameNumber: 0,
-          phase: 'lobby',
-          currentQuestionNumber: 0,
-          totalQuestions: 10,
-          phaseStartedAt: null,
-          phaseEndsAt: null,
-        });
-      } else {
-        await ctx.db.patch('triviaGameStates', state._id, {
-          phase: 'lobby',
-          currentQuestionNumber: 0,
-          phaseStartedAt: null,
-          phaseEndsAt: null,
-        });
-      }
-      return;
-    }
-    case 'typeRacer': {
-      const state = await ctx.db
-        .query('typeRacerGameStates')
-        .withIndex('by_roomId', (index) => index.eq('roomId', room._id))
-        .unique();
-      const resetFields = {
-        phase: 'lobby' as const,
-        passageId: null,
-        passageText: null,
-        passageTitle: null,
-        passageAuthor: null,
-        passageKind: null,
-        phaseStartedAt: null,
-        startsAt: null,
-        phaseEndsAt: null,
-        participantCount: 0,
-        finishedCount: 0,
-        winnerMemberId: null,
-        winnerFinishedAt: null,
-      };
-      if (state === null) {
-        await ctx.db.insert('typeRacerGameStates', {
-          roomId: room._id,
-          raceNumber: 0,
-          ...resetFields,
-        });
-      } else {
-        await ctx.db.patch('typeRacerGameStates', state._id, resetFields);
-      }
-      return;
-    }
-    default: {
-      const unsupportedGameType: never = gameType;
-      throw new Error(`Unsupported game type: ${unsupportedGameType}`);
-    }
-  }
-}
-
-async function gameStateIsComplete(ctx: DatabaseReaderContext, room: Doc<'rooms'>): Promise<boolean> {
-  switch (room.gameType) {
-    case 'trivia': {
-      const state = await ctx.db
-        .query('triviaGameStates')
-        .withIndex('by_roomId', (index) => index.eq('roomId', room._id))
-        .unique();
-      return state?.phase === 'complete';
-    }
-    case 'typeRacer': {
-      const state = await ctx.db
-        .query('typeRacerGameStates')
-        .withIndex('by_roomId', (index) => index.eq('roomId', room._id))
-        .unique();
-      return state?.phase === 'complete';
-    }
-    default: {
-      const unsupportedGameType: never = room.gameType;
-      throw new Error(`Unsupported game type: ${unsupportedGameType}`);
-    }
-  }
 }
 
 export const openNextGameVoting = mutation({
@@ -559,6 +476,7 @@ export const chooseNextGame = mutation({
     if (activePlaytest !== null) {
       fail('PLAYTEST_ALREADY_RUNNING', 'Stop the current playtest before changing games.');
     }
+    await requireAvailableGame(ctx, args.gameType);
 
     const now = Date.now();
     const status = 'lobby';

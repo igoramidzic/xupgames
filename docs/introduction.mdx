@@ -1,6 +1,21 @@
 ---
 title: Introduction
-description: 'Welcome to the documentation'
+description: 'How Xup Games makes multiplayer games easy to add without coupling them together'
 ---
 
-Welcome. Replace this with your introduction.
+Xup Games is an open-source platform for realtime multiplayer games. A host
+creates a room, shares one link, and up to 50 people can play without accounts
+or installs.
+
+The platform deliberately separates the things every game needs from the things
+that make one game unique:
+
+- **Platform infrastructure** owns rooms, guest identity, memberships,
+  passwords, presence, next-game voting, and playtests.
+- **Official games** are maintained alongside Xup Games.
+- **Community games** keep their backend state and functions in a dedicated
+  local Convex Component and are clearly attributed in the game catalog.
+
+Start with the [Quickstart](/quickstart) to run the project. Read [Game
+architecture](/games/architecture) and [Create a game](/games/create-a-game)
+before adding a game.

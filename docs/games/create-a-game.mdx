@@ -1,0 +1,151 @@
+---
+title: Create a game
+description: 'A complete backend, web, metadata, test, and rollout checklist'
+---
+
+## 1. Decide the source and key
+
+Choose whether the game is maintained by Xup Games (`official`) or contributed
+and attributed independently (`community`). Pick a stable lower-camel-case
+`gameType`, such as `wordRelay`.
+
+Never rename a shipped `gameType`. It is stored in rooms, game history, votes,
+and playtests. A rename is a data migration, not a cosmetic refactor.
+
+Before coding, write down:
+
+- display name and one-sentence description;
+- author name and optional public URL;
+- minimum/maximum players;
+- lobby, active, and complete phases;
+- owner-only and player actions;
+- reconnect behavior, late-join behavior, and completion rule;
+- any timers, scheduled work, presence, or playtest behavior.
+
+## 2. Register the catalog contract
+
+In `convex/gameRegistry.ts`:
+
+1. Add the key to `GAME_TYPES`.
+2. Add its literal to `gameTypeValidator`.
+3. Add one `GAME_DEFINITIONS` manifest with its name, description, author,
+   source, enabled state, and sort order.
+
+Start with `isEnabled: false` until the complete vertical slice is ready. Do not
+copy display metadata into the web registry; the database catalog is the UI
+source of truth.
+
+## 3. Build the backend
+
+### Community game
+
+Start from the uncompiled template:
+
+```bash
+cp -R convex/communityGames/template convex/communityGames/wordRelay
+mv convex/communityGames/wordRelay/convex.config.ts.example convex/communityGames/wordRelay/convex.config.ts
+mv convex/communityGames/wordRelay/schema.ts.example convex/communityGames/wordRelay/schema.ts
+mv convex/communityGames/wordRelay/game.ts.example convex/communityGames/wordRelay/game.ts
+```
+
+Replace the template name and sample model. Mount the component in
+`convex/convex.config.ts`, then run `pnpm dev:convex` once to generate that
+component's own `_generated/` directory.
+
+The component owns typed game state only. Parent app IDs cross the component
+boundary as validated strings. Use the component's generated server/data model,
+indexed reads, bounded collections, and argument plus return validators on every
+function.
+
+Add a thin parent-app wrapper outside the component. The wrapper must:
+
+1. call `roomAccess.requireRoomMember`;
+2. require the expected `gameType`;
+3. require active membership or ownership for the relevant action;
+4. pass only the minimum IDs and game input to `components.wordRelay`;
+5. return a safe client view without exposing internal component documents.
+
+### Official game
+
+Create `convex/officialGames/<gameType>/` and put lifecycle/state helpers there.
+Official game tables may live in the parent `convex/schema.ts`, but they must be
+game-specific and indexed by `roomId`. Keep browser-facing endpoints thin and
+authorize them through `roomAccess.ts` just like community wrappers.
+
+### Lifecycle adapter
+
+Register the game once in `convex/gameRouter.ts`. Implement the hooks the
+platform needs:
+
+- initialize state when a room is created;
+- prepare/reset state when a later game is selected;
+- synchronize a late/rejoining member when necessary;
+- report whether the game is complete;
+- add an explicit playtest adapter if automated players are supported.
+
+Unsupported hooks must fail clearly. Never silently fall back to another game.
+
+## 4. Build the web module
+
+Create one colocated directory:
+
+```text
+web/src/games/community/word-relay/
+├── WordRelayRoom.tsx
+├── WordRelayPreview.tsx
+├── WordRelayRoom.test.tsx
+└── word-relay.css              # only if Tailwind cannot express the behavior
+```
+
+Use `official/` instead for an official game. Then make only two shared edits:
+
+1. Register the supported type, icon, accent/tint, and preview in
+   `web/src/games/registry.tsx`.
+2. Route the active room component in `web/src/games/GameRoom.tsx`.
+
+The picker and voting UI automatically read name, description, author, source,
+enabled state, and order from Convex. Community games receive a visible
+`Community` badge.
+
+Follow `web/AGENTS.md`: keep Xup navigation, room/member controls, dialogs,
+voting, results, source badges, accessibility, and responsive behavior
+consistent with official games. A game may use its own accent and play-surface
+character without introducing a disconnected application shell.
+
+## 5. Test the boundaries
+
+At minimum, cover:
+
+- initialization is idempotent;
+- wrong-game requests fail;
+- non-members, inactive members, and non-owners cannot perform protected actions;
+- component/app argument and return validators reject invalid data;
+- reset/replay does not leak the previous game;
+- joining or reconnecting during an active game is deterministic;
+- completion is stable across retries;
+- the web router renders the right room;
+- picker and voting show name, author, description, and source badge;
+- the game remains usable at 320px and with keyboard/reduced-motion settings.
+
+Run:
+
+```bash
+pnpm exec convex codegen --typecheck enable
+pnpm exec tsc --noEmit -p convex/tsconfig.json
+pnpm check
+pnpm test:ci
+pnpm build:web
+git diff --check
+```
+
+## 6. Sync and verify the catalog
+
+After the schema and functions reach your development deployment:
+
+```bash
+pnpm exec convex run games:syncCatalog
+```
+
+The mutation is safe to repeat. Confirm the picker shows the intended source,
+author, description, and ordering, then create a room and complete at least one
+real multiplayer round before changing `isEnabled` to `true` for release.

@@ -27,6 +27,23 @@ These instructions apply to everything under `web/` and supplement the repositor
 - Put reusable low-level primitives in `src/components/ui/`. Do not place page-specific or game-specific behavior in that directory.
 - Prefer one primary exported component per file. Small private helpers may stay with their owner when extracting them would make navigation harder.
 
+## Game organization
+
+- `src/games/GameRoom.tsx` is the only route from shared room infrastructure into a game room. Add a game there instead of adding `gameType` switches to pages or shared room components.
+- `src/games/registry.tsx` owns code-side presentation: icon, accent/tint, preview, and the supported web `gameType` union. Human-facing name, description, author, source, enabled state, and ordering come from `api.games.listAvailable`; do not duplicate them in UI constants.
+- Official game UI belongs in `src/games/official/<game-slug>/`. Community game UI belongs in `src/games/community/<game-slug>/`. Keep the room, preview, tests, and unavoidable component CSS together.
+- Keep `src/components/` for game-neutral multiplayer surfaces such as voting and post-game flow. A shared component may consume catalog metadata but must not import game-specific state or behavior.
+- Game picker and next-game choices must show the catalog source badge and author. Community games use the explicit `Community` badge; official games use `Official`.
+- Never render a catalog entry that has no registered web presentation and room route. A game remains disabled until the complete vertical slice exists.
+
+## Xup visual language
+
+- Community games should feel authored, but they still belong inside Xup Games. Preserve the existing brand shell: warm off-white/cool paper surfaces, deep navy text and outlines, confident display typography, compact metadata, irregular rounded geometry, and restrained hard-shadow accents.
+- A game may introduce a focused accent palette and game-appropriate typography for its play surface. Keep global navigation, room identity, member controls, dialogs, voting, result surfaces, focus states, and source badges visually consistent with official games.
+- Match the density and craft of Trivia and Type Racer. Avoid generic dashboard cards, default browser controls, unexplained gradients, or a disconnected visual system.
+- Treat responsive behavior as part of the theme. Game controls must remain usable at 320px, important state must stay visible without horizontal scrolling, and motion must respect reduced-motion preferences.
+- Reuse the shared button/dialog/alert primitives and semantic tokens before inventing new chrome. Keep text contrast, keyboard focus, labels, and target sizes at WCAG 2.1 AA quality.
+
 ## Change discipline
 
 - New components must follow these rules immediately.

@@ -1,41 +1,23 @@
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useMutation, useQuery } from 'convex/react';
-import { BrainCircuit, Check, Gamepad2, Keyboard, LoaderCircle, Sparkles, Vote } from 'lucide-react';
+import { Check, Gamepad2, LoaderCircle, Sparkles, Vote } from 'lucide-react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  GameAuthor,
+  type GameCatalogEntry,
+  GameSourceBadge,
+  type GameType,
+  gamePresentation,
+  hasGamePresentation,
+} from '@/games/registry';
 import { userFacingError } from '@/lib/userFacingError';
 
-type GameType = 'trivia' | 'typeRacer';
+type SelectableGame = GameCatalogEntry & { gameType: GameType };
 
-const GAMES: ReadonlyArray<{
-  gameType: GameType;
-  name: string;
-  description: string;
-  icon: typeof BrainCircuit;
-  color: string;
-  tint: string;
-}> = [
-  {
-    gameType: 'trivia',
-    name: 'Trivia',
-    description: 'Take on another ten questions.',
-    icon: BrainCircuit,
-    color: '#0c8bb7',
-    tint: '#e9f8fc',
-  },
-  {
-    gameType: 'typeRacer',
-    name: 'Type Racer',
-    description: 'Line up for a new passage.',
-    icon: Keyboard,
-    color: '#e54f50',
-    tint: '#fff0ef',
-  },
-];
-
-function gameDefinition(gameType: GameType) {
-  const game = GAMES.find((candidate) => candidate.gameType === gameType);
+function gameDefinition(games: SelectableGame[], gameType: GameType) {
+  const game = games.find((candidate) => candidate.gameType === gameType);
   if (game === undefined) {
     throw new Error(`Unknown game type: ${gameType}`);
   }
@@ -65,6 +47,8 @@ export default function NextGameVoting({
   isOwner: boolean;
 }) {
   const poll = useQuery(api.roomGames.getNextGamePoll, { roomId, sessionToken });
+  const catalog = useQuery(api.games.listAvailable, {});
+  const games = (catalog ?? []).filter(hasGamePresentation);
   const openVoting = useMutation(api.roomGames.openNextGameVoting);
   const castVote = useMutation(api.roomGames.castNextGameVote);
   const closeRound = useMutation(api.roomGames.closeNextGameVotingRound);
@@ -126,7 +110,7 @@ export default function NextGameVoting({
     }
   }
 
-  if (poll === undefined || poll === null) {
+  if (poll === undefined || poll === null || catalog === undefined) {
     return (
       <div className="flex min-h-27 items-center justify-center gap-2.5 rounded-[16px_11px_18px_12px] border border-[#c7d1e0] bg-white/75 px-5 text-xs font-[680] text-[#657087]">
         <LoaderCircle className="size-4 animate-spin text-[#3155d9]" aria-hidden="true" /> Preparing the next-game
@@ -146,7 +130,7 @@ export default function NextGameVoting({
     }
     return 0;
   });
-  const orderedGames = [...GAMES].sort((first, second) => {
+  const orderedGames = [...games].sort((first, second) => {
     if (first.gameType === currentGameType) {
       return -1;
     }
@@ -187,8 +171,9 @@ export default function NextGameVoting({
         <>
           <div className="grid grid-cols-2 gap-2.5 max-[620px]:grid-cols-1">
             {orderedOptions.map((gameType) => {
-              const game = gameDefinition(gameType);
-              const Icon = game.icon;
+              const game = gameDefinition(games, gameType);
+              const presentation = gamePresentation(gameType);
+              const Icon = presentation.icon;
               const selected = poll.selectedGameType === gameType;
               const isReplay = gameType === currentGameType;
               const tally = poll.tallies?.find((candidate) => candidate.gameType === gameType);
@@ -198,7 +183,7 @@ export default function NextGameVoting({
                   className="relative min-h-28 flex-col items-stretch justify-start gap-0 overflow-hidden p-3.5 disabled:cursor-default disabled:opacity-60"
                   type="button"
                   key={gameType}
-                  style={{ '--game-color': game.color, '--game-tint': game.tint } as CSSProperties}
+                  style={{ '--game-color': presentation.color, '--game-tint': presentation.tint } as CSSProperties}
                   data-selected={selected}
                   onClick={() => handleVote(gameType)}
                   disabled={!poll.isEligible || pendingAction !== null}
@@ -219,11 +204,16 @@ export default function NextGameVoting({
                       <Check className="size-4 text-[#16885c]" aria-label="Your vote" />
                     ) : null}
                   </span>
-                  <strong className="relative z-1 mt-3 block font-display text-lg font-[830]">
-                    {isReplay ? replayLabel(gameType) : `Switch to ${game.name}`}
-                  </strong>
+                  <span className="relative z-1 mt-3 flex flex-wrap items-center gap-2">
+                    <strong className="font-display text-lg font-[830]">
+                      {isReplay ? replayLabel(gameType) : `Switch to ${game.name}`}
+                    </strong>
+                    <GameSourceBadge source={game.source} />
+                  </span>
                   <span className="relative z-1 mt-1 flex items-end justify-between gap-2 text-[11px] leading-[1.35] text-[#657087]">
-                    {isReplay ? `Keep playing ${game.name}.` : game.description}
+                    <span>
+                      {isReplay ? `Keep playing ${game.name}.` : game.description} <GameAuthor game={game} />
+                    </span>
                     {tally ? <b className="text-[#34415b] tabular-nums">{tally.votes}</b> : null}
                   </span>
                 </Button>
@@ -258,7 +248,7 @@ export default function NextGameVoting({
         <div>
           {poll.recommendedGameType ? (
             <p className="mb-3 rounded-[10px_7px_11px_8px] bg-[#e8f7ef] px-3.5 py-2.5 text-xs font-[720] text-[#176b49]">
-              Players recommend <strong>{gameDefinition(poll.recommendedGameType).name}</strong>.
+              Players recommend <strong>{gameDefinition(games, poll.recommendedGameType).name}</strong>.
             </p>
           ) : (
             <p className="mb-3 rounded-[10px_7px_11px_8px] bg-[#fff3d1] px-3.5 py-2.5 text-xs font-[720] text-[#785c14]">
@@ -273,7 +263,7 @@ export default function NextGameVoting({
                   className="grid grid-cols-[90px_minmax(0,1fr)_34px] items-center gap-2 text-[11px] text-[#5f6c82]"
                   key={tally.gameType}
                 >
-                  <span className="font-[720] text-[#34415b]">{gameDefinition(tally.gameType).name}</span>
+                  <span className="font-[720] text-[#34415b]">{gameDefinition(games, tally.gameType).name}</span>
                   <span className="h-2 overflow-hidden rounded-full bg-[#e5eaf1]">
                     <span
                       className="block h-full rounded-full bg-[#3155d9]"
@@ -288,7 +278,8 @@ export default function NextGameVoting({
           {isOwner ? (
             <div className="grid grid-cols-2 gap-2.5 max-[620px]:grid-cols-1">
               {orderedGames.map((game) => {
-                const Icon = game.icon;
+                const presentation = gamePresentation(game.gameType);
+                const Icon = presentation.icon;
                 const recommended = poll.recommendedGameType === game.gameType;
                 const isReplay = game.gameType === currentGameType;
                 return (
@@ -302,7 +293,7 @@ export default function NextGameVoting({
                     disabled={currentGameId === null || pendingAction !== null}
                   >
                     <span className="flex items-center justify-between gap-2">
-                      <Icon className="size-4.5" style={{ color: game.color }} aria-hidden="true" />
+                      <Icon className="size-4.5" style={{ color: presentation.color }} aria-hidden="true" />
                       {pendingAction === `choose:${game.gameType}` ? (
                         <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
                       ) : recommended ? (
@@ -311,9 +302,12 @@ export default function NextGameVoting({
                         </span>
                       ) : null}
                     </span>
-                    <strong className="mt-2 block text-sm">
-                      {isReplay ? replayLabel(game.gameType) : `Switch to ${game.name}`}
-                    </strong>
+                    <span className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <strong className="text-sm">
+                        {isReplay ? replayLabel(game.gameType) : `Switch to ${game.name}`}
+                      </strong>
+                      <GameSourceBadge source={game.source} />
+                    </span>
                     <span className="mt-0.5 block text-[10px] text-[#6b768a]">{game.description}</span>
                   </Button>
                 );

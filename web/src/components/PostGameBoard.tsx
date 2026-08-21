@@ -2,9 +2,8 @@ import type { Id } from '@convex/_generated/dataModel';
 import { type LucideIcon, Timer } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import NextGameVoting from '@/components/NextGameVoting';
+import type { GameType } from '@/games/registry';
 import { cn } from '@/lib/utils';
-
-type GameType = 'trivia' | 'typeRacer';
 
 export const NEXT_GAME_BALLOT_DELAY_MS = 2_000;
 export const WINNER_SPOTLIGHT_DURATION_MS = 3_000;

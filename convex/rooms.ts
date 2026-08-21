@@ -10,12 +10,12 @@ import {
   normalizeRoomPassword,
   validateSessionToken,
 } from './domain';
-import { gameTypeValidator } from './games';
+import { initializeGameState, syncGameMembership } from './gameRouter';
+import { gameTypeValidator, requireAvailableGame } from './games';
 import { createPasswordCredential, verifyPasswordCredential } from './passwords';
 import { stopActivePlaytestForRoom } from './playtestLifecycle';
 import { createInitialRoomGame } from './roomGames';
 import { listActiveHumanRoomMembers, listRoomMembersForDisplay } from './roomMembers';
-import { enrollTypeRacerMemberInActiveRace } from './typeRacer';
 
 const roomStatusValidator = v.union(v.literal('open'), v.literal('closed'));
 const ownershipReasonValidator = v.union(v.literal('created'), v.literal('transferred'), v.literal('claimed'));
@@ -72,25 +72,6 @@ const sessionResultValidator = v.union(
 );
 
 type DatabaseReaderContext = Pick<QueryCtx, 'db'>;
-
-async function syncGameMembership(
-  ctx: MutationCtx,
-  room: Doc<'rooms'>,
-  membership: Pick<Doc<'roomMembers'>, '_id' | 'displayName'>,
-  now: number
-): Promise<void> {
-  switch (room.gameType) {
-    case 'trivia':
-      return;
-    case 'typeRacer':
-      await enrollTypeRacerMemberInActiveRace(ctx, room._id, membership, now);
-      return;
-    default: {
-      const unsupportedGameType: never = room.gameType;
-      throw new Error(`Unsupported game type: ${unsupportedGameType}`);
-    }
-  }
-}
 
 async function findRoomByCode(ctx: DatabaseReaderContext, code: string): Promise<Doc<'rooms'> | null> {
   return await ctx.db
@@ -255,6 +236,7 @@ export const create = mutation({
     const sessionToken = validateSessionToken(args.sessionToken);
     const displayName = normalizeDisplayName(args.displayName);
     const gameType = args.gameType ?? 'trivia';
+    await requireAvailableGame(ctx, gameType);
     const password = args.password === undefined ? null : normalizeRoomPassword(args.password);
     const passwordCredential = password === null ? null : await createPasswordCredential(password);
     const now = Date.now();
@@ -294,42 +276,7 @@ export const create = mutation({
     });
     const roomGame = await createInitialRoomGame(ctx, roomId, gameType, now);
     await ctx.db.patch('rooms', roomId, { currentGameId: roomGame._id });
-    switch (gameType) {
-      case 'trivia':
-        await ctx.db.insert('triviaGameStates', {
-          roomId,
-          gameNumber: 0,
-          phase: 'lobby',
-          currentQuestionNumber: 0,
-          totalQuestions: 10,
-          phaseStartedAt: null,
-          phaseEndsAt: null,
-        });
-        break;
-      case 'typeRacer':
-        await ctx.db.insert('typeRacerGameStates', {
-          roomId,
-          raceNumber: 0,
-          phase: 'lobby',
-          passageId: null,
-          passageText: null,
-          passageTitle: null,
-          passageAuthor: null,
-          passageKind: null,
-          phaseStartedAt: null,
-          startsAt: null,
-          phaseEndsAt: null,
-          participantCount: 0,
-          finishedCount: 0,
-          winnerMemberId: null,
-          winnerFinishedAt: null,
-        });
-        break;
-      default: {
-        const unsupportedGameType: never = gameType;
-        throw new Error(`Unsupported game type: ${unsupportedGameType}`);
-      }
-    }
+    await initializeGameState(ctx, roomId, gameType);
     await ctx.db.insert('roomMembers', {
       roomId,
       guestId: guest._id,

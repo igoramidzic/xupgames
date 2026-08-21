@@ -1,12 +1,14 @@
 {
-  "name": "startup-template",
+  "name": "xup-games",
   "version": "0.0.0",
   "private": true,
+  "packageManager": "pnpm@10.30.2",
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
     "dev": "concurrently -n web,convex -c blue,green --kill-others-on-fail \"pnpm dev:web\" \"pnpm dev:convex\"",
     "dev:web": "pnpm --filter web dev",
     "dev:convex": "convex dev",
+    "setup:convex": "convex dev --once --run games:syncCatalog",
     "dev:site": "pnpm --filter site dev",
     "dev:docs": "cd docs && mintlify dev",
     "dev:all": "concurrently -n web,convex,site,docs -c blue,green,magenta,yellow --kill-others-on-fail \"pnpm dev:web\" \"pnpm dev:convex\" \"pnpm dev:site\" \"pnpm dev:docs\"",
@@ -42,6 +44,7 @@
     "concurrently": "^10.0.5",
     "jsdom": "^29.1.1",
     "mintlify": "^4.2.813",
+    "typescript": "~6.0.3",
     "vitest": "^4.1.11"
   }
 }
