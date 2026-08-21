@@ -32,6 +32,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { isLocalhost } from '@/lib/environment';
 import type { GuestIdentity } from '@/lib/guest';
 import { getRoomMembers } from '@/lib/roomSession';
+import { useListReorderAnimation } from '@/lib/useListReorderAnimation';
 import { useRoomPresence } from '@/lib/useRoomPresence';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
@@ -70,53 +71,6 @@ function completedRoundCount(phase: GameView['phase'], currentQuestionNumber: nu
     return currentQuestionNumber;
   }
   return 0;
-}
-
-function useLeaderboardSwapAnimation(orderKey: string) {
-  const elements = useRef(new Map<string, HTMLLIElement>());
-  const previousPositions = useRef(new Map<string, DOMRect>());
-
-  useLayoutEffect(() => {
-    const memberIds = orderKey === '' ? [] : orderKey.split('|');
-    const nextPositions = new Map<string, DOMRect>();
-    const reduceMotion =
-      typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    for (const memberId of memberIds) {
-      const element = elements.current.get(memberId);
-      if (!element) {
-        continue;
-      }
-      const nextPosition = element.getBoundingClientRect();
-      const previousPosition = previousPositions.current.get(memberId);
-      nextPositions.set(memberId, nextPosition);
-      const offsetY = previousPosition ? previousPosition.top - nextPosition.top : 0;
-      if (reduceMotion || Math.abs(offsetY) < 1 || typeof element.animate !== 'function') {
-        continue;
-      }
-
-      element.dataset.reordering = 'true';
-      const animation = element.animate(
-        [{ transform: `translate3d(0, ${offsetY}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }],
-        { duration: 520, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
-      );
-      void animation.finished
-        .catch(() => undefined)
-        .finally(() => {
-          delete element.dataset.reordering;
-        });
-    }
-
-    previousPositions.current = nextPositions;
-  }, [orderKey]);
-
-  return (memberId: string, element: HTMLLIElement | null) => {
-    if (element === null) {
-      elements.current.delete(memberId);
-      return;
-    }
-    elements.current.set(memberId, element);
-  };
 }
 
 export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; session: ActiveSession }) {
@@ -176,7 +130,7 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
       : null;
   const selectedOption = game?.playerAnswer?.selectedOptionIndex ?? pendingOptionForCurrentRound;
   const leaderboardOrderKey = game?.leaderboard.map((entry) => entry.memberId).join('|') ?? '';
-  const setLeaderboardItemRef = useLeaderboardSwapAnimation(leaderboardOrderKey);
+  const setLeaderboardItemRef = useListReorderAnimation(leaderboardOrderKey);
 
   async function copyRoomLink() {
     try {
@@ -762,7 +716,7 @@ function QuestionContentTransition({
               key={option}
               type="button"
               className="relative grid min-h-20.5 cursor-pointer grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-3.5 overflow-hidden rounded-[14px_7px_15px_8px] border-[1.5px] border-[#bbc9d8] bg-white py-3 pr-4 pl-3 text-left text-[#31465f] shadow-[0_5px_0_#d6e0e9] transition-[transform,border-color,background] duration-150 enabled:hover:-translate-y-0.5 enabled:hover:border-[#5e7c98] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[rgb(18_168_212/32%)] data-[selected=true]:border-[#d2a411] data-[selected=true]:bg-[#fff4c7] data-[selected=true]:shadow-[0_5px_0_#d2a411] data-[correct=true]:border-[#16855c] data-[correct=true]:bg-[#e3f8ef] data-[correct=true]:shadow-[0_5px_0_#42b884] data-[incorrect=true]:border-[#ce4942] data-[incorrect=true]:bg-[#fff0ee] data-[incorrect=true]:shadow-[0_5px_0_#e46d64] disabled:cursor-default max-[760px]:min-h-16.25 max-[760px]:grid-cols-[38px_minmax(0,1fr)_auto]"
-              data-selected={isSelected}
+              data-selected={isSelected && !activeSnapshot.isReveal}
               data-correct={isCorrect}
               data-incorrect={isIncorrectSelection}
               onClick={() => onAnswer(index)}

@@ -48,7 +48,7 @@ export function alignTypeRacerInput(typedText: string, passage: string): TypeRac
     }
 
     const isCorrect = typedCharacter === targetCharacter;
-    targetStates[targetIndex] = isCorrect ? 'correct' : 'wrong';
+    targetStates[targetIndex] = prefixIsClean && isCorrect ? 'correct' : 'wrong';
     if (prefixIsClean && isCorrect) {
       correctChars += 1;
     } else {

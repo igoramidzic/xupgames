@@ -86,6 +86,43 @@ function racer() {
   };
 }
 
+function activeRace(racers: ReturnType<typeof racer>[], phase: 'countdown' | 'racing' | 'complete' = 'racing') {
+  return {
+    raceNumber: 1,
+    phase,
+    phaseStartedAt: Date.now() - 1_000,
+    startsAt: Date.now() - 1_000,
+    phaseEndsAt: phase === 'complete' ? null : Date.now() + 60_000,
+    participantCount: racers.length,
+    finishedCount: racers.filter((entry) => entry.status === 'finished').length,
+    winnerMemberId: phase === 'complete' ? (racers[0]?.memberId ?? null) : null,
+    passage: {
+      id: 'ishmael',
+      text: 'Call me Ishmael.',
+      title: 'Moby-Dick',
+      author: 'Herman Melville',
+      kind: 'phrase',
+    },
+    racers,
+    currentPlayer: racers.find((entry) => entry.isCurrentPlayer) ?? null,
+  };
+}
+
+function racerRowOrder() {
+  return within(screen.getByRole('list', { name: 'Racer standings' }))
+    .getAllByRole('listitem')
+    .map((row) => row.dataset.memberId);
+}
+
+function displayedRacerColor(displayName: string) {
+  const row = screen.getByText(displayName).closest('li');
+  const track = row?.querySelector<HTMLElement>('[data-progress-track="true"]');
+  if (track === null || track === undefined) {
+    throw new Error(`Progress track for ${displayName} was not rendered.`);
+  }
+  return track.style.getPropertyValue('--racer-color');
+}
+
 describe('TypeRacerRoom', () => {
   beforeEach(() => {
     mocks.onlineByMemberId.clear();
@@ -216,18 +253,21 @@ describe('TypeRacerRoom', () => {
       </MemoryRouter>
     );
 
-    await user.type(screen.getByLabelText('Type the passage'), 'Call mx');
+    await user.type(screen.getByLabelText('Type the passage'), 'Call mx Is');
     expect(screen.getByText('Backspace to the first red letter.')).toBeInTheDocument();
     const passage = screen.getByTestId('race-passage');
     expect(passage.querySelectorAll('[data-passage-word]').length).toBeGreaterThan(1);
-    const wrongCharacter = passage.querySelector('[data-character-state="wrong"]');
-    expect(wrongCharacter).toHaveTextContent('e');
-    expect(wrongCharacter).toHaveClass('text-[#e04d5b]');
-    expect(wrongCharacter).not.toHaveClass('bg-[#ff5c57]');
-    expect(wrongCharacter).not.toHaveClass('underline');
+    const wrongCharacters = Array.from(passage.querySelectorAll('[data-character-state="wrong"]'));
+    expect(wrongCharacters.map((element) => element.textContent).join('')).toBe('e Is');
+    expect(wrongCharacters).toHaveLength(4);
+    for (const wrongCharacter of wrongCharacters) {
+      expect(wrongCharacter).toHaveClass('text-[#e04d5b]');
+      expect(wrongCharacter).not.toHaveClass('bg-[#ff5c57]');
+      expect(wrongCharacter).not.toHaveClass('underline');
+    }
     expect(passage.querySelector('[data-caret="true"]')).toHaveClass('before:absolute');
 
-    await user.keyboard('{Backspace}{Backspace}mexyz');
+    await user.keyboard('{Backspace}{Backspace}{Backspace}{Backspace}exyz');
     const insertedCharacters = Array.from(passage.querySelectorAll('[data-inserted-character="true"]'));
     expect(insertedCharacters.map((element) => element.textContent).join('')).toBe('xyz');
     expect(insertedCharacters.at(-1)).not.toHaveClass('underline');
@@ -442,5 +482,235 @@ describe('TypeRacerRoom', () => {
     const fill = track.querySelector('[data-progress-fill="true"]');
     expect(fill).toHaveClass('opacity-75');
     expect(track.children).toHaveLength(2);
+  });
+
+  it('keeps racers in fixed lanes with the current player first while live ranks change', () => {
+    const ada = { ...racer(), rank: 2 };
+    const grace = {
+      ...racer(),
+      rank: 1,
+      memberId: 'member-2',
+      displayName: 'Grace',
+      isCurrentPlayer: false,
+      correctChars: 8,
+      progress: 0.5,
+    };
+    const linus = {
+      ...racer(),
+      rank: 3,
+      memberId: 'member-3',
+      displayName: 'Linus',
+      isCurrentPlayer: false,
+      correctChars: 4,
+      progress: 0.25,
+    };
+    mocks.game = activeRace([grace, ada, linus]);
+
+    const view = render(
+      <MemoryRouter>
+        <TypeRacerRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    expect(racerRowOrder()).toEqual(['member-1', 'member-2', 'member-3']);
+
+    const updatedLinus = { ...linus, rank: 1, correctChars: 12, progress: 0.75 };
+    const updatedGrace = { ...grace, rank: 2, correctChars: 10, progress: 0.625 };
+    const updatedAda = { ...ada, rank: 3 };
+    mocks.game = activeRace([updatedLinus, updatedGrace, updatedAda]);
+    view.rerender(
+      <MemoryRouter>
+        <TypeRacerRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    expect(racerRowOrder()).toEqual(['member-1', 'member-2', 'member-3']);
+    const standings = within(screen.getByRole('list', { name: 'Racer standings' }));
+    expect(standings.getByText('Ada').closest('li')?.querySelector('strong')?.textContent).toBe('3');
+    expect(standings.getByText('Grace').closest('li')?.querySelector('strong')?.textContent).toBe('2');
+    expect(standings.getByText('Linus').closest('li')?.querySelector('strong')?.textContent).toBe('1');
+    expect(within(standings.getByText('Linus').closest('li') as HTMLElement).getByLabelText('Leader')).toBeVisible();
+  });
+
+  it('appends racers who join after the fixed race order is established', () => {
+    const ada = racer();
+    const grace = {
+      ...racer(),
+      rank: 2,
+      memberId: 'member-2',
+      displayName: 'Grace',
+      isCurrentPlayer: false,
+    };
+    mocks.game = activeRace([ada, grace]);
+    const view = render(
+      <MemoryRouter>
+        <TypeRacerRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    const lateRacer = {
+      ...racer(),
+      rank: 1,
+      memberId: 'member-3',
+      displayName: 'Linus',
+      isCurrentPlayer: false,
+      correctChars: 12,
+      progress: 0.75,
+    };
+    mocks.game = activeRace([lateRacer, { ...ada, rank: 2 }, { ...grace, rank: 3 }]);
+    view.rerender(
+      <MemoryRouter>
+        <TypeRacerRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    expect(racerRowOrder()).toEqual(['member-1', 'member-2', 'member-3']);
+  });
+
+  it('animates fixed lanes into authoritative final standings when the race completes', () => {
+    const animate = vi.fn(() => ({ cancel: vi.fn(), finished: Promise.resolve() }) as unknown as Animation);
+    const originalAnimate = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'animate');
+    Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      const top = Number(this.dataset.displayPosition ?? 0) * 100;
+      return {
+        x: 0,
+        y: top,
+        top,
+        right: 300,
+        bottom: top + 80,
+        left: 0,
+        width: 300,
+        height: 80,
+        toJSON: () => ({}),
+      };
+    });
+    try {
+      const ada = { ...racer(), rank: 3 };
+      const grace = {
+        ...racer(),
+        rank: 1,
+        memberId: 'member-2',
+        displayName: 'Grace',
+        isCurrentPlayer: false,
+      };
+      const linus = {
+        ...racer(),
+        rank: 2,
+        memberId: 'member-3',
+        displayName: 'Linus',
+        isCurrentPlayer: false,
+      };
+      mocks.game = activeRace([grace, linus, ada]);
+      const view = render(
+        <MemoryRouter>
+          <TypeRacerRoom guest={guest} session={session as never} />
+        </MemoryRouter>
+      );
+      expect(racerRowOrder()).toEqual(['member-1', 'member-2', 'member-3']);
+      const adaColor = displayedRacerColor('Ada');
+
+      mocks.game = activeRace([grace, linus, ada], 'complete');
+      view.rerender(
+        <MemoryRouter>
+          <TypeRacerRoom guest={guest} session={session as never} />
+        </MemoryRouter>
+      );
+
+      expect(racerRowOrder()).toEqual(['member-2', 'member-3', 'member-1']);
+      expect(displayedRacerColor('Ada')).toBe(adaColor);
+      expect(animate).toHaveBeenCalledTimes(3);
+      expect(animate).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ transform: expect.stringContaining('translate3d') }),
+          { transform: 'translate3d(0, 0, 0)' },
+        ]),
+        { duration: 520, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+      );
+    } finally {
+      rectSpy.mockRestore();
+      if (originalAnimate) {
+        Object.defineProperty(HTMLElement.prototype, 'animate', originalAnimate);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+      }
+    }
+  });
+
+  it('moves immediately to final standings when reduced motion is requested', () => {
+    const animate = vi.fn(() => ({ cancel: vi.fn(), finished: Promise.resolve() }) as unknown as Animation);
+    const originalAnimate = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'animate');
+    const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+    Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn((query: string) => ({
+        matches: true,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      const top = Number(this.dataset.displayPosition ?? 0) * 100;
+      return {
+        x: 0,
+        y: top,
+        top,
+        right: 300,
+        bottom: top + 80,
+        left: 0,
+        width: 300,
+        height: 80,
+        toJSON: () => ({}),
+      };
+    });
+    try {
+      const ada = { ...racer(), rank: 2 };
+      const grace = {
+        ...racer(),
+        rank: 1,
+        memberId: 'member-2',
+        displayName: 'Grace',
+        isCurrentPlayer: false,
+      };
+      mocks.game = activeRace([grace, ada]);
+      const view = render(
+        <MemoryRouter>
+          <TypeRacerRoom guest={guest} session={session as never} />
+        </MemoryRouter>
+      );
+      expect(racerRowOrder()).toEqual(['member-1', 'member-2']);
+
+      mocks.game = activeRace([grace, ada], 'complete');
+      view.rerender(
+        <MemoryRouter>
+          <TypeRacerRoom guest={guest} session={session as never} />
+        </MemoryRouter>
+      );
+
+      expect(racerRowOrder()).toEqual(['member-2', 'member-1']);
+      expect(animate).not.toHaveBeenCalled();
+    } finally {
+      rectSpy.mockRestore();
+      if (originalAnimate) {
+        Object.defineProperty(HTMLElement.prototype, 'animate', originalAnimate);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+      }
+      if (originalMatchMedia) {
+        Object.defineProperty(window, 'matchMedia', originalMatchMedia);
+      } else {
+        Reflect.deleteProperty(window, 'matchMedia');
+      }
+    }
   });
 });

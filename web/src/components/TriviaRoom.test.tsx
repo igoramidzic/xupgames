@@ -376,6 +376,10 @@ describe('TriviaRoom', () => {
     const standings = within(screen.getByRole('list', { name: 'Player standings' }));
     expect(standings.getByText('+875 points')).toBeInTheDocument();
     expect(standings.getAllByText(/\+.*points/)).toHaveLength(1);
+    const correctAnswer = screen.getByRole('button', { name: /B\s*Tungsten/ });
+    expect(correctAnswer).toHaveAttribute('data-selected', 'false');
+    expect(correctAnswer).toHaveAttribute('data-correct', 'true');
+    expect(correctAnswer).toHaveClass('data-[correct=true]:bg-[#e3f8ef]');
     const answerFills = document.querySelectorAll<HTMLElement>('.trivia-answer-result > span');
     expect(answerFills[1]?.style.getPropertyValue('--answer-share')).toBe('50%');
     expect(answerFills[2]?.style.getPropertyValue('--answer-share')).toBe('50%');

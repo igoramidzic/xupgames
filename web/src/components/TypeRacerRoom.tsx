@@ -32,6 +32,7 @@ import { isLocalhost } from '@/lib/environment';
 import type { GuestIdentity } from '@/lib/guest';
 import { getRoomMembers } from '@/lib/roomSession';
 import { alignTypeRacerInput, type TypeRacerInputAlignment, typingAccuracy } from '@/lib/typeRacerTyping';
+import { useListReorderAnimation } from '@/lib/useListReorderAnimation';
 import { useRoomPresence } from '@/lib/useRoomPresence';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
@@ -40,10 +41,83 @@ type SessionResult = FunctionReturnType<typeof api.rooms.getSession>;
 type ActiveSession = Extract<SessionResult, { kind: 'session' }>;
 type RaceView = FunctionReturnType<typeof api.typeRacer.getRace>;
 type Racer = RaceView['racers'][number];
+type RacerMemberId = Racer['memberId'];
 
 const PROGRESS_REPORT_INTERVAL_MS = 500;
 const MAX_INSERTED_CHARACTERS = 64;
 const RACER_COLORS = ['#ff746c', '#74a7ff', '#58d7a1', '#f1c84f', '#d89aff', '#4ed4e6', '#ff8fc5', '#b8d65c'];
+
+function memberColor(memberId: string) {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < memberId.length; index += 1) {
+    hash ^= memberId.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return RACER_COLORS[(hash >>> 0) % RACER_COLORS.length];
+}
+
+function currentPlayerFirst(memberIds: RacerMemberId[], currentPlayerId: RacerMemberId | undefined) {
+  return currentPlayerId === undefined
+    ? memberIds
+    : [currentPlayerId, ...memberIds.filter((memberId) => memberId !== currentPlayerId)];
+}
+
+function reconcileRacerOrder(
+  previousIds: RacerMemberId[],
+  racerIds: RacerMemberId[],
+  currentPlayerId: RacerMemberId | undefined
+) {
+  const currentIds = new Set(racerIds);
+  const knownIds = new Set(previousIds);
+  const retainedIds = previousIds.filter((memberId) => currentIds.has(memberId));
+  const arrivingIds = racerIds.filter((memberId) => !knownIds.has(memberId));
+  const nextIds = [...retainedIds, ...arrivingIds];
+
+  return currentPlayerFirst(nextIds, currentPlayerId);
+}
+
+function useRaceBoardOrder(racers: Racer[], raceNumber: number, phase: RaceView['phase']) {
+  const [frozenOrder, setFrozenOrder] = useState<{ raceNumber: number; memberIds: RacerMemberId[] }>(() => {
+    const memberIds = racers.map((racer) => racer.memberId);
+    const currentPlayerId = racers.find((racer) => racer.isCurrentPlayer)?.memberId;
+    return { raceNumber, memberIds: currentPlayerFirst(memberIds, currentPlayerId) };
+  });
+  const raceInProgress = phase === 'countdown' || phase === 'racing';
+  const racerIdsKey = racers.map((racer) => racer.memberId).join('|');
+  const currentPlayerId = racers.find((racer) => racer.isCurrentPlayer)?.memberId;
+  const racerIds = useMemo(
+    () => (racerIdsKey === '' ? [] : (racerIdsKey.split('|') as RacerMemberId[])),
+    [racerIdsKey]
+  );
+  const initialIds = useMemo(() => currentPlayerFirst(racerIds, currentPlayerId), [currentPlayerId, racerIds]);
+  const baseIds = frozenOrder.raceNumber === raceNumber ? frozenOrder.memberIds : initialIds;
+  const nextIds = useMemo(
+    () => reconcileRacerOrder(baseIds, racerIds, currentPlayerId),
+    [baseIds, currentPlayerId, racerIds]
+  );
+
+  useEffect(() => {
+    if (!raceInProgress) {
+      return;
+    }
+    setFrozenOrder((previous) => {
+      if (previous.raceNumber === raceNumber && previous.memberIds.join('|') === nextIds.join('|')) {
+        return previous;
+      }
+      return { raceNumber, memberIds: nextIds };
+    });
+  }, [nextIds, raceInProgress, raceNumber]);
+
+  if (!raceInProgress) {
+    return racers;
+  }
+
+  const racersById = new Map(racers.map((racer) => [racer.memberId, racer]));
+  return nextIds.flatMap((memberId) => {
+    const racer = racersById.get(memberId);
+    return racer === undefined ? [] : [racer];
+  });
+}
 
 type TypingState = {
   text: string;
@@ -560,7 +634,12 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
           ) : null}
         </section>
 
-        <RaceBoard racers={displayedRacers} onlineByMemberId={onlineByMemberId} phase={effectivePhase ?? 'lobby'} />
+        <RaceBoard
+          racers={displayedRacers}
+          onlineByMemberId={onlineByMemberId}
+          phase={effectivePhase ?? 'lobby'}
+          raceNumber={game.raceNumber}
+        />
       </main>
 
       {confirmation ? (
@@ -726,18 +805,27 @@ function RaceBoard({
   racers,
   onlineByMemberId,
   phase,
+  raceNumber,
 }: {
   racers: Racer[];
   onlineByMemberId: ReadonlyMap<string, boolean>;
   phase: RaceView['phase'];
+  raceNumber: number;
 }) {
+  const orderedRacers = useRaceBoardOrder(racers, raceNumber, phase);
+  const racerOrderKey = orderedRacers.map((racer) => racer.memberId).join('|');
+  const setRacerItemRef = useListReorderAnimation(racerOrderKey, {
+    animate: phase === 'complete',
+    resetKey: raceNumber,
+  });
+
   return (
     <aside className="flex h-[calc(100dvh-104px)] min-h-145 flex-col overflow-hidden rounded-[22px_12px_24px_14px] border border-[#9faed5] bg-[#2b1b45] text-white shadow-[7px_8px_0_#c7d3ef] max-[820px]:h-145">
       <div className="flex items-center justify-between border-b border-white/12 px-5 py-5">
         <div>
           <p className="m-0 text-[10px] font-[830] tracking-[0.15em] text-[#aebcf1] uppercase">Live field</p>
           <h2 className="mt-1 mb-0 font-display text-[25px] font-[850] tracking-[-0.045em]">
-            {racers.length} racer{racers.length === 1 ? '' : 's'}
+            {orderedRacers.length} racer{orderedRacers.length === 1 ? '' : 's'}
           </h2>
         </div>
         <div className="grid size-11 place-items-center rounded-[10px_16px_11px_15px] bg-[#ff5c57] shadow-[3px_3px_0_#120b1d]">
@@ -753,17 +841,20 @@ function RaceBoard({
         className="m-0 flex-1 list-none overflow-y-auto p-3.5 [scrollbar-color:#776991_transparent]"
         aria-label="Racer standings"
       >
-        {racers.map((racer, index) => {
-          const color = RACER_COLORS[index % RACER_COLORS.length];
+        {orderedRacers.map((racer, index) => {
+          const color = memberColor(racer.memberId);
           const progress = Math.max(0, Math.min(1, racer.progress));
           const isDisconnected = racer.isActive && onlineByMemberId.get(racer.memberId) === false;
           const playerState = !racer.isActive ? 'inactive' : isDisconnected ? 'disconnected' : 'connected';
           const racerStyle = { '--racer-progress': `${progress * 100}%`, '--racer-color': color } as CSSProperties;
           return (
             <li
-              className="mb-2.5 rounded-[10px_15px_11px_14px] border border-[#6e5c87]/55 bg-[#37274f] px-3.5 py-3 transition-[border-color,background-color,opacity,filter] data-[current=true]:border-[#ffd65a]/60 data-[current=true]:bg-[#443452] data-[player-state=disconnected]:opacity-55 data-[player-state=disconnected]:saturate-50 data-[player-state=inactive]:opacity-40 data-[player-state=inactive]:saturate-25 motion-reduce:transition-none"
+              ref={(element) => setRacerItemRef(racer.memberId, element)}
+              className="relative mb-2.5 rounded-[10px_15px_11px_14px] border border-[#6e5c87]/55 bg-[#37274f] px-3.5 py-3 transition-[border-color,background-color,opacity,filter] data-[current=true]:border-[#ffd65a]/60 data-[current=true]:bg-[#443452] data-[player-state=disconnected]:opacity-55 data-[player-state=disconnected]:saturate-50 data-[player-state=inactive]:opacity-40 data-[player-state=inactive]:saturate-25 data-[reordering=true]:z-2 data-[reordering=true]:pointer-events-none motion-reduce:transition-none"
               key={racer.memberId}
               data-current={racer.isCurrentPlayer}
+              data-display-position={index + 1}
+              data-member-id={racer.memberId}
               data-player-state={playerState}
             >
               <div className="mb-2.5 grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 text-sm">
