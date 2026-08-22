@@ -8,9 +8,12 @@ import {
   DOODLE_DASH_CHOICE_DURATION_MS,
   DOODLE_DASH_COLORS,
   DOODLE_DASH_FINAL_COUNTDOWN_MS,
+  DOODLE_DASH_MAX_LIVE_CHUNK_POINTS,
+  DOODLE_DASH_MAX_LIVE_CHUNKS_PER_ACTION,
   DOODLE_DASH_MAX_MESSAGES_PER_MEMBER,
   DOODLE_DASH_MAX_STROKE_POINTS,
   DOODLE_DASH_MAX_STROKES,
+  DOODLE_DASH_MAX_VISIBLE_LIVE_CHUNKS,
   DOODLE_DASH_MAX_VISIBLE_MESSAGES,
   DOODLE_DASH_REVEAL_DURATION_MS,
   doodleDashWordLengths,
@@ -42,6 +45,7 @@ import { activateCurrentRoomGame, completeCurrentRoomGame } from './roomGames';
 import { listActiveHumanRoomMembers, listRoomMembersForDisplay } from './roomMembers';
 
 const MAX_GAME_TURNS = MAX_PLAYERS * Math.max(...DOODLE_DASH_ROUND_OPTIONS);
+const LIVE_STROKE_CLEANUP_BATCH_SIZE = 100;
 const ALLOWED_PEN_WIDTHS = [5, 10, 18] as const;
 const ALLOWED_ERASER_WIDTHS = [20, 36] as const;
 
@@ -75,6 +79,17 @@ const strokeValidator = v.object({
   sequence: v.number(),
   actionId: v.string(),
   tool: v.union(v.literal('pen'), v.literal('eraser'), v.literal('fill')),
+  color: v.string(),
+  width: v.number(),
+  points: v.array(v.object({ x: v.number(), y: v.number() })),
+});
+
+const liveStrokeChunkValidator = v.object({
+  chunkId: v.id('doodleDashLiveStrokeChunks'),
+  actionId: v.string(),
+  actionStartedAt: v.number(),
+  chunkIndex: v.number(),
+  tool: v.union(v.literal('pen'), v.literal('eraser')),
   color: v.string(),
   width: v.number(),
   points: v.array(v.object({ x: v.number(), y: v.number() })),
@@ -371,6 +386,12 @@ async function revealCurrentWord(
     phaseStartedAt: now,
     phaseEndsAt: now + DOODLE_DASH_REVEAL_DURATION_MS,
   });
+  const cleanupId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(
+    0,
+    internal.doodleDash.cleanupLiveStrokeChunks,
+    { roundId: round._id, actionId: null }
+  );
+  void cleanupId;
   const scheduledId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(
     DOODLE_DASH_REVEAL_DURATION_MS,
     internal.doodleDash.advanceTurn,
@@ -559,6 +580,32 @@ export const getGame = query({
       leaderboard,
       configuration,
     };
+  },
+});
+
+export const listLiveStrokeChunks = query({
+  args: { roomId: v.id('rooms'), sessionToken: v.string() },
+  returns: v.array(liveStrokeChunkValidator),
+  handler: async (ctx, args) => {
+    await requireDoodleDashMember(ctx, args.roomId, args.sessionToken, false);
+    const state = await findDoodleDashGameState(ctx, args.roomId);
+    if (state === null || state.currentRoundId === null || state.phase !== 'drawing') return [];
+    const roundId = state.currentRoundId;
+    const chunks = await ctx.db
+      .query('doodleDashLiveStrokeChunks')
+      .withIndex('by_roundId', (index) => index.eq('roundId', roundId))
+      .order('desc')
+      .take(DOODLE_DASH_MAX_VISIBLE_LIVE_CHUNKS);
+    return chunks.reverse().map((chunk) => ({
+      chunkId: chunk._id,
+      actionId: chunk.actionId,
+      actionStartedAt: chunk.actionStartedAt,
+      chunkIndex: chunk.chunkIndex,
+      tool: chunk.tool,
+      color: chunk.color,
+      width: chunk.width,
+      points: chunk.points,
+    }));
   },
 });
 
@@ -815,6 +862,77 @@ export const submitGuess = mutation({
   },
 });
 
+export const streamStrokeChunk = mutation({
+  args: {
+    roomId: v.id('rooms'),
+    sessionToken: v.string(),
+    actionId: v.string(),
+    actionStartedAt: v.number(),
+    chunkIndex: v.number(),
+    tool: v.union(v.literal('pen'), v.literal('eraser')),
+    color: v.string(),
+    width: v.number(),
+    points: v.array(v.object({ x: v.number(), y: v.number() })),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { room, membership } = await requireDoodleDashMember(ctx, args.roomId, args.sessionToken, true);
+    const state = await findDoodleDashGameState(ctx, room._id);
+    if (state === null || state.currentRoundId === null || state.phase !== 'drawing') {
+      fail('DOODLE_DASH_DRAWING_CLOSED', 'The drawing canvas is closed.');
+    }
+    const round = await ctx.db.get('doodleDashRounds', state.currentRoundId);
+    if (round === null || round.drawerMemberId !== membership._id) {
+      fail('DOODLE_DASH_NOT_DRAWER', 'Only the current drawer can use the canvas.');
+    }
+    const widthAllowed =
+      (args.tool === 'pen' && (ALLOWED_PEN_WIDTHS as readonly number[]).includes(args.width)) ||
+      (args.tool === 'eraser' && (ALLOWED_ERASER_WIDTHS as readonly number[]).includes(args.width));
+    const colorAllowed = args.tool === 'eraser' || (DOODLE_DASH_COLORS as readonly string[]).includes(args.color);
+    if (
+      args.points.length < 1 ||
+      args.points.length > DOODLE_DASH_MAX_LIVE_CHUNK_POINTS ||
+      !widthAllowed ||
+      !colorAllowed ||
+      !Number.isSafeInteger(args.actionStartedAt) ||
+      args.actionStartedAt < 1 ||
+      !Number.isInteger(args.chunkIndex) ||
+      args.chunkIndex < 0 ||
+      args.chunkIndex >= DOODLE_DASH_MAX_LIVE_CHUNKS_PER_ACTION ||
+      args.actionId.length < 1 ||
+      args.actionId.length > 80 ||
+      !/^[a-zA-Z0-9_-]+$/u.test(args.actionId)
+    ) {
+      fail('INVALID_DOODLE_DASH_STROKE', 'That live drawing stroke is invalid.');
+    }
+    const durableStroke = await ctx.db
+      .query('doodleDashStrokes')
+      .withIndex('by_roundId_and_actionId', (index) => index.eq('roundId', round._id).eq('actionId', args.actionId))
+      .unique();
+    if (durableStroke !== null) return null;
+    const existingChunk = await ctx.db
+      .query('doodleDashLiveStrokeChunks')
+      .withIndex('by_roundId_and_actionId_and_chunkIndex', (index) =>
+        index.eq('roundId', round._id).eq('actionId', args.actionId).eq('chunkIndex', args.chunkIndex)
+      )
+      .unique();
+    if (existingChunk !== null) return null;
+    await ctx.db.insert('doodleDashLiveStrokeChunks', {
+      roomId: room._id,
+      roundId: round._id,
+      actionId: args.actionId,
+      actionStartedAt: args.actionStartedAt,
+      chunkIndex: args.chunkIndex,
+      tool: args.tool,
+      color: args.tool === 'eraser' ? '#ffffff' : args.color,
+      width: args.width,
+      points: args.points.map(normalizePoint),
+      createdAt: Date.now(),
+    });
+    return null;
+  },
+});
+
 export const appendStroke = mutation({
   args: {
     roomId: v.id('rooms'),
@@ -855,21 +973,24 @@ export const appendStroke = mutation({
     ) {
       fail('INVALID_DOODLE_DASH_STROKE', 'That drawing stroke is invalid.');
     }
+    const existingStroke = await ctx.db
+      .query('doodleDashStrokes')
+      .withIndex('by_roundId_and_actionId', (index) => index.eq('roundId', round._id).eq('actionId', args.actionId))
+      .unique();
+    if (existingStroke !== null) return { sequence: existingStroke.sequence };
     if (round.nextStrokeSequence > DOODLE_DASH_MAX_STROKES) {
       fail('DOODLE_DASH_DRAWING_CLOSED', 'This canvas reached its stroke limit.');
     }
     const points = args.points.map(normalizePoint);
     const sequence = round.nextStrokeSequence;
-    const previousStrokes = await ctx.db
+    const undoneStrokes = await ctx.db
       .query('doodleDashStrokes')
-      .withIndex('by_roundId_and_sequence', (index) => index.eq('roundId', round._id))
+      .withIndex('by_roundId_and_isUndone_and_sequence', (index) => index.eq('roundId', round._id).eq('isUndone', true))
       .take(DOODLE_DASH_MAX_STROKES + 1);
-    if (previousStrokes.length > DOODLE_DASH_MAX_STROKES) {
+    if (undoneStrokes.length > DOODLE_DASH_MAX_STROKES) {
       throw new Error('Doodle Dash stroke capacity invariant violated.');
     }
-    for (const stroke of previousStrokes) {
-      if (stroke.isUndone === true) await ctx.db.delete('doodleDashStrokes', stroke._id);
-    }
+    for (const stroke of undoneStrokes) await ctx.db.delete('doodleDashStrokes', stroke._id);
     await ctx.db.insert('doodleDashStrokes', {
       roomId: room._id,
       roundId: round._id,
@@ -879,9 +1000,16 @@ export const appendStroke = mutation({
       color: args.tool === 'eraser' ? '#ffffff' : args.color,
       width: args.width,
       points,
+      isUndone: false,
       createdAt: Date.now(),
     });
     await ctx.db.patch('doodleDashRounds', round._id, { nextStrokeSequence: sequence + 1 });
+    const cleanupId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(
+      0,
+      internal.doodleDash.cleanupLiveStrokeChunks,
+      { roundId: round._id, actionId: args.actionId }
+    );
+    void cleanupId;
     return { sequence };
   },
 });
@@ -977,6 +1105,45 @@ export const clearCanvas = mutation({
       .take(DOODLE_DASH_MAX_STROKES + 1);
     if (strokes.length > DOODLE_DASH_MAX_STROKES) throw new Error('Doodle Dash stroke capacity invariant violated.');
     for (const stroke of strokes) await ctx.db.delete('doodleDashStrokes', stroke._id);
+    const cleanupId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(
+      0,
+      internal.doodleDash.cleanupLiveStrokeChunks,
+      { roundId: round._id, actionId: null }
+    );
+    void cleanupId;
+    return null;
+  },
+});
+
+export const cleanupLiveStrokeChunks = internalMutation({
+  args: {
+    roundId: v.id('doodleDashRounds'),
+    actionId: v.union(v.string(), v.null()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const actionId = args.actionId;
+    const chunks =
+      actionId === null
+        ? await ctx.db
+            .query('doodleDashLiveStrokeChunks')
+            .withIndex('by_roundId', (index) => index.eq('roundId', args.roundId))
+            .take(LIVE_STROKE_CLEANUP_BATCH_SIZE)
+        : await ctx.db
+            .query('doodleDashLiveStrokeChunks')
+            .withIndex('by_roundId_and_actionId_and_chunkIndex', (index) =>
+              index.eq('roundId', args.roundId).eq('actionId', actionId)
+            )
+            .take(LIVE_STROKE_CLEANUP_BATCH_SIZE);
+    for (const chunk of chunks) await ctx.db.delete('doodleDashLiveStrokeChunks', chunk._id);
+    if (chunks.length === LIVE_STROKE_CLEANUP_BATCH_SIZE) {
+      const scheduledId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(
+        0,
+        internal.doodleDash.cleanupLiveStrokeChunks,
+        args
+      );
+      void scheduledId;
+    }
     return null;
   },
 });

@@ -7,10 +7,12 @@ import DoodleDashRoom from './DoodleDashRoom';
 const mocks = vi.hoisted(() => ({
   game: null as Record<string, unknown> | null,
   mutationIndex: 0,
+  queryIndex: 0,
   startGame: vi.fn(),
   chooseWord: vi.fn(),
   submitGuess: vi.fn(),
   appendStroke: vi.fn(),
+  streamStrokeChunk: vi.fn(),
   undoStroke: vi.fn(),
   redoStroke: vi.fn(),
   clearCanvas: vi.fn(),
@@ -20,13 +22,18 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('convex/react', () => ({
-  useQuery: () => mocks.game,
+  useQuery: () => {
+    const result = mocks.queryIndex % 2 === 0 ? mocks.game : [];
+    mocks.queryIndex += 1;
+    return result;
+  },
   useMutation: () => {
     const mutations = [
       mocks.startGame,
       mocks.chooseWord,
       mocks.submitGuess,
       mocks.appendStroke,
+      mocks.streamStrokeChunk,
       mocks.undoStroke,
       mocks.redoStroke,
       mocks.clearCanvas,
@@ -188,11 +195,13 @@ function activeRound(overrides: Record<string, unknown> = {}) {
 describe('DoodleDashRoom', () => {
   beforeEach(() => {
     mocks.mutationIndex = 0;
+    mocks.queryIndex = 0;
     for (const mock of [
       mocks.startGame,
       mocks.chooseWord,
       mocks.submitGuess,
       mocks.appendStroke,
+      mocks.streamStrokeChunk,
       mocks.undoStroke,
       mocks.redoStroke,
       mocks.clearCanvas,

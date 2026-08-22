@@ -227,7 +227,25 @@ export default defineSchema({
     points: v.array(v.object({ x: v.number(), y: v.number() })),
     isUndone: v.optional(v.boolean()),
     createdAt: v.number(),
-  }).index('by_roundId_and_sequence', ['roundId', 'sequence']),
+  })
+    .index('by_roundId_and_sequence', ['roundId', 'sequence'])
+    .index('by_roundId_and_actionId', ['roundId', 'actionId'])
+    .index('by_roundId_and_isUndone_and_sequence', ['roundId', 'isUndone', 'sequence']),
+
+  doodleDashLiveStrokeChunks: defineTable({
+    roomId: v.id('rooms'),
+    roundId: v.id('doodleDashRounds'),
+    actionId: v.string(),
+    actionStartedAt: v.number(),
+    chunkIndex: v.number(),
+    tool: v.union(v.literal('pen'), v.literal('eraser')),
+    color: v.string(),
+    width: v.number(),
+    points: v.array(v.object({ x: v.number(), y: v.number() })),
+    createdAt: v.number(),
+  })
+    .index('by_roundId', ['roundId'])
+    .index('by_roundId_and_actionId_and_chunkIndex', ['roundId', 'actionId', 'chunkIndex']),
 
   triviaGameStates: defineTable({
     roomId: v.id('rooms'),

@@ -70,10 +70,15 @@ function formatTimer(milliseconds: number) {
 export default function DoodleDashRoom({ guest, session }: { guest: GuestIdentity; session: ActiveSession }) {
   const navigate = useNavigate();
   const game = useQuery(api.doodleDash.getGame, { roomId: session.roomId, sessionToken: guest.sessionToken });
+  const liveStrokeChunks = useQuery(api.doodleDash.listLiveStrokeChunks, {
+    roomId: session.roomId,
+    sessionToken: guest.sessionToken,
+  });
   const startGame = useMutation(api.doodleDash.startGame);
   const chooseWord = useMutation(api.doodleDash.chooseWord);
   const submitGuess = useMutation(api.doodleDash.submitGuess);
   const appendStroke = useMutation(api.doodleDash.appendStroke);
+  const streamStrokeChunk = useMutation(api.doodleDash.streamStrokeChunk);
   const undoStroke = useMutation(api.doodleDash.undoStroke);
   const redoStroke = useMutation(api.doodleDash.redoStroke);
   const clearCanvas = useMutation(api.doodleDash.clearCanvas);
@@ -325,6 +330,7 @@ export default function DoodleDashRoom({ guest, session }: { guest: GuestIdentit
                 ) : (
                   <ActiveBoard
                     game={game}
+                    liveStrokeChunks={liveStrokeChunks ?? []}
                     remainingMs={remainingMs}
                     onlineByMemberId={onlineByMemberId}
                     guess={guess}
@@ -342,6 +348,13 @@ export default function DoodleDashRoom({ guest, session }: { guest: GuestIdentit
                         roomId: session.roomId,
                         sessionToken: guest.sessionToken,
                         ...stroke,
+                      });
+                    }}
+                    onStream={async (chunk) => {
+                      await streamStrokeChunk({
+                        roomId: session.roomId,
+                        sessionToken: guest.sessionToken,
+                        ...chunk,
                       });
                     }}
                     onUndo={async () => {
@@ -533,6 +546,7 @@ function LobbyPanel({
 
 function ActiveBoard({
   game,
+  liveStrokeChunks,
   remainingMs,
   onlineByMemberId,
   guess,
@@ -544,11 +558,13 @@ function ActiveBoard({
   onChooseWord,
   onCanvasError,
   onAppend,
+  onStream,
   onUndo,
   onRedo,
   onClear,
 }: {
   game: GameView;
+  liveStrokeChunks: NonNullable<FunctionReturnType<typeof api.doodleDash.listLiveStrokeChunks>>;
   remainingMs: number;
   onlineByMemberId: Map<string, boolean>;
   guess: string;
@@ -560,6 +576,7 @@ function ActiveBoard({
   onChooseWord: (optionIndex: number) => void;
   onCanvasError: (error: unknown) => void;
   onAppend: Parameters<typeof DoodleDashCanvas>[0]['onAppend'];
+  onStream: Parameters<typeof DoodleDashCanvas>[0]['onStream'];
   onUndo: () => Promise<void>;
   onRedo: () => Promise<void>;
   onClear: () => Promise<void>;
@@ -613,12 +630,15 @@ function ActiveBoard({
 
         <div className="relative min-h-0">
           <DoodleDashCanvas
+            key={round.roundId}
             strokes={round.strokes}
+            liveStrokes={liveStrokeChunks}
             canDraw={round.isDrawer && game.phase === 'drawing'}
             showTools={round.isDrawer}
             canUndo={round.canUndo}
             canRedo={round.canRedo}
             onAppend={onAppend}
+            onStream={onStream}
             onUndo={onUndo}
             onRedo={onRedo}
             onClear={onClear}
