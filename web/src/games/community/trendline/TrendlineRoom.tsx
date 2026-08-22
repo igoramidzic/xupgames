@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GameModeControl, { GameModeContent } from '@/components/GameModeControl';
 import GameSurfaceTransition from '@/components/GameSurfaceTransition';
+import LobbyPlayersSidebar, { type LobbyPlayersSidebarTheme } from '@/components/LobbyPlayersSidebar';
 import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
 import {
   AlertDialog,
@@ -34,6 +35,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { isLocalhost } from '@/lib/environment';
+import {
+  GAME_LOBBY_CARD_HEIGHT_CLASS,
+  GAME_LOBBY_FRAME_CLASS,
+  GAME_LOBBY_GRID_CLASS,
+  GAME_LOBBY_SIDEBAR_HEIGHT_CLASS,
+} from '@/lib/gameLobbyLayout';
 import type { GuestIdentity } from '@/lib/guest';
 import { getRoomMembers } from '@/lib/roomSession';
 import { useRoomPresence } from '@/lib/useRoomPresence';
@@ -43,6 +50,27 @@ import { cn } from '@/lib/utils';
 type SessionResult = FunctionReturnType<typeof api.rooms.getSession>;
 type ActiveSession = Extract<SessionResult, { kind: 'session' }>;
 type GameView = FunctionReturnType<typeof api.trendline.getGame>;
+
+const TRENDLINE_LOBBY_SIDEBAR_THEME: LobbyPlayersSidebarTheme = {
+  background: '#183a36',
+  border: '#315a53',
+  shadow: '7px 8px 0 #c6e1da',
+  text: '#ffffff',
+  mutedText: '#a7c0ba',
+  eyebrow: '#9bd9c8',
+  divider: 'rgb(255 255 255 / 12%)',
+  countBackground: '#244b45',
+  countText: '#a8c8c0',
+  currentPlayerBackground: '#244b45',
+  avatarBackground: '#f4cd54',
+  avatarBorder: '#0c211e',
+  avatarText: '#183a36',
+  avatarShadow: '2px 2px 0 #0c211e',
+  inviteBackground: '#244b45',
+  inviteHoverBackground: '#2d5751',
+  inviteBorder: '#51736d',
+  inviteText: '#ffffff',
+};
 
 const POINT_COUNT = 24;
 const VIEWBOX_WIDTH = 1_000;
@@ -324,7 +352,13 @@ export default function TrendlineRoom({ guest, session }: { guest: GuestIdentity
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-360 grid-cols-[minmax(0,1fr)_360px] gap-4 p-4 max-[1040px]:grid-cols-[minmax(0,1fr)_310px] max-[820px]:grid-cols-1 max-[620px]:p-2.5">
+      <main
+        className={cn(
+          game.phase === 'lobby'
+            ? [GAME_LOBBY_FRAME_CLASS, GAME_LOBBY_GRID_CLASS]
+            : 'mx-auto grid w-full max-w-360 grid-cols-[minmax(0,1fr)_300px] items-start gap-4.5 p-4 max-[820px]:grid-cols-1 max-[620px]:p-2.5'
+        )}
+      >
         <section className="min-w-0">
           <GameModeContent
             roomId={session.roomId}
@@ -528,7 +562,20 @@ export default function TrendlineRoom({ guest, session }: { guest: GuestIdentity
             </p>
           ) : null}
         </section>
-        <TrendlineLeaderboard game={game} onlineByMemberId={onlineByMemberId} />
+        {game.phase === 'lobby' ? (
+          <LobbyPlayersSidebar
+            members={members}
+            activeMemberCount={session.activeMemberCount}
+            currentMemberId={session.currentMember.memberId}
+            onlineByMemberId={onlineByMemberId}
+            readyLabel="Ready to play"
+            copied={copied}
+            onInvite={copyRoomLink}
+            theme={TRENDLINE_LOBBY_SIDEBAR_THEME}
+          />
+        ) : (
+          <TrendlineLeaderboard game={game} onlineByMemberId={onlineByMemberId} />
+        )}
       </main>
       {confirmation ? (
         <TrendlineActionDialog
@@ -675,7 +722,12 @@ function TrendlineLobby({
   onCopy: () => void;
 }) {
   return (
-    <div className="relative flex min-h-[calc(100dvh-104px)] flex-col justify-center overflow-hidden rounded-[20px_28px_22px_26px] border border-[#9bc4b9] bg-white px-[clamp(28px,7vw,92px)] py-16 shadow-[7px_8px_0_#c6e1da] max-[820px]:min-h-145">
+    <div
+      className={cn(
+        'relative flex flex-col justify-center overflow-hidden rounded-[20px_28px_22px_26px] border border-[#9bc4b9] bg-white px-[clamp(28px,7vw,92px)] py-16 shadow-[7px_8px_0_#c6e1da]',
+        GAME_LOBBY_CARD_HEIGHT_CLASS
+      )}
+    >
       <div className="absolute top-10 right-10 grid size-20 rotate-4 place-items-center rounded-[12px_22px_14px_20px] border-2 border-[#183a36] bg-[#f4cd54] shadow-[6px_6px_0_#183a36] max-[620px]:top-7 max-[620px]:right-6 max-[620px]:size-14">
         <LineChart className="size-9 max-[620px]:size-6" />
       </div>
@@ -726,7 +778,12 @@ function TrendlineLeaderboard({
   onlineByMemberId: ReadonlyMap<string, boolean>;
 }) {
   return (
-    <aside className="flex h-[calc(100dvh-104px)] min-h-145 flex-col overflow-hidden rounded-[22px_12px_24px_14px] border border-[#315a53] bg-[#183a36] text-white shadow-[7px_8px_0_#c6e1da] max-[820px]:h-145">
+    <aside
+      className={cn(
+        'flex flex-col overflow-hidden rounded-[22px_12px_24px_14px] border border-[#315a53] bg-[#183a36] text-white shadow-[7px_8px_0_#c6e1da]',
+        GAME_LOBBY_SIDEBAR_HEIGHT_CLASS
+      )}
+    >
       <div className="flex items-center justify-between border-b border-white/12 px-5 py-5">
         <div>
           <p className="m-0 text-[10px] font-[830] tracking-[0.15em] text-[#9bd9c8] uppercase">The field</p>
@@ -738,7 +795,7 @@ function TrendlineLeaderboard({
           {game.phase === 'complete' ? <Trophy className="size-5" /> : <Globe2 className="size-5" />}
         </div>
       </div>
-      <ol className="m-0 flex-1 list-none overflow-y-auto p-3.5" aria-label="Trendline standings">
+      <ol className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-3.5" aria-label="Trendline standings">
         {game.leaderboard.map((entry) => {
           const disconnected = entry.isActive && onlineByMemberId.get(entry.memberId) === false;
           return (

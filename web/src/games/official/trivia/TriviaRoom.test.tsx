@@ -169,6 +169,14 @@ describe('TriviaRoom', () => {
       </MemoryRouter>
     );
     expect(screen.getByRole('banner')).toHaveClass('grid-cols-[auto_minmax(0,1fr)_auto]', 'gap-3');
+    expect(screen.getByRole('main')).toHaveClass('max-w-345', 'grid-cols-[minmax(0,1fr)_300px]', 'gap-4.5');
+    const players = screen.getByRole('complementary', { name: 'Players in the room' });
+    expect(players).toHaveClass('max-h-[clamp(640px,calc(100dvh-112px),768px)]');
+    expect(players.style.getPropertyValue('--lobby-sidebar-background')).toBe('rgb(250 252 254 / 96%)');
+    expect(within(players).getByText('Ada (you)')).toBeInTheDocument();
+    expect(within(players).getByText('Room owner')).toBeInTheDocument();
+    expect(within(players).getByText('Ready to play')).toBeInTheDocument();
+    expect(within(players).getByRole('button', { name: 'Invite more players' })).toBeInTheDocument();
     expect(screen.getByText(/players ready/)).toHaveTextContent('2 players ready');
     expect(screen.queryByText('10 QUESTIONS · 15 SECONDS EACH')).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Trivia rules and game configuration' })).toHaveTextContent(

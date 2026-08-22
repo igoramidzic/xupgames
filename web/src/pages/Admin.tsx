@@ -505,6 +505,11 @@ function SeatMap({ panel, target }: { panel: ReadyPlaytestRoom; target: number }
 
 function gameAdapterCopy(gameType: ReadyPlaytestRoom['room']['gameType']) {
   switch (gameType) {
+    case 'doodleDash':
+      return {
+        label: 'No Doodle Dash bot adapter',
+        description: 'Automated drawing and guessing are not available for this game yet.',
+      };
     case 'trivia':
       return {
         label: 'Trivia answer adapter',

@@ -1,9 +1,14 @@
 import { v } from 'convex/values';
 
-export const GAME_TYPES = ['trivia', 'typeRacer', 'trendline'] as const;
+export const GAME_TYPES = ['doodleDash', 'trivia', 'typeRacer', 'trendline'] as const;
 export type GameType = (typeof GAME_TYPES)[number];
 
-export const gameTypeValidator = v.union(v.literal('trivia'), v.literal('typeRacer'), v.literal('trendline'));
+export const gameTypeValidator = v.union(
+  v.literal('doodleDash'),
+  v.literal('trivia'),
+  v.literal('typeRacer'),
+  v.literal('trendline')
+);
 export const gameSourceValidator = v.union(v.literal('official'), v.literal('community'));
 export type GameSource = 'official' | 'community';
 
@@ -27,6 +32,16 @@ export type StaticGameDefinition = {
  * it in the shared platform schema.
  */
 export const GAME_DEFINITIONS = [
+  {
+    gameType: 'doodleDash',
+    name: 'Doodle Dash',
+    description: 'Take turns drawing secret words while everyone races to guess them.',
+    authorName: 'Xup Games',
+    authorUrl: null,
+    source: 'official',
+    isEnabled: true,
+    sortOrder: 5,
+  },
   {
     gameType: 'typeRacer',
     name: 'Type Racer',

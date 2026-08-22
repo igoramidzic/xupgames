@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -128,6 +128,13 @@ describe('TrendlineRoom', () => {
       </MemoryRouter>
     );
     expect(screen.getByText('Community game · Igor Amidzic')).toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveClass('max-w-345', 'grid-cols-[minmax(0,1fr)_300px]', 'gap-4.5');
+    const players = screen.getByRole('complementary', { name: 'Players in the room' });
+    expect(players).toHaveClass('max-h-[clamp(640px,calc(100dvh-112px),768px)]');
+    expect(players.style.getPropertyValue('--lobby-sidebar-background')).toBe('#183a36');
+    expect(within(players).getByText('Igor (you)')).toBeInTheDocument();
+    expect(within(players).getByText('Room owner')).toBeInTheDocument();
+    expect(within(players).getByRole('button', { name: 'Invite more players' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Start game' }));
     expect(mocks.startGame).toHaveBeenCalledWith({ roomId: 'room-1', sessionToken: guest.sessionToken });
   });

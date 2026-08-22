@@ -9,6 +9,8 @@ export async function initializeGameBot(ctx: MutationCtx, room: Doc<'rooms'>, bo
     throw new Error('A playtest cannot start before the room selects a game.');
   }
   switch (room.gameType) {
+    case 'doodleDash':
+      throw new Error('Doodle Dash does not have an automated playtest adapter yet.');
     case 'trivia':
       await initializeTriviaBot(ctx, bot);
       return;
@@ -34,6 +36,8 @@ export async function runGameBotTick(
     throw new Error('A playtest cannot run before the room selects a game.');
   }
   switch (room.gameType) {
+    case 'doodleDash':
+      throw new Error('Doodle Dash does not have an automated playtest adapter yet.');
     case 'trivia':
       return await runTriviaBotTick(ctx, room, bot);
     case 'typeRacer':
@@ -54,6 +58,8 @@ export async function stopGameBot(
 ): Promise<void> {
   const gameType = room?.gameType;
   switch (gameType) {
+    case 'doodleDash':
+      throw new Error('Doodle Dash does not have an automated playtest adapter yet.');
     case 'trivia':
       await stopTriviaBot(ctx, bot);
       return;

@@ -21,6 +21,7 @@ import { type CSSProperties, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GameModeControl, { GameModeContent } from '@/components/GameModeControl';
 import GameSurfaceTransition from '@/components/GameSurfaceTransition';
+import LobbyPlayersSidebar, { type LobbyPlayersSidebarTheme } from '@/components/LobbyPlayersSidebar';
 import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
 import {
   AlertDialog,
@@ -33,6 +34,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { isLocalhost } from '@/lib/environment';
+import { GAME_LOBBY_CARD_HEIGHT_CLASS, GAME_LOBBY_FRAME_CLASS, GAME_LOBBY_GRID_CLASS } from '@/lib/gameLobbyLayout';
 import type { GuestIdentity } from '@/lib/guest';
 import { getRoomMembers } from '@/lib/roomSession';
 import { useListReorderAnimation } from '@/lib/useListReorderAnimation';
@@ -48,6 +50,26 @@ const ANSWER_LABELS = ['A', 'B', 'C', 'D'];
 const ANSWER_DURATION_MS = 15_000;
 const COUNTDOWN_DURATION_MS = 3_000;
 const REVEAL_DURATION_MS = 7_000;
+const TRIVIA_LOBBY_SIDEBAR_THEME: LobbyPlayersSidebarTheme = {
+  background: 'rgb(250 252 254 / 96%)',
+  border: '#aebfd0',
+  shadow: '5px 6px 0 #ccdae6',
+  text: '#10213d',
+  mutedText: '#8897a8',
+  eyebrow: '#0c86ae',
+  divider: '#ced9e4',
+  countBackground: '#e7eff5',
+  countText: '#53687d',
+  currentPlayerBackground: '#e2f4fb',
+  avatarBackground: '#ffda55',
+  avatarBorder: '#10213d',
+  avatarText: '#10213d',
+  avatarShadow: '2px 2px 0 rgb(16 33 61 / 18%)',
+  inviteBackground: '#f4f8fb',
+  inviteHoverBackground: '#ffffff',
+  inviteBorder: '#aebfd0',
+  inviteText: '#253a52',
+};
 
 function useClock(enabled: boolean) {
   const [now, setNow] = useState(Date.now());
@@ -308,7 +330,13 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
         </div>
       </header>
 
-      <main className="mx-auto grid min-h-[calc(100dvh-76px)] w-full max-w-345 grid-cols-[minmax(0,1fr)_300px] gap-4.5 p-4.5 [--trivia-question-min-height:clamp(560px,calc(100dvh-230px),720px)] max-[980px]:grid-cols-[minmax(0,1fr)_240px] max-[760px]:min-h-[calc(100dvh-68px)] max-[760px]:grid-cols-1 max-[760px]:p-2.25 max-[760px]:[--trivia-question-min-height:clamp(590px,calc(100dvh-180px),680px)]">
+      <main
+        className={cn(
+          GAME_LOBBY_FRAME_CLASS,
+          GAME_LOBBY_GRID_CLASS,
+          '[--trivia-question-min-height:clamp(560px,calc(100dvh-230px),720px)] max-[760px]:[--trivia-question-min-height:clamp(590px,calc(100dvh-180px),680px)]'
+        )}
+      >
         <section className="grid min-h-0 min-w-0 place-items-stretch content-start" aria-live="polite">
           <GameModeContent
             roomId={session.roomId}
@@ -374,86 +402,101 @@ export default function TriviaRoom({ guest, session }: { guest: GuestIdentity; s
           </GameModeContent>
         </section>
 
-        <aside className="flex h-[max(680px,calc(100dvh-112px))] min-h-0 flex-col self-start overflow-hidden rounded-[15px_7px_17px_9px] border border-[#aebfd0] bg-[rgb(250_252_254/96%)] shadow-[5px_6px_0_#ccdae6] max-[760px]:h-107.5 max-[760px]:min-h-107.5">
-          <div className="mx-3 flex items-start justify-between border-b border-[#ced9e4] pt-5 pb-3.75">
-            <div>
-              <p className="mb-0.75 text-[10px] font-[850] tracking-[0.13em] text-[#0c86ae]">LIVE TABLE</p>
-              <h2 className="m-0 text-[25px] tracking-[-0.045em] text-[#10213d]">Standings</h2>
+        {game.phase === 'lobby' ? (
+          <LobbyPlayersSidebar
+            members={members}
+            activeMemberCount={session.activeMemberCount}
+            currentMemberId={session.currentMember.memberId}
+            onlineByMemberId={onlineByMemberId}
+            readyLabel="Ready to play"
+            copied={copied}
+            onInvite={copyRoomLink}
+            theme={TRIVIA_LOBBY_SIDEBAR_THEME}
+          />
+        ) : (
+          <aside className="flex h-[max(680px,calc(100dvh-112px))] min-h-0 flex-col self-start overflow-hidden rounded-[15px_7px_17px_9px] border border-[#aebfd0] bg-[rgb(250_252_254/96%)] shadow-[5px_6px_0_#ccdae6] max-[760px]:h-107.5 max-[760px]:min-h-107.5">
+            <div className="mx-3 flex items-start justify-between border-b border-[#ced9e4] pt-5 pb-3.75">
+              <div>
+                <p className="mb-0.75 text-[10px] font-[850] tracking-[0.13em] text-[#0c86ae]">LIVE TABLE</p>
+                <h2 className="m-0 text-[25px] tracking-[-0.045em] text-[#10213d]">Standings</h2>
+              </div>
+              <span className="inline-flex items-center gap-1.25 rounded-md bg-[#e7eff5] px-2 py-1.5 text-xs font-[760] text-[#53687d]">
+                <UsersRound className="size-3.25" aria-hidden="true" /> {session.activeMemberCount}
+              </span>
             </div>
-            <span className="inline-flex items-center gap-1.25 rounded-md bg-[#e7eff5] px-2 py-1.5 text-xs font-[760] text-[#53687d]">
-              <UsersRound className="size-3.25" aria-hidden="true" /> {session.activeMemberCount}
-            </span>
-          </div>
 
-          {currentPlayer ? (
-            <div className="mx-3 my-4 grid grid-cols-[1fr_auto] rounded-[12px_6px_13px_7px] bg-[#10213d] p-3.5 text-white">
-              <span className="text-xs font-bold text-[#91a7bf]">Your score</span>
-              <strong className="col-start-2 row-start-1 row-end-3 self-center text-[28px] text-[#ffda55] tabular-nums">
-                {formatPoints(currentPlayer.totalPoints)}
-              </strong>
-              <small className="text-xs font-bold text-[#91a7bf]">
-                {currentPlayer.correctAnswers}/{completedRounds} correct
-              </small>
-            </div>
-          ) : null}
+            {currentPlayer ? (
+              <div className="mx-3 my-4 grid grid-cols-[1fr_auto] rounded-[12px_6px_13px_7px] bg-[#10213d] p-3.5 text-white">
+                <span className="text-xs font-bold text-[#91a7bf]">Your score</span>
+                <strong className="col-start-2 row-start-1 row-end-3 self-center text-[28px] text-[#ffda55] tabular-nums">
+                  {formatPoints(currentPlayer.totalPoints)}
+                </strong>
+                <small className="text-xs font-bold text-[#91a7bf]">
+                  {currentPlayer.correctAnswers}/{completedRounds} correct
+                </small>
+              </div>
+            ) : null}
 
-          <ScrollArea
-            className="min-h-25 flex-1 [--scroll-fade-reveal:72px] [--scroll-fade-size:30px]"
-            viewportClassName="scroll-fade"
-            scrollbarClassName="w-2 border-l-0 px-0.5 py-0.25"
-            thumbClassName="bg-[#aeb8c2]"
-            type="always"
-          >
-            <ol className="m-0 flex list-none flex-col gap-2 pt-3 pr-4 pb-7.5 pl-3" aria-label="Player standings">
-              {game.leaderboard.map((entry) => {
-                const isDisconnected = entry.isActive && onlineByMemberId.get(entry.memberId) === false;
-                return (
-                  <li
-                    key={entry.memberId}
-                    ref={(element) => setLeaderboardItemRef(entry.memberId, element)}
-                    data-current={entry.isCurrentPlayer}
-                    data-rank={entry.rank}
-                    className={cn(
-                      'relative grid min-h-13.5 grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2 rounded-[8px_4px_9px_5px] px-1.75 py-1.25 text-[#53677d] transition-opacity data-[current=true]:bg-[#e2f4fb] data-[current=true]:text-[#145b77] data-[reordering=true]:z-2 data-[reordering=true]:pointer-events-none',
-                      !entry.isActive && 'opacity-45 grayscale'
-                    )}
-                  >
-                    <span className="grid size-6.75 place-items-center text-sm font-extrabold text-[#8292a3]">
-                      {!entry.isActive ? (
-                        '—'
-                      ) : entry.rank <= 3 ? (
-                        <Medal className="size-4 text-[#d2a411]" aria-hidden="true" />
-                      ) : (
-                        entry.rank
+            <ScrollArea
+              className="min-h-25 flex-1 [--scroll-fade-reveal:72px] [--scroll-fade-size:30px]"
+              viewportClassName="scroll-fade"
+              scrollbarClassName="w-2 border-l-0 px-0.5 py-0.25"
+              thumbClassName="bg-[#aeb8c2]"
+              type="always"
+            >
+              <ol className="m-0 flex list-none flex-col gap-2 pt-3 pr-4 pb-7.5 pl-3" aria-label="Player standings">
+                {game.leaderboard.map((entry) => {
+                  const isDisconnected = entry.isActive && onlineByMemberId.get(entry.memberId) === false;
+                  return (
+                    <li
+                      key={entry.memberId}
+                      ref={(element) => setLeaderboardItemRef(entry.memberId, element)}
+                      data-current={entry.isCurrentPlayer}
+                      data-rank={entry.rank}
+                      className={cn(
+                        'relative grid min-h-13.5 grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2 rounded-[8px_4px_9px_5px] px-1.75 py-1.25 text-[#53677d] transition-opacity data-[current=true]:bg-[#e2f4fb] data-[current=true]:text-[#145b77] data-[reordering=true]:z-2 data-[reordering=true]:pointer-events-none',
+                        !entry.isActive && 'opacity-45 grayscale'
                       )}
-                    </span>
-                    <span className="grid min-w-0">
-                      <strong className="overflow-hidden text-sm text-ellipsis whitespace-nowrap text-[#253a52]">
-                        {entry.displayName}
-                      </strong>
-                      <small className="flex items-center gap-1.75 text-[11px] text-[#8897a8]">
-                        {!entry.isActive ? 'Left' : isDisconnected ? 'Disconnected' : `${entry.correctAnswers} right`}
-                        {entry.isActive && !isDisconnected && entry.bestStreak >= 2 ? (
-                          <em className="inline-flex items-center gap-0.5 font-extrabold not-italic text-[#e15a42]">
-                            <Flame className="size-2.25" aria-hidden="true" /> {entry.bestStreak}
-                          </em>
-                        ) : null}
-                      </small>
-                    </span>
-                    <span className="grid justify-items-end">
-                      <strong className="text-sm text-[#223950] tabular-nums">{formatPoints(entry.totalPoints)}</strong>
-                      {game.phase === 'reveal' && entry.pointsGained !== null && entry.pointsGained > 0 ? (
-                        <small className="animate-in whitespace-nowrap text-[11px] font-[850] text-[#16855c] tabular-nums fade-in slide-in-from-bottom-1 duration-300">
-                          +{formatPoints(entry.pointsGained)} points
+                    >
+                      <span className="grid size-6.75 place-items-center text-sm font-extrabold text-[#8292a3]">
+                        {!entry.isActive ? (
+                          '—'
+                        ) : entry.rank <= 3 ? (
+                          <Medal className="size-4 text-[#d2a411]" aria-hidden="true" />
+                        ) : (
+                          entry.rank
+                        )}
+                      </span>
+                      <span className="grid min-w-0">
+                        <strong className="overflow-hidden text-sm text-ellipsis whitespace-nowrap text-[#253a52]">
+                          {entry.displayName}
+                        </strong>
+                        <small className="flex items-center gap-1.75 text-[11px] text-[#8897a8]">
+                          {!entry.isActive ? 'Left' : isDisconnected ? 'Disconnected' : `${entry.correctAnswers} right`}
+                          {entry.isActive && !isDisconnected && entry.bestStreak >= 2 ? (
+                            <em className="inline-flex items-center gap-0.5 font-extrabold not-italic text-[#e15a42]">
+                              <Flame className="size-2.25" aria-hidden="true" /> {entry.bestStreak}
+                            </em>
+                          ) : null}
                         </small>
-                      ) : null}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-          </ScrollArea>
-        </aside>
+                      </span>
+                      <span className="grid justify-items-end">
+                        <strong className="text-sm text-[#223950] tabular-nums">
+                          {formatPoints(entry.totalPoints)}
+                        </strong>
+                        {game.phase === 'reveal' && entry.pointsGained !== null && entry.pointsGained > 0 ? (
+                          <small className="animate-in whitespace-nowrap text-[11px] font-[850] text-[#16855c] tabular-nums fade-in slide-in-from-bottom-1 duration-300">
+                            +{formatPoints(entry.pointsGained)} points
+                          </small>
+                        ) : null}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </ScrollArea>
+          </aside>
+        )}
       </main>
 
       {notice ? (
@@ -510,7 +553,12 @@ function LobbyPanel({
       : configuration.categories.join(', ');
 
   return (
-    <div className="relative flex h-[clamp(640px,calc(100dvh-112px),768px)] max-h-192 min-h-0 flex-col overflow-hidden rounded-[24px_10px_26px_12px] border border-[#aebfd0] bg-[rgb(249_252_255/96%)] shadow-[8px_9px_0_#ccdae6] max-[760px]:h-auto max-[760px]:min-h-150">
+    <div
+      className={cn(
+        'relative flex flex-col overflow-hidden rounded-[24px_10px_26px_12px] border border-[#aebfd0] bg-[rgb(249_252_255/96%)] shadow-[8px_9px_0_#ccdae6]',
+        GAME_LOBBY_CARD_HEIGHT_CLASS
+      )}
+    >
       <div
         className="absolute top-[clamp(40px,8vw,90px)] right-[clamp(36px,8vw,110px)] aspect-square w-[clamp(140px,18vw,240px)] animate-spin rounded-full border border-[#99c8db] [animation-duration:18s] motion-reduce:animate-none before:absolute before:inset-[15%] before:rounded-full before:border before:border-dashed before:border-[#b6cfdb] before:content-[''] after:absolute after:inset-[34%] after:rounded-full after:border after:border-dashed after:border-[#b6cfdb] after:bg-[#12a8d4] after:content-[''] max-[980px]:opacity-40 max-[760px]:top-9 max-[760px]:right-6.25 max-[760px]:w-32.5"
         aria-hidden="true"

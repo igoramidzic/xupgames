@@ -1,7 +1,7 @@
 import { api } from '@convex/_generated/api';
 import { useMutation } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
-import { Check, Copy, DoorOpen, LoaderCircle, LockKeyhole, UsersRound, Vote } from 'lucide-react';
+import { Check, Copy, DoorOpen, LoaderCircle, LockKeyhole, Vote } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -18,6 +18,7 @@ import { getRoomMembers } from '@/lib/roomSession';
 import { useRoomPresence } from '@/lib/useRoomPresence';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
+import LobbyPlayersSidebar from './LobbyPlayersSidebar';
 import NextGameVoting from './NextGameVoting';
 
 type SessionResult = FunctionReturnType<typeof api.rooms.getSession>;
@@ -136,7 +137,7 @@ export default function InitialGameLobby({ guest, session }: { guest: GuestIdent
         </div>
       </header>
 
-      <main className="mx-auto grid min-h-[calc(100dvh-76px)] w-[min(1120px,calc(100%-36px))] grid-cols-[minmax(0,1fr)_280px] items-start gap-4.5 py-8 max-[820px]:w-[min(720px,calc(100%-24px))] max-[820px]:grid-cols-1 max-[760px]:min-h-[calc(100dvh-68px)] max-[760px]:py-4">
+      <main className="mx-auto grid min-h-[calc(100dvh-76px)] w-[min(1120px,calc(100%-36px))] grid-cols-[minmax(0,1fr)_300px] items-start gap-4.5 py-8 max-[820px]:w-[min(720px,calc(100%-24px))] max-[820px]:grid-cols-1 max-[760px]:min-h-[calc(100dvh-68px)] max-[760px]:py-4">
         <section className="min-w-0">
           <div className="mb-5 rounded-[22px_15px_24px_17px] border border-[#c1ccdc] bg-[rgb(255_255_255/86%)] p-6 shadow-[7px_8px_0_rgb(23_32_58/8%)] max-[620px]:p-4.5">
             <p className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-[820] tracking-[0.13em] text-[#3155d9] uppercase">
@@ -172,60 +173,14 @@ export default function InitialGameLobby({ guest, session }: { guest: GuestIdent
           )}
         </section>
 
-        <aside className="min-h-0 overflow-hidden rounded-[16px_10px_18px_12px] border border-[#c1ccdc] bg-[rgb(255_255_255/94%)] shadow-[5px_6px_0_rgb(23_32_58/8%)]">
-          <div className="flex items-center justify-between border-b border-[#d5dde8] px-4 py-4">
-            <div>
-              <p className="mb-0.5 text-[9px] font-[820] tracking-[0.12em] text-[#3155d9] uppercase">In the room</p>
-              <h2 className="m-0 font-display text-xl font-[800] tracking-[-0.035em]">Players</h2>
-            </div>
-            <span className="inline-flex items-center gap-1.25 rounded-full bg-[#edf1f7] px-2.5 py-1.5 text-xs font-[760] text-[#536079]">
-              <UsersRound className="size-3.5" aria-hidden="true" /> {session.activeMemberCount}
-            </span>
-          </div>
-          <ol className="m-0 flex max-h-[calc(100dvh-190px)] list-none flex-col gap-1.5 overflow-y-auto p-3 max-[820px]:max-h-80">
-            {members.map((member) => {
-              const isCurrentPlayer = member.memberId === session.currentMember.memberId;
-              const isDisconnected = member.isActive && onlineByMemberId.get(member.memberId) === false;
-              return (
-                <li
-                  className={cn(
-                    'flex min-h-12 items-center gap-2.5 rounded-[10px_7px_11px_8px] px-2.5 py-2',
-                    isCurrentPlayer && 'bg-[#edf1ff]',
-                    !member.isActive && 'opacity-45 grayscale'
-                  )}
-                  key={member.memberId}
-                >
-                  <span className="grid size-8.5 shrink-0 place-items-center rounded-[11px_8px_12px_9px] border border-[#17203a] bg-[#f3cb42] font-display text-sm font-[850] text-[#17203a] shadow-[2px_2px_0_rgb(23_32_58/14%)]">
-                    {member.displayName.slice(0, 1).toUpperCase()}
-                  </span>
-                  <span className="grid min-w-0 flex-1">
-                    <strong className="overflow-hidden text-sm text-ellipsis whitespace-nowrap text-[#27344e]">
-                      {member.displayName} {isCurrentPlayer ? '(you)' : ''}
-                    </strong>
-                    <small className="text-[10px] font-[650] text-[#7b8699]">
-                      {!member.isActive
-                        ? 'Left'
-                        : isDisconnected
-                          ? 'Disconnected'
-                          : member.isOwner
-                            ? 'Room owner'
-                            : 'Ready to vote'}
-                    </small>
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-          <Button
-            className="m-3 mt-0 inline-flex h-10 w-[calc(100%-24px)] items-center justify-center gap-2 rounded-lg border border-[#bdc8d8] bg-[#f8fafd] px-3 text-xs font-[760] text-[#34415b] hover:bg-white [&_svg]:size-4"
-            type="button"
-            onClick={copyRoomLink}
-            variant="paper"
-          >
-            {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-            {copied ? 'Link copied' : 'Invite more players'}
-          </Button>
-        </aside>
+        <LobbyPlayersSidebar
+          members={members}
+          activeMemberCount={session.activeMemberCount}
+          currentMemberId={session.currentMember.memberId}
+          onlineByMemberId={onlineByMemberId}
+          copied={copied}
+          onInvite={copyRoomLink}
+        />
       </main>
 
       {notice ? (

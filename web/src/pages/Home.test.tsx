@@ -37,7 +37,7 @@ describe('Home', () => {
     expect(screen.getByLabelText('Require a password to join')).toBeInTheDocument();
     expect(screen.queryByText('Choose a game')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Trivia/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'A preview of a trivia round' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'A preview of a Doodle Dash drawing turn' })).toBeInTheDocument();
   });
 
   it('starts randomly, then fades through every game preview', () => {
@@ -63,7 +63,7 @@ describe('Home', () => {
 
     act(() => vi.advanceTimersByTime(HOME_PREVIEW_FADE_MS));
     expect(carousel).toHaveAttribute('data-visible', 'true');
-    expect(screen.getByRole('region', { name: 'A preview of a trivia round' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'A preview of a Doodle Dash drawing turn' })).toBeInTheDocument();
 
     expect(Math.random).toHaveBeenCalledTimes(1);
   });

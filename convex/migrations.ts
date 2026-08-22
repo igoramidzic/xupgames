@@ -23,6 +23,12 @@ export const initializeRoomGameLifecycle = migrations.define({
     if (room.currentGameId === undefined && room.gameType !== undefined) {
       let status: 'lobby' | 'active' | 'complete';
       switch (room.gameType) {
+        case 'doodleDash': {
+          // Doodle Dash was introduced after this migration, so there is no
+          // legacy active state to recover.
+          status = 'lobby';
+          break;
+        }
         case 'trivia': {
           const state = await ctx.db
             .query('triviaGameStates')

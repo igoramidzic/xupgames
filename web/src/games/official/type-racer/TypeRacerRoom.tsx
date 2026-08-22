@@ -21,6 +21,7 @@ import { type CSSProperties, useEffect, useEffectEvent, useMemo, useRef, useStat
 import { Link, useNavigate } from 'react-router-dom';
 import GameModeControl, { GameModeContent } from '@/components/GameModeControl';
 import GameSurfaceTransition from '@/components/GameSurfaceTransition';
+import LobbyPlayersSidebar, { type LobbyPlayersSidebarTheme } from '@/components/LobbyPlayersSidebar';
 import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
 import {
   AlertDialog,
@@ -32,6 +33,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { isLocalhost } from '@/lib/environment';
+import {
+  GAME_LOBBY_CARD_HEIGHT_CLASS,
+  GAME_LOBBY_FRAME_CLASS,
+  GAME_LOBBY_GRID_CLASS,
+  GAME_LOBBY_SIDEBAR_HEIGHT_CLASS,
+} from '@/lib/gameLobbyLayout';
 import type { GuestIdentity } from '@/lib/guest';
 import { getRoomMembers } from '@/lib/roomSession';
 import { alignTypeRacerInput, type TypeRacerInputAlignment, typingAccuracy } from '@/lib/typeRacerTyping';
@@ -49,6 +56,26 @@ type RacerMemberId = Racer['memberId'];
 const PROGRESS_REPORT_INTERVAL_MS = 500;
 const MAX_INSERTED_CHARACTERS = 64;
 const RACER_COLORS = ['#ff746c', '#74a7ff', '#58d7a1', '#f1c84f', '#d89aff', '#4ed4e6', '#ff8fc5', '#b8d65c'];
+const TYPE_RACER_LOBBY_SIDEBAR_THEME: LobbyPlayersSidebarTheme = {
+  background: '#2b1b45',
+  border: '#9faed5',
+  shadow: '7px 8px 0 #c7d3ef',
+  text: '#ffffff',
+  mutedText: '#c9bed7',
+  eyebrow: '#aebcf1',
+  divider: 'rgb(255 255 255 / 12%)',
+  countBackground: '#443452',
+  countText: '#d7cfdf',
+  currentPlayerBackground: '#443452',
+  avatarBackground: '#ffd65a',
+  avatarBorder: '#120b1d',
+  avatarText: '#160d21',
+  avatarShadow: '2px 2px 0 #120b1d',
+  inviteBackground: '#37274f',
+  inviteHoverBackground: '#443452',
+  inviteBorder: '#6e5c87',
+  inviteText: '#ffffff',
+};
 
 function memberColor(memberId: string) {
   let hash = 2_166_136_261;
@@ -517,7 +544,13 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-360 grid-cols-[minmax(0,1fr)_390px] gap-4 p-4 max-[1060px]:grid-cols-[minmax(0,1fr)_330px] max-[820px]:grid-cols-1 max-[620px]:p-2.5">
+      <main
+        className={cn(
+          game.phase === 'lobby'
+            ? [GAME_LOBBY_FRAME_CLASS, GAME_LOBBY_GRID_CLASS]
+            : 'mx-auto grid w-full max-w-360 grid-cols-[minmax(0,1fr)_300px] items-start gap-4.5 p-4 max-[820px]:grid-cols-1 max-[620px]:p-2.5'
+        )}
+      >
         <section className="min-w-0">
           <GameModeContent
             roomId={session.roomId}
@@ -691,12 +724,25 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
           ) : null}
         </section>
 
-        <RaceBoard
-          racers={displayedRacers}
-          onlineByMemberId={onlineByMemberId}
-          phase={effectivePhase ?? 'lobby'}
-          raceNumber={game.raceNumber}
-        />
+        {game.phase === 'lobby' ? (
+          <LobbyPlayersSidebar
+            members={members}
+            activeMemberCount={session.activeMemberCount}
+            currentMemberId={session.currentMember.memberId}
+            onlineByMemberId={onlineByMemberId}
+            readyLabel="Ready to play"
+            copied={copied}
+            onInvite={copyRoomLink}
+            theme={TYPE_RACER_LOBBY_SIDEBAR_THEME}
+          />
+        ) : (
+          <RaceBoard
+            racers={displayedRacers}
+            onlineByMemberId={onlineByMemberId}
+            phase={effectivePhase ?? 'lobby'}
+            raceNumber={game.raceNumber}
+          />
+        )}
       </main>
 
       {confirmation ? (
@@ -807,7 +853,12 @@ function LobbyPanel({
   onCopy: () => void;
 }) {
   return (
-    <div className="relative flex min-h-[calc(100dvh-104px)] flex-col justify-center overflow-hidden rounded-[14px_26px_16px_24px] border border-[#9faed5] bg-white px-[clamp(28px,7vw,92px)] py-16 shadow-[7px_8px_0_#c7d3ef] max-[820px]:min-h-145">
+    <div
+      className={cn(
+        'relative flex flex-col justify-center overflow-hidden rounded-[14px_26px_16px_24px] border border-[#9faed5] bg-white px-[clamp(28px,7vw,92px)] py-16 shadow-[7px_8px_0_#c7d3ef]',
+        GAME_LOBBY_CARD_HEIGHT_CLASS
+      )}
+    >
       <div className="absolute top-10 right-10 grid size-20 rotate-4 place-items-center rounded-[12px_22px_14px_20px] border-2 border-[#27183f] bg-[#ffd65a] shadow-[6px_6px_0_#27183f] max-[620px]:top-7 max-[620px]:right-6 max-[620px]:size-14">
         <LibraryBig className="size-9 max-[620px]:size-6" aria-hidden="true" />
       </div>
@@ -880,7 +931,12 @@ function RaceBoard({
   });
 
   return (
-    <aside className="flex h-[calc(100dvh-104px)] min-h-145 flex-col overflow-hidden rounded-[22px_12px_24px_14px] border border-[#9faed5] bg-[#2b1b45] text-white shadow-[7px_8px_0_#c7d3ef] max-[820px]:h-145">
+    <aside
+      className={cn(
+        'flex flex-col overflow-hidden rounded-[22px_12px_24px_14px] border border-[#9faed5] bg-[#2b1b45] text-white shadow-[7px_8px_0_#c7d3ef]',
+        GAME_LOBBY_SIDEBAR_HEIGHT_CLASS
+      )}
+    >
       <div className="flex items-center justify-between border-b border-white/12 px-5 py-5">
         <div>
           <p className="m-0 text-[10px] font-[830] tracking-[0.15em] text-[#aebcf1] uppercase">Live field</p>
@@ -898,7 +954,7 @@ function RaceBoard({
       </div>
 
       <ol
-        className="m-0 flex-1 list-none overflow-y-auto p-3.5 [scrollbar-color:#776991_transparent]"
+        className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-3.5 [scrollbar-color:#776991_transparent]"
         aria-label="Racer standings"
       >
         {orderedRacers.map((racer, index) => {

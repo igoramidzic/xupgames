@@ -15,6 +15,14 @@ const triviaPhase = v.union(
   v.literal('reveal'),
   v.literal('complete')
 );
+const doodleDashPhase = v.union(
+  v.literal('lobby'),
+  v.literal('choosing'),
+  v.literal('drawing'),
+  v.literal('reveal'),
+  v.literal('complete')
+);
+const doodleDashRoundStatus = v.union(v.literal('choosing'), v.literal('drawing'), v.literal('reveal'));
 const typeRacerPhase = v.union(v.literal('lobby'), v.literal('countdown'), v.literal('racing'), v.literal('complete'));
 const typeRacerProgressStatus = v.union(v.literal('waiting'), v.literal('racing'), v.literal('finished'));
 const typeRacerPassageKind = v.union(v.literal('phrase'), v.literal('sentence'), v.literal('paragraph'));
@@ -124,6 +132,102 @@ export default defineSchema({
   })
     .index('by_pollRoundId', ['pollRoundId'])
     .index('by_pollRoundId_and_memberId', ['pollRoundId', 'memberId']),
+
+  doodleDashGameStates: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    phase: doodleDashPhase,
+    currentRoundId: v.union(v.id('doodleDashRounds'), v.null()),
+    currentTurnNumber: v.number(),
+    totalTurns: v.number(),
+    turnOrder: v.array(v.id('roomMembers')),
+    configuredRoundCount: v.optional(v.number()),
+    configuredDrawDurationMs: v.optional(v.number()),
+    configuredCategories: v.optional(v.array(v.string())),
+    phaseStartedAt: v.union(v.number(), v.null()),
+    phaseEndsAt: v.union(v.number(), v.null()),
+  }).index('by_roomId', ['roomId']),
+
+  doodleDashRounds: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    turnNumber: v.number(),
+    cycleNumber: v.number(),
+    drawerMemberId: v.id('roomMembers'),
+    drawerDisplayName: v.string(),
+    wordOptions: v.array(v.object({ word: v.string(), category: v.string() })),
+    selectedWord: v.union(v.string(), v.null()),
+    selectedCategory: v.union(v.string(), v.null()),
+    hintOrder: v.array(v.number()),
+    revealedLetterCount: v.number(),
+    status: doodleDashRoundStatus,
+    choiceStartedAt: v.number(),
+    drawStartedAt: v.union(v.number(), v.null()),
+    drawEndsAt: v.union(v.number(), v.null()),
+    revealedAt: v.union(v.number(), v.null()),
+    eligibleGuesserCount: v.number(),
+    correctGuessCount: v.number(),
+    firstCorrectAt: v.union(v.number(), v.null()),
+    nextStrokeSequence: v.number(),
+  })
+    .index('by_roomId_and_gameNumber_and_turnNumber', ['roomId', 'gameNumber', 'turnNumber'])
+    .index('by_drawerMemberId', ['drawerMemberId']),
+
+  doodleDashScores: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    memberId: v.id('roomMembers'),
+    displayName: v.string(),
+    totalPoints: v.number(),
+    guessPoints: v.number(),
+    drawPoints: v.number(),
+    wordsGuessed: v.number(),
+    drawingTurns: v.number(),
+    correctGuessers: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber'])
+    .index('by_roomId_and_gameNumber_and_memberId', ['roomId', 'gameNumber', 'memberId']),
+
+  doodleDashCorrectGuesses: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    roundId: v.id('doodleDashRounds'),
+    memberId: v.id('roomMembers'),
+    responseTimeMs: v.number(),
+    guessPoints: v.number(),
+    drawerPoints: v.number(),
+    submittedAt: v.number(),
+  })
+    .index('by_roundId_and_memberId', ['roundId', 'memberId'])
+    .index('by_roomId_and_gameNumber_and_memberId', ['roomId', 'gameNumber', 'memberId']),
+
+  doodleDashMessages: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    roundId: v.id('doodleDashRounds'),
+    memberId: v.id('roomMembers'),
+    displayName: v.string(),
+    kind: v.union(v.literal('guess'), v.literal('correct')),
+    text: v.optional(v.string()),
+    isClose: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index('by_roundId', ['roundId'])
+    .index('by_roundId_and_memberId', ['roundId', 'memberId']),
+
+  doodleDashStrokes: defineTable({
+    roomId: v.id('rooms'),
+    roundId: v.id('doodleDashRounds'),
+    sequence: v.number(),
+    actionId: v.optional(v.string()),
+    tool: v.union(v.literal('pen'), v.literal('eraser'), v.literal('fill')),
+    color: v.string(),
+    width: v.number(),
+    points: v.array(v.object({ x: v.number(), y: v.number() })),
+    isUndone: v.optional(v.boolean()),
+    createdAt: v.number(),
+  }).index('by_roundId_and_sequence', ['roundId', 'sequence']),
 
   triviaGameStates: defineTable({
     roomId: v.id('rooms'),

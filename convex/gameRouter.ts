@@ -7,6 +7,11 @@ import {
   trendlineGameIsComplete,
 } from './communityGameAdapters/trendline';
 import type { GameType } from './games';
+import {
+  doodleDashGameIsComplete,
+  initializeDoodleDashGame,
+  prepareDoodleDashGame,
+} from './officialGames/doodleDash/lifecycle';
 import { initializeTriviaGame, prepareTriviaGame, triviaGameIsComplete } from './officialGames/trivia/lifecycle';
 import {
   initializeTypeRacerGame,
@@ -26,6 +31,9 @@ type DatabaseReaderContext = Pick<QueryCtx, 'db' | 'runQuery'>;
  */
 export async function initializeGameState(ctx: MutationCtx, roomId: Id<'rooms'>, gameType: GameType): Promise<void> {
   switch (gameType) {
+    case 'doodleDash':
+      await initializeDoodleDashGame(ctx, roomId);
+      return;
     case 'trivia':
       await initializeTriviaGame(ctx, roomId);
       return;
@@ -52,6 +60,8 @@ export async function syncGameMembership(
     return;
   }
   switch (room.gameType) {
+    case 'doodleDash':
+      return;
     case 'trivia':
       return;
     case 'typeRacer':
@@ -69,6 +79,9 @@ export async function syncGameMembership(
 
 export async function prepareGameState(ctx: MutationCtx, room: Doc<'rooms'>, gameType: GameType): Promise<void> {
   switch (gameType) {
+    case 'doodleDash':
+      await prepareDoodleDashGame(ctx, room._id);
+      return;
     case 'trivia':
       await prepareTriviaGame(ctx, room._id);
       return;
@@ -90,6 +103,8 @@ export async function gameStateIsComplete(ctx: DatabaseReaderContext, room: Doc<
     return false;
   }
   switch (room.gameType) {
+    case 'doodleDash':
+      return await doodleDashGameIsComplete(ctx, room._id);
     case 'trivia':
       return await triviaGameIsComplete(ctx, room._id);
     case 'typeRacer':

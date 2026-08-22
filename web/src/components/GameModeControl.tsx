@@ -138,7 +138,7 @@ export function GameModeContent({
 
   if (manualVoteActive || view === 'vote') {
     return (
-      <div className="grid min-h-[clamp(560px,calc(100dvh-112px),768px)] content-center gap-3 max-[760px]:min-h-140">
+      <div className="grid min-h-[clamp(560px,calc(100dvh-112px),768px)] content-start gap-3 max-[760px]:min-h-140">
         <div className="flex items-start gap-2.5 rounded-[12px_8px_13px_9px] border border-[#c9d4e4] bg-[#eef2ff] px-4 py-3 text-xs leading-[1.45] font-[720] text-[#3155d9] shadow-[3px_4px_0_rgb(23_32_58/8%)]">
           <UsersRound className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
@@ -159,7 +159,7 @@ export function GameModeContent({
   }
 
   return (
-    <section className="flex min-h-[clamp(560px,calc(100dvh-112px),768px)] items-center rounded-[22px_14px_24px_16px] border border-[#b8c4d6] bg-[#f8faff] p-[clamp(22px,4vw,48px)] text-[#17203a] shadow-[7px_8px_0_#d2dbea] max-[760px]:min-h-140 max-[620px]:p-4">
+    <section className="flex min-h-[clamp(560px,calc(100dvh-112px),768px)] items-start rounded-[22px_14px_24px_16px] border border-[#b8c4d6] bg-[#f8faff] p-[clamp(22px,4vw,48px)] text-[#17203a] shadow-[7px_8px_0_#d2dbea] max-[760px]:min-h-140 max-[620px]:p-4">
       <div className="mx-auto w-full max-w-215">
         {view === 'method' ? (
           <>

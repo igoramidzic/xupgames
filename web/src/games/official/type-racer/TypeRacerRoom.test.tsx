@@ -165,6 +165,13 @@ describe('TypeRacerRoom', () => {
       'max-[760px]:w-fit',
       'max-[760px]:justify-self-center'
     );
+    expect(screen.getByRole('main')).toHaveClass('max-w-345', 'grid-cols-[minmax(0,1fr)_300px]', 'gap-4.5');
+    const players = screen.getByRole('complementary', { name: 'Players in the room' });
+    expect(players).toHaveClass('max-h-[clamp(640px,calc(100dvh-112px),768px)]');
+    expect(players.style.getPropertyValue('--lobby-sidebar-background')).toBe('#2b1b45');
+    expect(within(players).getByText('Ada (you)')).toBeInTheDocument();
+    expect(within(players).getByText('Room owner')).toBeInTheDocument();
+    expect(within(players).getByRole('button', { name: 'Invite more players' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Start the countdown' }));
     expect(mocks.startRace).toHaveBeenCalledWith({ roomId: 'room-1', sessionToken: guest.sessionToken });
   });
