@@ -1,5 +1,6 @@
 import type { Doc } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
+import type { GameType } from '../games';
 import { initializeDoodleDashBot, runDoodleDashBotTick, stopDoodleDashBot } from './doodleDash';
 import { initializeTrendlineBot, runTrendlineBotTick, stopTrendlineBot } from './trendline';
 import { initializeTriviaBot, runTriviaBotTick, stopTriviaBot } from './trivia';
@@ -55,10 +56,9 @@ export async function runGameBotTick(
 
 export async function stopGameBot(
   ctx: MutationCtx,
-  room: Doc<'rooms'> | null,
+  gameType: GameType | undefined,
   bot: Doc<'playtestBots'>
 ): Promise<void> {
-  const gameType = room?.gameType;
   switch (gameType) {
     case 'doodleDash':
       await stopDoodleDashBot(ctx, bot);

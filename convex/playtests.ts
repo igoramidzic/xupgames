@@ -459,7 +459,7 @@ export const cleanup = internalMutation({
     const now = Date.now();
     let activeMembershipsRemoved = 0;
     for (const bot of bots) {
-      await stopGameBot(ctx, room, bot);
+      await stopGameBot(ctx, run.gameType, bot);
       if (room !== null) {
         await presence.removeRoomUser(ctx, room._id, bot.memberId);
       }
