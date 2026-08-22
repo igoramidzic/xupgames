@@ -1,7 +1,7 @@
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useMutation, useQuery } from 'convex/react';
-import { Check, Gamepad2, LoaderCircle, Sparkles, Vote } from 'lucide-react';
+import { Check, Gamepad2, LoaderCircle, Sparkles, Timer, Vote } from 'lucide-react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +17,8 @@ import { cn } from '@/lib/utils';
 
 type SelectableGame = GameCatalogEntry & { gameType: GameType };
 type GameTally = { votes: number; percentage: number };
+const NEXT_GAME_AUTO_ADVANCE_DELAY_MS = 5_000;
+const AUTO_ADVANCE_COUNTDOWN_TICK_MS = 100;
 
 function GameOptionCard({
   game,
@@ -25,7 +27,7 @@ function GameOptionCard({
   tally,
   complete = false,
   recommended = false,
-  lost = false,
+  advancing = false,
   pending = false,
   disabled,
   onClick,
@@ -36,7 +38,7 @@ function GameOptionCard({
   tally?: GameTally;
   complete?: boolean;
   recommended?: boolean;
-  lost?: boolean;
+  advancing?: boolean;
   pending?: boolean;
   disabled: boolean;
   onClick: () => void;
@@ -51,20 +53,27 @@ function GameOptionCard({
       className={cn(
         'relative h-auto! min-h-0 min-w-0 gap-0! overflow-hidden disabled:cursor-default disabled:opacity-100',
         isDialogLayout ? 'p-3.5' : 'aspect-[4/3] p-4 pb-4.5 max-[520px]:aspect-auto max-[520px]:min-h-40',
-        lost && 'opacity-40'
+        complete &&
+          'bg-white data-[selected=true]:border-[#35a675] data-[selected=true]:bg-[#ecf9f2] data-[selected=true]:shadow-[0_4px_0_#35a675]'
       )}
       type="button"
       style={{ '--game-color': presentation.color, '--game-tint': presentation.tint } as CSSProperties}
       data-selected={complete ? recommended : selected}
-      data-lost={lost}
+      data-advancing={advancing}
       onClick={onClick}
       disabled={disabled}
       aria-pressed={complete ? undefined : selected}
     >
-      {tally ? (
+      {tally && !complete ? (
         <span
           className="absolute inset-y-0 left-0 bg-[var(--game-color)] opacity-10 transition-[width] duration-300"
           style={{ width: `${tally.percentage}%` }}
+          aria-hidden="true"
+        />
+      ) : null}
+      {advancing ? (
+        <span
+          className="pointer-events-none absolute inset-0 bg-white/20 motion-safe:animate-pulse"
           aria-hidden="true"
         />
       ) : null}
@@ -82,7 +91,9 @@ function GameOptionCard({
           {pending ? (
             <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
           ) : recommended ? (
-            <span className="text-[9px] font-[820] tracking-[0.08em] text-[#16885c] uppercase">Top vote</span>
+            <span className="text-[9px] font-[820] tracking-[0.08em] text-[#16885c] uppercase">
+              {complete ? 'Winner' : 'Top vote'}
+            </span>
           ) : selected ? (
             <Check className="size-4 text-[#16885c]" aria-label="Your vote" />
           ) : null}
@@ -126,6 +137,57 @@ function gameDefinition(games: SelectableGame[], gameType: GameType) {
     throw new Error(`Unknown game type: ${gameType}`);
   }
   return game;
+}
+
+function WinnerCountdown({ gameName, autoAdvanceAt }: { gameName: string; autoAdvanceAt: number }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    setNow(Date.now());
+    const interval = window.setInterval(() => {
+      const nextNow = Date.now();
+      setNow(nextNow);
+      if (nextNow >= autoAdvanceAt) {
+        window.clearInterval(interval);
+      }
+    }, AUTO_ADVANCE_COUNTDOWN_TICK_MS);
+    return () => window.clearInterval(interval);
+  }, [autoAdvanceAt]);
+
+  const remaining = Math.max(0, autoAdvanceAt - now);
+  const seconds = Math.ceil(remaining / 1_000);
+  const progress = Math.min(
+    100,
+    Math.max(0, Math.round(((NEXT_GAME_AUTO_ADVANCE_DELAY_MS - remaining) / NEXT_GAME_AUTO_ADVANCE_DELAY_MS) * 100))
+  );
+  const countdownText = seconds > 0 ? `Starting ${gameName} in ${seconds}s` : `Starting ${gameName}…`;
+
+  return (
+    <div className="mb-3 rounded-[10px_7px_11px_8px] bg-[#eef2ff] px-3.5 py-2.5 text-[#3155d9]">
+      <div className="flex items-center justify-between gap-3 text-xs font-[760] max-[620px]:flex-col max-[620px]:items-start max-[620px]:gap-1.5">
+        <span className="inline-flex items-center gap-2">
+          <Timer className="size-4" aria-hidden="true" /> The winning game is locked in.
+        </span>
+        <span className="shrink-0 tabular-nums" aria-live="polite">
+          {countdownText}
+        </span>
+      </div>
+      <div
+        className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#d8e0f4]"
+        role="progressbar"
+        aria-label={`Time until ${gameName} starts`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress}
+        aria-valuetext={countdownText}
+      >
+        <span
+          className="block h-full rounded-full bg-[#3155d9] transition-[width] duration-100 ease-linear motion-reduce:transition-none"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export default function NextGameVoting({
@@ -225,15 +287,8 @@ export default function NextGameVoting({
     }
     return 0;
   });
-  const orderedGames = [...games].sort((first, second) => {
-    if (first.gameType === currentGameType) {
-      return -1;
-    }
-    if (second.gameType === currentGameType) {
-      return 1;
-    }
-    return 0;
-  });
+  const recommendedGame = poll.recommendedGameType === null ? null : gameDefinition(games, poll.recommendedGameType);
+  const tieNeedsOwner = awaitingOwner && recommendedGame === null;
 
   return (
     <section
@@ -259,11 +314,11 @@ export default function NextGameVoting({
             id="next-game-heading"
           >
             {awaitingOwner
-              ? isOwner
-                ? isInitialVote
-                  ? 'Pick the first game.'
-                  : 'Pick the next game.'
-                : 'The owner has the final pick.'
+              ? recommendedGame !== null
+                ? `${recommendedGame.name} is up next.`
+                : isOwner
+                  ? 'Break the tie.'
+                  : 'The vote is tied.'
               : isInitialVote
                 ? 'What should we play first?'
                 : 'What should we play next?'}
@@ -321,91 +376,49 @@ export default function NextGameVoting({
 
       {awaitingOwner ? (
         <div>
-          {isOwner ? (
-            <>
-              <p className="mb-3 flex items-center gap-2 rounded-[10px_7px_11px_8px] bg-[#eef2ff] px-3.5 py-2.5 text-xs font-[720] text-[#3155d9]">
-                <Gamepad2 className="size-4" aria-hidden="true" /> Pick one to continue. Everyone will move into the
-                game you choose.
-              </p>
-              <div
-                className={cn(
-                  'grid grid-cols-3 gap-2.5',
-                  isDialogLayout ? 'max-[700px]:grid-cols-1' : 'max-[1100px]:grid-cols-2 max-[520px]:grid-cols-1'
-                )}
-              >
-                {orderedGames.map((game) => {
-                  const presentation = gamePresentation(game.gameType);
-                  const Icon = presentation.icon;
-                  const recommended = poll.recommendedGameType === game.gameType;
-                  return (
-                    <Button
-                      variant="decision"
-                      className="h-auto! min-h-0 min-w-0 flex-col items-stretch justify-start gap-0! p-4 disabled:cursor-wait disabled:opacity-60"
-                      type="button"
-                      key={game.gameType}
-                      data-recommended={recommended}
-                      onClick={() => handleChoose(game.gameType)}
-                      disabled={pendingAction !== null}
-                    >
-                      <span className="flex min-w-0 items-center justify-between gap-2">
-                        <Icon className="size-6" style={{ color: presentation.color }} aria-hidden="true" />
-                        {pendingAction === `choose:${game.gameType}` ? (
-                          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-                        ) : recommended ? (
-                          <span className="text-[9px] font-[820] tracking-[0.08em] text-[#16885c] uppercase">
-                            Top vote
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="mt-3 flex min-w-0 flex-wrap items-center gap-1.5">
-                        <strong className="text-sm">{game.name}</strong>
-                        <GameSourceBadge source={game.source} />
-                      </span>
-                      {game.source === 'community' ? (
-                        <span className="mt-2 min-w-0">
-                          <GameAuthor game={game} />
-                        </span>
-                      ) : null}
-                    </Button>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <>
-              <div
-                className={cn(
-                  'grid grid-cols-3',
-                  isDialogLayout
-                    ? 'gap-2.5 max-[700px]:grid-cols-1'
-                    : 'gap-3 max-[1100px]:grid-cols-2 max-[520px]:grid-cols-1'
-                )}
-              >
-                {orderedOptions.map((gameType) => {
-                  const game = gameDefinition(games, gameType);
-                  const tally = poll.tallies?.find((candidate) => candidate.gameType === gameType);
-                  const recommended = poll.recommendedGameType === gameType;
-                  return (
-                    <GameOptionCard
-                      key={gameType}
-                      game={game}
-                      layout={layout}
-                      selected={poll.selectedGameType === gameType}
-                      tally={tally}
-                      complete
-                      recommended={recommended}
-                      lost={poll.recommendedGameType !== null && !recommended}
-                      disabled
-                      onClick={() => undefined}
-                    />
-                  );
-                })}
-              </div>
-              <p className="mt-4 mb-0 flex items-center gap-2 text-xs text-[#687389]">
-                <Gamepad2 className="size-4 text-[#3155d9]" aria-hidden="true" /> Waiting for the room owner to choose.
-              </p>
-            </>
-          )}
+          {recommendedGame !== null && poll.autoAdvanceAt !== null ? (
+            <WinnerCountdown gameName={recommendedGame.name} autoAdvanceAt={poll.autoAdvanceAt} />
+          ) : isOwner ? (
+            <p className="mb-3 flex items-center gap-2 rounded-[10px_7px_11px_8px] bg-[#eef2ff] px-3.5 py-2.5 text-xs font-[720] text-[#3155d9]">
+              <Gamepad2 className="size-4" aria-hidden="true" /> Pick one of the tied games to continue.
+            </p>
+          ) : null}
+          <div
+            className={cn(
+              'grid grid-cols-3',
+              isDialogLayout
+                ? 'gap-2.5 max-[700px]:grid-cols-1'
+                : 'gap-3 max-[1100px]:grid-cols-2 max-[520px]:grid-cols-1'
+            )}
+          >
+            {orderedOptions.map((gameType) => {
+              const game = gameDefinition(games, gameType);
+              const tally = poll.tallies?.find((candidate) => candidate.gameType === gameType);
+              const recommended = poll.recommendedGameType === gameType;
+              const ownerCanBreakTie = tieNeedsOwner && isOwner;
+              return (
+                <GameOptionCard
+                  key={gameType}
+                  game={game}
+                  layout={layout}
+                  selected={poll.selectedGameType === gameType}
+                  tally={tally}
+                  complete
+                  recommended={recommended}
+                  advancing={recommended && poll.autoAdvanceAt !== null}
+                  pending={pendingAction === `choose:${gameType}`}
+                  onClick={ownerCanBreakTie ? () => handleChoose(gameType) : () => undefined}
+                  disabled={!ownerCanBreakTie || pendingAction !== null}
+                />
+              );
+            })}
+          </div>
+          {tieNeedsOwner && !isOwner ? (
+            <p className="mt-4 mb-0 flex items-center gap-2 text-xs text-[#687389]">
+              <Gamepad2 className="size-4 text-[#3155d9]" aria-hidden="true" /> Waiting for the room owner to break the
+              tie.
+            </p>
+          ) : null}
         </div>
       ) : null}
 

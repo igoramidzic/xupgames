@@ -1,6 +1,6 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import NextGameVoting from './NextGameVoting';
 
 const mocks = vi.hoisted(() => ({
@@ -61,6 +61,7 @@ const basePoll = {
   tallies: null,
   recommendedGameType: null,
   chosenGameType: null,
+  autoAdvanceAt: null,
 };
 
 function renderVoting(isOwner = false, currentGameType: 'trivia' | 'typeRacer' | 'trendline' | null = 'trivia') {
@@ -89,6 +90,8 @@ function renderDialogVoting() {
 }
 
 describe('NextGameVoting', () => {
+  afterEach(() => vi.useRealTimers());
+
   beforeEach(() => {
     mocks.mutationIndex = 0;
     mocks.openVoting.mockReset().mockResolvedValue(null);
@@ -127,8 +130,7 @@ describe('NextGameVoting', () => {
     });
   });
 
-  it('restores white decision cards and tells the owner to make the final selection', async () => {
-    const user = userEvent.setup();
+  it("counts down to the owner's winning game without requiring another action", () => {
     mocks.poll = {
       ...basePoll,
       status: 'awaitingOwner',
@@ -136,6 +138,7 @@ describe('NextGameVoting', () => {
       votesCast: 3,
       selectedGameType: 'trivia',
       recommendedGameType: 'trivia',
+      autoAdvanceAt: Date.now() + 5_000,
       tallies: [
         { gameType: 'trivia', votes: 2, percentage: 67 },
         { gameType: 'typeRacer', votes: 1, percentage: 33 },
@@ -145,26 +148,31 @@ describe('NextGameVoting', () => {
 
     expect(screen.queryByRole('group', { name: 'Final vote count' })).not.toBeInTheDocument();
     expect(screen.queryByText('Players recommend Trivia.')).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Pick the next game.' })).toBeInTheDocument();
-    expect(screen.getByText(/Pick one to continue/)).toBeInTheDocument();
-    const winner = screen.getByRole('button', { name: /Top voteTrivia/ });
+    expect(screen.getByRole('heading', { name: 'Trivia is up next.' })).toBeInTheDocument();
+    expect(screen.getByText('The winning game is locked in.')).toBeInTheDocument();
+    expect(screen.getByText('Starting Trivia in 5s')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Time until Trivia starts' })).toBeInTheDocument();
+    const winner = screen.getByRole('button', { name: /WinnerTrivia/ });
     const loser = screen.getByRole('button', { name: /Type Racer/ });
-    expect(winner).toHaveAttribute('data-variant', 'decision');
-    expect(loser).toHaveAttribute('data-variant', 'decision');
-    expect(winner).toHaveClass('bg-white');
+    expect(winner).toHaveAttribute('data-variant', 'game-choice');
+    expect(loser).toHaveAttribute('data-variant', 'game-choice');
+    expect(winner).toHaveClass(
+      'aspect-[4/3]',
+      'data-[selected=true]:bg-[#ecf9f2]',
+      'data-[selected=true]:border-[#35a675]'
+    );
     expect(loser).toHaveClass('bg-white');
     expect(loser).not.toHaveClass('opacity-40');
-
-    await user.click(winner);
-    expect(mocks.chooseGame).toHaveBeenCalledWith({
-      roomId: 'room-1',
-      sessionToken: 'a'.repeat(32),
-      expectedRoomGameId: 'room-game-1',
-      gameType: 'trivia',
-    });
+    expect(within(winner).getByText('2')).toBeInTheDocument();
+    expect(within(loser).getByText('1')).toBeInTheDocument();
+    expect(winner.querySelector('svg')?.parentElement).toHaveClass('bg-[var(--game-color)]', 'size-11');
+    expect(winner).toHaveAttribute('data-advancing', 'true');
+    expect(winner).toBeDisabled();
+    expect(loser).toBeDisabled();
+    expect(mocks.chooseGame).not.toHaveBeenCalled();
   });
 
-  it('shows non-owners the same completed cards in a read-only state', () => {
+  it('shows non-owners the same completed result styling in a read-only state', () => {
     mocks.poll = {
       ...basePoll,
       status: 'awaitingOwner',
@@ -172,6 +180,7 @@ describe('NextGameVoting', () => {
       votesCast: 3,
       selectedGameType: 'typeRacer',
       recommendedGameType: 'trivia',
+      autoAdvanceAt: Date.now() + 5_000,
       tallies: [
         { gameType: 'trivia', votes: 2, percentage: 67 },
         { gameType: 'typeRacer', votes: 1, percentage: 33 },
@@ -179,10 +188,39 @@ describe('NextGameVoting', () => {
     };
     renderVoting(false);
 
-    expect(screen.getByRole('button', { name: /Top voteTrivia/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Type Racer/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Type Racer/ })).toHaveClass('opacity-40');
-    expect(screen.getByText('Waiting for the room owner to choose.')).toBeInTheDocument();
+    const winner = screen.getByRole('button', { name: /WinnerTrivia/ });
+    const loser = screen.getByRole('button', { name: /Type Racer/ });
+    expect(winner).toBeDisabled();
+    expect(loser).toBeDisabled();
+    expect(winner).toHaveClass('data-[selected=true]:bg-[#ecf9f2]');
+    expect(loser).toHaveClass('bg-white');
+    expect(loser).not.toHaveClass('opacity-40');
+    expect(within(winner).getByText('2')).toBeInTheDocument();
+    expect(within(loser).getByText('1')).toBeInTheDocument();
+    expect(screen.getByText('The winning game is locked in.')).toBeInTheDocument();
+    expect(screen.queryByText(/Waiting for the room owner/)).not.toBeInTheDocument();
+  });
+
+  it('updates the winner countdown while the backend transition approaches', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-21T22:00:00Z'));
+    mocks.poll = {
+      ...basePoll,
+      status: 'awaitingOwner',
+      roundStatus: 'closed',
+      votesCast: 1,
+      recommendedGameType: 'trivia',
+      autoAdvanceAt: Date.now() + 5_000,
+      tallies: [
+        { gameType: 'trivia', votes: 1, percentage: 100 },
+        { gameType: 'typeRacer', votes: 0, percentage: 0 },
+      ],
+    };
+    renderVoting(false);
+
+    expect(screen.getByText('Starting Trivia in 5s')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(2_100));
+    expect(screen.getByText('Starting Trivia in 3s')).toBeInTheDocument();
   });
 
   it('puts the current mode first and keeps every label to the game name', () => {
@@ -203,8 +241,7 @@ describe('NextGameVoting', () => {
     expect(screen.getByRole('button', { name: /Type Racer/ }).parentElement).toHaveClass('grid-cols-3');
   });
 
-  it('uses compact first-game cards and lets the owner start a choice without an existing room game', async () => {
-    const user = userEvent.setup();
+  it('uses compact first-game cards while the backend prepares the winner', () => {
     mocks.poll = {
       ...basePoll,
       roomGameId: null,
@@ -214,6 +251,7 @@ describe('NextGameVoting', () => {
       votesCast: 1,
       selectedGameType: 'trivia',
       recommendedGameType: 'trivia',
+      autoAdvanceAt: Date.now() + 5_000,
       tallies: [
         { gameType: 'trivia', votes: 1, percentage: 100 },
         { gameType: 'typeRacer', votes: 0, percentage: 0 },
@@ -222,21 +260,68 @@ describe('NextGameVoting', () => {
     };
     renderVoting(true, null);
 
-    expect(screen.getByRole('heading', { name: 'Pick the first game.' })).toBeInTheDocument();
-    const recommendedChoice = screen.getByRole('button', { name: /Top voteTrivia/ });
+    expect(screen.getByRole('heading', { name: 'Trivia is up next.' })).toBeInTheDocument();
+    const recommendedChoice = screen.getByRole('button', { name: /WinnerTrivia/ });
     expect(recommendedChoice).toHaveClass('h-auto!', 'min-h-0', 'gap-0!');
-    expect(recommendedChoice).toHaveAttribute('data-variant', 'decision');
-    expect(recommendedChoice).toHaveClass('bg-white');
+    expect(recommendedChoice).toHaveAttribute('data-variant', 'game-choice');
+    expect(recommendedChoice).toHaveClass('data-[selected=true]:bg-[#ecf9f2]');
+    expect(within(recommendedChoice).getByText('1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Trendline/ })).toHaveTextContent('by Igor Amidzic');
+    expect(screen.getByRole('button', { name: /Trendline/ })).toHaveClass('bg-white');
     expect(screen.getByRole('button', { name: /Trendline/ })).not.toHaveClass('opacity-40');
+    expect(recommendedChoice).toBeDisabled();
+    expect(mocks.chooseGame).not.toHaveBeenCalled();
+  });
 
-    await user.click(recommendedChoice);
+  it('lets the owner break a tied runoff', async () => {
+    const user = userEvent.setup();
+    mocks.poll = {
+      ...basePoll,
+      status: 'awaitingOwner',
+      roundStatus: 'closed',
+      roundNumber: 2,
+      votesCast: 2,
+      selectedGameType: 'trivia',
+      recommendedGameType: null,
+      autoAdvanceAt: null,
+      tallies: [
+        { gameType: 'trivia', votes: 1, percentage: 50 },
+        { gameType: 'typeRacer', votes: 1, percentage: 50 },
+      ],
+    };
+    renderVoting(true);
+
+    expect(screen.getByRole('heading', { name: 'Break the tie.' })).toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Type Racer/ }));
     expect(mocks.chooseGame).toHaveBeenCalledWith({
       roomId: 'room-1',
       sessionToken: 'a'.repeat(32),
-      expectedRoomGameId: null,
-      gameType: 'trivia',
+      expectedRoomGameId: 'room-game-1',
+      gameType: 'typeRacer',
     });
+  });
+
+  it('keeps a tied runoff read-only for other players', () => {
+    mocks.poll = {
+      ...basePoll,
+      status: 'awaitingOwner',
+      roundStatus: 'closed',
+      roundNumber: 2,
+      votesCast: 2,
+      recommendedGameType: null,
+      autoAdvanceAt: null,
+      tallies: [
+        { gameType: 'trivia', votes: 1, percentage: 50 },
+        { gameType: 'typeRacer', votes: 1, percentage: 50 },
+      ],
+    };
+    renderVoting(false);
+
+    expect(screen.getByRole('heading', { name: 'The vote is tied.' })).toBeInTheDocument();
+    expect(screen.getByText('Waiting for the room owner to break the tie.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Trivia/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Type Racer/ })).toBeDisabled();
   });
 
   it('shows compact community metadata without a description', () => {

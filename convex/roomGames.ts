@@ -1,6 +1,7 @@
 import { v } from 'convex/values';
+import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
-import { type MutationCtx, mutation, type QueryCtx, query } from './_generated/server';
+import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from './_generated/server';
 import { fail, MAX_PLAYERS, validateSessionToken } from './domain';
 import { gameStateIsComplete, initializeGameState, prepareGameState } from './gameRouter';
 import { type GameType, gameTypeValidator, listAvailableGameTypes, requireAvailableGame } from './games';
@@ -15,6 +16,7 @@ const pollStatusValidator = v.union(
 );
 const pollTriggerValidator = v.union(v.literal('initial'), v.literal('gameComplete'), v.literal('owner'));
 type PollTrigger = 'initial' | 'gameComplete' | 'owner';
+export const NEXT_GAME_AUTO_ADVANCE_DELAY_MS = 5_000;
 
 const pollViewValidator = v.union(
   v.null(),
@@ -43,6 +45,7 @@ const pollViewValidator = v.union(
     ),
     recommendedGameType: v.union(gameTypeValidator, v.null()),
     chosenGameType: v.union(gameTypeValidator, v.null()),
+    autoAdvanceAt: v.union(v.number(), v.null()),
   })
 );
 
@@ -363,6 +366,10 @@ export const getNextGamePoll = query({
         : null,
       recommendedGameType: poll.recommendedGameType,
       chosenGameType: poll.chosenGameType,
+      autoAdvanceAt:
+        poll.status === 'awaitingOwner' && poll.recommendedGameType !== null && poll.resolvedAt !== null
+          ? poll.resolvedAt + NEXT_GAME_AUTO_ADVANCE_DELAY_MS
+          : null,
     };
   },
 });
@@ -567,7 +574,78 @@ export const closeNextGameVotingRound = mutation({
       recommendedGameType: resolution.recommendation,
       resolvedAt: now,
     });
+    if (resolution.recommendation !== null) {
+      await ctx.scheduler.runAfter(NEXT_GAME_AUTO_ADVANCE_DELAY_MS, internal.roomGames.autoAdvanceNextGame, {
+        pollId: poll._id,
+      });
+    }
     return { status: 'awaitingOwner' as const, roundNumber: round.roundNumber };
+  },
+});
+
+async function advanceRoomToGame(
+  ctx: MutationCtx,
+  room: Doc<'rooms'>,
+  currentRoomGame: Doc<'roomGames'> | null,
+  poll: Doc<'nextGamePolls'>,
+  gameType: GameType,
+  now: number
+): Promise<{ roomGameId: Id<'roomGames'>; gameType: GameType }> {
+  await requireNoActivePlaytest(ctx, room._id);
+  await requireAvailableGame(ctx, gameType);
+
+  const isInitialSelection = currentRoomGame === null && room.gameType === undefined;
+  const roomGameId = await ctx.db.insert('roomGames', {
+    roomId: room._id,
+    gameType,
+    sequence: currentRoomGame === null ? 1 : currentRoomGame.sequence + 1,
+    status: 'lobby',
+    createdAt: now,
+    startedAt: null,
+    completedAt: null,
+  });
+  await ctx.db.patch('rooms', room._id, {
+    gameType,
+    currentGameId: roomGameId,
+  });
+  if (isInitialSelection) {
+    await initializeGameState(ctx, room._id, gameType);
+  } else {
+    await prepareGameState(ctx, room, gameType);
+  }
+  await ctx.db.patch('nextGamePolls', poll._id, {
+    status: 'closed',
+    chosenGameType: gameType,
+    closedAt: now,
+  });
+  return { roomGameId, gameType };
+}
+
+export const autoAdvanceNextGame = internalMutation({
+  args: { pollId: v.id('nextGamePolls') },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const poll = await ctx.db.get('nextGamePolls', args.pollId);
+    if (poll === null || poll.status !== 'awaitingOwner' || poll.recommendedGameType === null) {
+      return null;
+    }
+    const room = await ctx.db.get('rooms', poll.roomId);
+    if (room === null) {
+      return null;
+    }
+    const currentRoomGame = await getCurrentRoomGame(ctx, room);
+    const expectedRoomGameId = poll.roomGameId ?? null;
+    const selectionIsCurrent =
+      room.status !== 'closed' &&
+      (currentRoomGame?._id ?? null) === expectedRoomGameId &&
+      ((currentRoomGame === null && room.gameType === undefined) || currentRoomGame?.status === 'complete');
+    if (!selectionIsCurrent) {
+      await ctx.db.patch('nextGamePolls', poll._id, { status: 'closed', closedAt: Date.now() });
+      return null;
+    }
+
+    await advanceRoomToGame(ctx, room, currentRoomGame, poll, poll.recommendedGameType, Date.now());
+    return null;
   },
 });
 
@@ -596,34 +674,10 @@ export const chooseNextGame = mutation({
     if (poll === null || poll.status !== 'awaitingOwner') {
       fail('NEXT_GAME_VOTING_CLOSED', 'Finish next-game voting before choosing.');
     }
-    await requireNoActivePlaytest(ctx, room._id);
-    await requireAvailableGame(ctx, args.gameType);
-
-    const now = Date.now();
-    const status = 'lobby';
-    const roomGameId = await ctx.db.insert('roomGames', {
-      roomId: room._id,
-      gameType: args.gameType,
-      sequence: currentRoomGame === null ? 1 : currentRoomGame.sequence + 1,
-      status,
-      createdAt: now,
-      startedAt: null,
-      completedAt: null,
-    });
-    await ctx.db.patch('rooms', room._id, {
-      gameType: args.gameType,
-      currentGameId: roomGameId,
-    });
-    if (isInitialSelection) {
-      await initializeGameState(ctx, room._id, args.gameType);
-    } else {
-      await prepareGameState(ctx, room, args.gameType);
+    if (poll.recommendedGameType !== null) {
+      fail('NEXT_GAME_WINNER_SELECTED', 'The winning game is already scheduled to start.');
     }
-    await ctx.db.patch('nextGamePolls', poll._id, {
-      status: 'closed',
-      chosenGameType: args.gameType,
-      closedAt: now,
-    });
-    return { roomGameId, gameType: args.gameType };
+    const now = Date.now();
+    return await advanceRoomToGame(ctx, room, currentRoomGame, poll, args.gameType, now);
   },
 });
