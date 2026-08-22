@@ -26,6 +26,7 @@ import type * as officialGames_doodleDash_lifecycle from "../officialGames/doodl
 import type * as officialGames_trivia_lifecycle from "../officialGames/trivia/lifecycle.js";
 import type * as officialGames_typeRacer_lifecycle from "../officialGames/typeRacer/lifecycle.js";
 import type * as passwords from "../passwords.js";
+import type * as playtestAdapters_doodleDash from "../playtestAdapters/doodleDash.js";
 import type * as playtestAdapters_index from "../playtestAdapters/index.js";
 import type * as playtestAdapters_trendline from "../playtestAdapters/trendline.js";
 import type * as playtestAdapters_trivia from "../playtestAdapters/trivia.js";
@@ -73,6 +74,7 @@ const fullApi: ApiFromModules<{
   "officialGames/trivia/lifecycle": typeof officialGames_trivia_lifecycle;
   "officialGames/typeRacer/lifecycle": typeof officialGames_typeRacer_lifecycle;
   passwords: typeof passwords;
+  "playtestAdapters/doodleDash": typeof playtestAdapters_doodleDash;
   "playtestAdapters/index": typeof playtestAdapters_index;
   "playtestAdapters/trendline": typeof playtestAdapters_trendline;
   "playtestAdapters/trivia": typeof playtestAdapters_trivia;

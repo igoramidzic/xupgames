@@ -342,6 +342,21 @@ export default defineSchema({
     .index('by_roomId_and_raceNumber', ['roomId', 'raceNumber'])
     .index('by_roomId_and_memberId', ['roomId', 'memberId']),
 
+  doodleDashPlaytestBotStates: defineTable({
+    botId: v.id('playtestBots'),
+    roomId: v.id('rooms'),
+    plannedRoundId: v.union(v.id('doodleDashRounds'), v.null()),
+    wordChoiceAt: v.number(),
+    wordOptionIndex: v.number(),
+    guessAt: v.number(),
+    guessSubmitted: v.boolean(),
+    drawingSeed: v.number(),
+    strokeIndex: v.number(),
+    pointIndex: v.number(),
+    chunkIndex: v.number(),
+    nextDrawAt: v.number(),
+  }).index('by_botId', ['botId']),
+
   triviaPlaytestBotStates: defineTable({
     botId: v.id('playtestBots'),
     roomId: v.id('rooms'),

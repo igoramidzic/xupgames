@@ -507,8 +507,9 @@ function gameAdapterCopy(gameType: ReadyPlaytestRoom['room']['gameType']) {
   switch (gameType) {
     case 'doodleDash':
       return {
-        label: 'No Doodle Dash bot adapter',
-        description: 'Automated drawing and guessing are not available for this game yet.',
+        label: 'Doodle Dash drawing adapter',
+        description:
+          'Bots choose words, make random doodles, and submit staggered correct guesses. They stay at the table until you remove them.',
       };
     case 'trivia':
       return {

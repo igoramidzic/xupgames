@@ -1,5 +1,6 @@
 import type { Doc } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
+import { initializeDoodleDashBot, runDoodleDashBotTick, stopDoodleDashBot } from './doodleDash';
 import { initializeTrendlineBot, runTrendlineBotTick, stopTrendlineBot } from './trendline';
 import { initializeTriviaBot, runTriviaBotTick, stopTriviaBot } from './trivia';
 import { initializeTypeRacerBot, runTypeRacerBotTick, stopTypeRacerBot } from './typeRacer';
@@ -10,7 +11,8 @@ export async function initializeGameBot(ctx: MutationCtx, room: Doc<'rooms'>, bo
   }
   switch (room.gameType) {
     case 'doodleDash':
-      throw new Error('Doodle Dash does not have an automated playtest adapter yet.');
+      await initializeDoodleDashBot(ctx, bot);
+      return;
     case 'trivia':
       await initializeTriviaBot(ctx, bot);
       return;
@@ -37,7 +39,7 @@ export async function runGameBotTick(
   }
   switch (room.gameType) {
     case 'doodleDash':
-      throw new Error('Doodle Dash does not have an automated playtest adapter yet.');
+      return await runDoodleDashBotTick(ctx, room, bot);
     case 'trivia':
       return await runTriviaBotTick(ctx, room, bot);
     case 'typeRacer':
@@ -59,7 +61,8 @@ export async function stopGameBot(
   const gameType = room?.gameType;
   switch (gameType) {
     case 'doodleDash':
-      throw new Error('Doodle Dash does not have an automated playtest adapter yet.');
+      await stopDoodleDashBot(ctx, bot);
+      return;
     case 'trivia':
       await stopTriviaBot(ctx, bot);
       return;

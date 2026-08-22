@@ -42,7 +42,7 @@ import {
 } from './doodleDashWords';
 import { requireRoomMember } from './roomAccess';
 import { activateCurrentRoomGame, completeCurrentRoomGame } from './roomGames';
-import { listActiveHumanRoomMembers, listRoomMembersForDisplay } from './roomMembers';
+import { listActiveRoomMembers, listRoomMembersForDisplay } from './roomMembers';
 
 const MAX_GAME_TURNS = MAX_PLAYERS * Math.max(...DOODLE_DASH_ROUND_OPTIONS);
 const LIVE_STROKE_CLEANUP_BATCH_SIZE = 100;
@@ -323,7 +323,7 @@ async function startDoodleDashTurn(
   void scheduledId;
 }
 
-async function beginDrawing(
+export async function beginDoodleDashDrawing(
   ctx: MutationCtx,
   state: Doc<'doodleDashGameStates'>,
   round: Doc<'doodleDashRounds'>,
@@ -398,6 +398,113 @@ async function revealCurrentWord(
     { stateId: state._id, roundId: round._id, gameNumber: state.gameNumber, turnNumber: round.turnNumber }
   );
   void scheduledId;
+}
+
+export type DoodleDashCorrectGuessResult =
+  | { kind: 'accepted'; pointsAwarded: number }
+  | { kind: 'existing'; pointsAwarded: number }
+  | { kind: 'ignored'; pointsAwarded: 0 };
+
+export async function recordDoodleDashCorrectGuess(
+  ctx: MutationCtx,
+  room: Doc<'rooms'>,
+  state: Doc<'doodleDashGameStates'>,
+  round: Doc<'doodleDashRounds'>,
+  membership: Doc<'roomMembers'>,
+  now: number
+): Promise<DoodleDashCorrectGuessResult> {
+  if (
+    state.phase !== 'drawing' ||
+    state.currentRoundId !== round._id ||
+    round.status !== 'drawing' ||
+    round.selectedWord === null ||
+    round.drawStartedAt === null ||
+    round.drawEndsAt === null ||
+    now > round.drawEndsAt ||
+    !membership.isActive ||
+    membership.roomId !== room._id ||
+    membership._id === round.drawerMemberId
+  ) {
+    return { kind: 'ignored', pointsAwarded: 0 };
+  }
+
+  const participantScore = await findScore(ctx, room._id, state.gameNumber, membership._id);
+  if (participantScore === null) {
+    return { kind: 'ignored', pointsAwarded: 0 };
+  }
+  const existingCorrect = await ctx.db
+    .query('doodleDashCorrectGuesses')
+    .withIndex('by_roundId_and_memberId', (index) => index.eq('roundId', round._id).eq('memberId', membership._id))
+    .unique();
+  if (existingCorrect !== null) {
+    return { kind: 'existing', pointsAwarded: existingCorrect.guessPoints };
+  }
+
+  const responseTimeMs = Math.max(0, Math.min(round.drawEndsAt - round.drawStartedAt, now - round.drawStartedAt));
+  const configuration = resolveConfiguration(state, state.turnOrder.length);
+  const { guessPoints, drawerPoints } = calculateDoodleDashPoints(responseTimeMs, configuration.drawDurationMs);
+  await ctx.db.insert('doodleDashCorrectGuesses', {
+    roomId: room._id,
+    gameNumber: state.gameNumber,
+    roundId: round._id,
+    memberId: membership._id,
+    responseTimeMs,
+    guessPoints,
+    drawerPoints,
+    submittedAt: now,
+  });
+  await ctx.db.insert('doodleDashMessages', {
+    roomId: room._id,
+    gameNumber: state.gameNumber,
+    roundId: round._id,
+    memberId: membership._id,
+    displayName: membership.displayName,
+    kind: 'correct',
+    isClose: false,
+    createdAt: now,
+  });
+  await ctx.db.patch('doodleDashScores', participantScore._id, {
+    displayName: membership.displayName,
+    totalPoints: participantScore.totalPoints + guessPoints,
+    guessPoints: participantScore.guessPoints + guessPoints,
+    wordsGuessed: participantScore.wordsGuessed + 1,
+    updatedAt: now,
+  });
+  const drawerScore = await findScore(ctx, room._id, state.gameNumber, round.drawerMemberId);
+  if (drawerScore !== null) {
+    await ctx.db.patch('doodleDashScores', drawerScore._id, {
+      totalPoints: drawerScore.totalPoints + drawerPoints,
+      drawPoints: drawerScore.drawPoints + drawerPoints,
+      correctGuessers: drawerScore.correctGuessers + 1,
+      updatedAt: now,
+    });
+  }
+  const correctGuessCount = round.correctGuessCount + 1;
+  const firstCorrectAt = round.firstCorrectAt ?? now;
+  await ctx.db.patch('doodleDashRounds', round._id, { correctGuessCount, firstCorrectAt });
+
+  let activeEligibleGuesserCount = 0;
+  for (const memberId of state.turnOrder) {
+    if (memberId === round.drawerMemberId) continue;
+    const member = await ctx.db.get('roomMembers', memberId);
+    if (member?.isActive === true) activeEligibleGuesserCount += 1;
+  }
+  if (correctGuessCount >= activeEligibleGuesserCount) {
+    await revealCurrentWord(ctx, state, { ...round, correctGuessCount, firstCorrectAt }, now);
+  } else if (round.firstCorrectAt === null && state.phaseEndsAt !== null) {
+    const shortenedEndsAt = Math.min(state.phaseEndsAt, now + DOODLE_DASH_FINAL_COUNTDOWN_MS);
+    if (shortenedEndsAt < state.phaseEndsAt) {
+      await ctx.db.patch('doodleDashRounds', round._id, { drawEndsAt: shortenedEndsAt });
+      await ctx.db.patch('doodleDashGameStates', state._id, { phaseEndsAt: shortenedEndsAt });
+      const scheduledId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(
+        shortenedEndsAt - now,
+        internal.doodleDash.endTurn,
+        { stateId: state._id, roundId: round._id, gameNumber: state.gameNumber, turnNumber: round.turnNumber }
+      );
+      void scheduledId;
+    }
+  }
+  return { kind: 'accepted', pointsAwarded: guessPoints };
 }
 
 export const getGame = query({
@@ -485,7 +592,7 @@ export const getGame = query({
     }));
     const configurationParticipantCount =
       state.phase === 'lobby'
-        ? (await listActiveHumanRoomMembers(ctx, args.roomId)).length
+        ? (await listActiveRoomMembers(ctx, args.roomId)).length
         : scores.length || displayMembers.filter((member) => member.isActive).length;
     const configuration = resolveConfiguration(state, configurationParticipantCount);
     if (round === null) {
@@ -664,7 +771,7 @@ export const startGame = mutation({
           : 'A Doodle Dash game is already in progress.'
       );
     }
-    const participants = await listActiveHumanRoomMembers(ctx, room._id);
+    const participants = await listActiveRoomMembers(ctx, room._id);
     if (participants.length < 2) {
       fail('ROOM_ACTION_NOT_ELIGIBLE', 'Doodle Dash needs at least two players.');
     }
@@ -726,7 +833,7 @@ export const chooseWord = mutation({
     if (round === null || round.drawerMemberId !== membership._id) {
       fail('DOODLE_DASH_NOT_DRAWER', 'Only the current drawer can choose the word.');
     }
-    await beginDrawing(ctx, state, round, args.optionIndex, Date.now());
+    await beginDoodleDashDrawing(ctx, state, round, args.optionIndex, Date.now());
     return null;
   },
 });
@@ -760,13 +867,6 @@ export const submitGuess = mutation({
     if (participantScore === null) {
       fail('DOODLE_DASH_NOT_GUESSER', 'You joined after this game started and can play in the next game.');
     }
-    const existingCorrect = await ctx.db
-      .query('doodleDashCorrectGuesses')
-      .withIndex('by_roundId_and_memberId', (index) => index.eq('roundId', round._id).eq('memberId', membership._id))
-      .unique();
-    if (existingCorrect !== null) {
-      fail('DOODLE_DASH_ALREADY_GUESSED', 'You already guessed this word.');
-    }
     const memberMessages = await ctx.db
       .query('doodleDashMessages')
       .withIndex('by_roundId_and_memberId', (index) => index.eq('roundId', round._id).eq('memberId', membership._id))
@@ -780,6 +880,13 @@ export const submitGuess = mutation({
       normalizeDoodleDashGuessForComparison(guessText) === normalizeDoodleDashGuessForComparison(round.selectedWord);
     const isClose = !isCorrect && isCloseDoodleDashGuess(guessText, round.selectedWord);
     if (!isCorrect) {
+      const existingCorrect = await ctx.db
+        .query('doodleDashCorrectGuesses')
+        .withIndex('by_roundId_and_memberId', (index) => index.eq('roundId', round._id).eq('memberId', membership._id))
+        .unique();
+      if (existingCorrect !== null) {
+        fail('DOODLE_DASH_ALREADY_GUESSED', 'You already guessed this word.');
+      }
       await ctx.db.insert('doodleDashMessages', {
         roomId: room._id,
         gameNumber: state.gameNumber,
@@ -793,74 +900,153 @@ export const submitGuess = mutation({
       });
       return { kind: isClose ? ('close' as const) : ('guess' as const), pointsAwarded: 0 };
     }
-
-    const responseTimeMs = Math.max(0, Math.min(round.drawEndsAt - round.drawStartedAt, now - round.drawStartedAt));
-    const configuration = resolveConfiguration(state, state.turnOrder.length);
-    const { guessPoints, drawerPoints } = calculateDoodleDashPoints(responseTimeMs, configuration.drawDurationMs);
-    await ctx.db.insert('doodleDashCorrectGuesses', {
-      roomId: room._id,
-      gameNumber: state.gameNumber,
-      roundId: round._id,
-      memberId: membership._id,
-      responseTimeMs,
-      guessPoints,
-      drawerPoints,
-      submittedAt: now,
-    });
-    await ctx.db.insert('doodleDashMessages', {
-      roomId: room._id,
-      gameNumber: state.gameNumber,
-      roundId: round._id,
-      memberId: membership._id,
-      displayName: membership.displayName,
-      kind: 'correct',
-      isClose: false,
-      createdAt: now,
-    });
-    await ctx.db.patch('doodleDashScores', participantScore._id, {
-      displayName: membership.displayName,
-      totalPoints: participantScore.totalPoints + guessPoints,
-      guessPoints: participantScore.guessPoints + guessPoints,
-      wordsGuessed: participantScore.wordsGuessed + 1,
-      updatedAt: now,
-    });
-    const drawerScore = await findScore(ctx, room._id, state.gameNumber, round.drawerMemberId);
-    if (drawerScore !== null) {
-      await ctx.db.patch('doodleDashScores', drawerScore._id, {
-        totalPoints: drawerScore.totalPoints + drawerPoints,
-        drawPoints: drawerScore.drawPoints + drawerPoints,
-        correctGuessers: drawerScore.correctGuessers + 1,
-        updatedAt: now,
-      });
+    const result = await recordDoodleDashCorrectGuess(ctx, room, state, round, membership, now);
+    if (result.kind === 'existing') {
+      fail('DOODLE_DASH_ALREADY_GUESSED', 'You already guessed this word.');
     }
-    const correctGuessCount = round.correctGuessCount + 1;
-    const firstCorrectAt = round.firstCorrectAt ?? now;
-    await ctx.db.patch('doodleDashRounds', round._id, { correctGuessCount, firstCorrectAt });
-
-    let activeEligibleGuesserCount = 0;
-    for (const memberId of state.turnOrder) {
-      if (memberId === round.drawerMemberId) continue;
-      const member = await ctx.db.get('roomMembers', memberId);
-      if (member?.isActive === true) activeEligibleGuesserCount += 1;
+    if (result.kind !== 'accepted') {
+      fail('DOODLE_DASH_GUESS_CLOSED', 'This guessing round is closed.');
     }
-    if (correctGuessCount >= activeEligibleGuesserCount) {
-      await revealCurrentWord(ctx, state, { ...round, correctGuessCount, firstCorrectAt }, now);
-    } else if (round.firstCorrectAt === null && state.phaseEndsAt !== null) {
-      const shortenedEndsAt = Math.min(state.phaseEndsAt, now + DOODLE_DASH_FINAL_COUNTDOWN_MS);
-      if (shortenedEndsAt < state.phaseEndsAt) {
-        await ctx.db.patch('doodleDashRounds', round._id, { drawEndsAt: shortenedEndsAt });
-        await ctx.db.patch('doodleDashGameStates', state._id, { phaseEndsAt: shortenedEndsAt });
-        const scheduledId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(
-          shortenedEndsAt - now,
-          internal.doodleDash.endTurn,
-          { stateId: state._id, roundId: round._id, gameNumber: state.gameNumber, turnNumber: round.turnNumber }
-        );
-        void scheduledId;
-      }
-    }
-    return { kind: 'correct' as const, pointsAwarded: guessPoints };
+    return { kind: 'correct' as const, pointsAwarded: result.pointsAwarded };
   },
 });
+
+export type DoodleDashLiveStrokeInput = {
+  actionId: string;
+  actionStartedAt: number;
+  chunkIndex: number;
+  tool: 'pen' | 'eraser';
+  color: string;
+  width: number;
+  points: Array<{ x: number; y: number }>;
+};
+
+export async function recordDoodleDashLiveStrokeChunk(
+  ctx: MutationCtx,
+  room: Doc<'rooms'>,
+  round: Doc<'doodleDashRounds'>,
+  input: DoodleDashLiveStrokeInput,
+  now: number
+): Promise<void> {
+  const widthAllowed =
+    (input.tool === 'pen' && (ALLOWED_PEN_WIDTHS as readonly number[]).includes(input.width)) ||
+    (input.tool === 'eraser' && (ALLOWED_ERASER_WIDTHS as readonly number[]).includes(input.width));
+  const colorAllowed = input.tool === 'eraser' || (DOODLE_DASH_COLORS as readonly string[]).includes(input.color);
+  if (
+    input.points.length < 1 ||
+    input.points.length > DOODLE_DASH_MAX_LIVE_CHUNK_POINTS ||
+    !widthAllowed ||
+    !colorAllowed ||
+    !Number.isSafeInteger(input.actionStartedAt) ||
+    input.actionStartedAt < 1 ||
+    !Number.isInteger(input.chunkIndex) ||
+    input.chunkIndex < 0 ||
+    input.chunkIndex >= DOODLE_DASH_MAX_LIVE_CHUNKS_PER_ACTION ||
+    input.actionId.length < 1 ||
+    input.actionId.length > 80 ||
+    !/^[a-zA-Z0-9_-]+$/u.test(input.actionId)
+  ) {
+    fail('INVALID_DOODLE_DASH_STROKE', 'That live drawing stroke is invalid.');
+  }
+  const durableStroke = await ctx.db
+    .query('doodleDashStrokes')
+    .withIndex('by_roundId_and_actionId', (index) => index.eq('roundId', round._id).eq('actionId', input.actionId))
+    .unique();
+  if (durableStroke !== null) return;
+  const existingChunk = await ctx.db
+    .query('doodleDashLiveStrokeChunks')
+    .withIndex('by_roundId_and_actionId_and_chunkIndex', (index) =>
+      index.eq('roundId', round._id).eq('actionId', input.actionId).eq('chunkIndex', input.chunkIndex)
+    )
+    .unique();
+  if (existingChunk !== null) return;
+  await ctx.db.insert('doodleDashLiveStrokeChunks', {
+    roomId: room._id,
+    roundId: round._id,
+    actionId: input.actionId,
+    actionStartedAt: input.actionStartedAt,
+    chunkIndex: input.chunkIndex,
+    tool: input.tool,
+    color: input.tool === 'eraser' ? '#ffffff' : input.color,
+    width: input.width,
+    points: input.points.map(normalizePoint),
+    createdAt: now,
+  });
+}
+
+export type DoodleDashStrokeInput = {
+  actionId: string;
+  tool: 'pen' | 'eraser' | 'fill';
+  color: string;
+  width: number;
+  points: Array<{ x: number; y: number }>;
+};
+
+export async function commitDoodleDashStroke(
+  ctx: MutationCtx,
+  room: Doc<'rooms'>,
+  round: Doc<'doodleDashRounds'>,
+  input: DoodleDashStrokeInput,
+  now: number
+): Promise<{ sequence: number }> {
+  const widthAllowed =
+    (input.tool === 'pen' && (ALLOWED_PEN_WIDTHS as readonly number[]).includes(input.width)) ||
+    (input.tool === 'eraser' && (ALLOWED_ERASER_WIDTHS as readonly number[]).includes(input.width)) ||
+    (input.tool === 'fill' && input.width === 0);
+  const colorAllowed = input.tool === 'eraser' || (DOODLE_DASH_COLORS as readonly string[]).includes(input.color);
+  const pointCountAllowed =
+    input.tool === 'fill'
+      ? input.points.length === 1
+      : input.points.length >= 1 && input.points.length <= DOODLE_DASH_MAX_STROKE_POINTS;
+  if (
+    !pointCountAllowed ||
+    !widthAllowed ||
+    !colorAllowed ||
+    input.actionId.length < 1 ||
+    input.actionId.length > 80 ||
+    !/^[a-zA-Z0-9_-]+$/u.test(input.actionId)
+  ) {
+    fail('INVALID_DOODLE_DASH_STROKE', 'That drawing stroke is invalid.');
+  }
+  const existingStroke = await ctx.db
+    .query('doodleDashStrokes')
+    .withIndex('by_roundId_and_actionId', (index) => index.eq('roundId', round._id).eq('actionId', input.actionId))
+    .unique();
+  if (existingStroke !== null) return { sequence: existingStroke.sequence };
+  if (round.nextStrokeSequence > DOODLE_DASH_MAX_STROKES) {
+    fail('DOODLE_DASH_DRAWING_CLOSED', 'This canvas reached its stroke limit.');
+  }
+  const points = input.points.map(normalizePoint);
+  const sequence = round.nextStrokeSequence;
+  const undoneStrokes = await ctx.db
+    .query('doodleDashStrokes')
+    .withIndex('by_roundId_and_isUndone_and_sequence', (index) => index.eq('roundId', round._id).eq('isUndone', true))
+    .take(DOODLE_DASH_MAX_STROKES + 1);
+  if (undoneStrokes.length > DOODLE_DASH_MAX_STROKES) {
+    throw new Error('Doodle Dash stroke capacity invariant violated.');
+  }
+  for (const stroke of undoneStrokes) await ctx.db.delete('doodleDashStrokes', stroke._id);
+  await ctx.db.insert('doodleDashStrokes', {
+    roomId: room._id,
+    roundId: round._id,
+    sequence,
+    actionId: input.actionId,
+    tool: input.tool,
+    color: input.tool === 'eraser' ? '#ffffff' : input.color,
+    width: input.width,
+    points,
+    isUndone: false,
+    createdAt: now,
+  });
+  await ctx.db.patch('doodleDashRounds', round._id, { nextStrokeSequence: sequence + 1 });
+  const cleanupId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(
+    0,
+    internal.doodleDash.cleanupLiveStrokeChunks,
+    { roundId: round._id, actionId: input.actionId }
+  );
+  void cleanupId;
+  return { sequence };
+}
 
 export const streamStrokeChunk = mutation({
   args: {
@@ -885,50 +1071,7 @@ export const streamStrokeChunk = mutation({
     if (round === null || round.drawerMemberId !== membership._id) {
       fail('DOODLE_DASH_NOT_DRAWER', 'Only the current drawer can use the canvas.');
     }
-    const widthAllowed =
-      (args.tool === 'pen' && (ALLOWED_PEN_WIDTHS as readonly number[]).includes(args.width)) ||
-      (args.tool === 'eraser' && (ALLOWED_ERASER_WIDTHS as readonly number[]).includes(args.width));
-    const colorAllowed = args.tool === 'eraser' || (DOODLE_DASH_COLORS as readonly string[]).includes(args.color);
-    if (
-      args.points.length < 1 ||
-      args.points.length > DOODLE_DASH_MAX_LIVE_CHUNK_POINTS ||
-      !widthAllowed ||
-      !colorAllowed ||
-      !Number.isSafeInteger(args.actionStartedAt) ||
-      args.actionStartedAt < 1 ||
-      !Number.isInteger(args.chunkIndex) ||
-      args.chunkIndex < 0 ||
-      args.chunkIndex >= DOODLE_DASH_MAX_LIVE_CHUNKS_PER_ACTION ||
-      args.actionId.length < 1 ||
-      args.actionId.length > 80 ||
-      !/^[a-zA-Z0-9_-]+$/u.test(args.actionId)
-    ) {
-      fail('INVALID_DOODLE_DASH_STROKE', 'That live drawing stroke is invalid.');
-    }
-    const durableStroke = await ctx.db
-      .query('doodleDashStrokes')
-      .withIndex('by_roundId_and_actionId', (index) => index.eq('roundId', round._id).eq('actionId', args.actionId))
-      .unique();
-    if (durableStroke !== null) return null;
-    const existingChunk = await ctx.db
-      .query('doodleDashLiveStrokeChunks')
-      .withIndex('by_roundId_and_actionId_and_chunkIndex', (index) =>
-        index.eq('roundId', round._id).eq('actionId', args.actionId).eq('chunkIndex', args.chunkIndex)
-      )
-      .unique();
-    if (existingChunk !== null) return null;
-    await ctx.db.insert('doodleDashLiveStrokeChunks', {
-      roomId: room._id,
-      roundId: round._id,
-      actionId: args.actionId,
-      actionStartedAt: args.actionStartedAt,
-      chunkIndex: args.chunkIndex,
-      tool: args.tool,
-      color: args.tool === 'eraser' ? '#ffffff' : args.color,
-      width: args.width,
-      points: args.points.map(normalizePoint),
-      createdAt: Date.now(),
-    });
+    await recordDoodleDashLiveStrokeChunk(ctx, room, round, args, Date.now());
     return null;
   },
 });
@@ -954,63 +1097,7 @@ export const appendStroke = mutation({
     if (round === null || round.drawerMemberId !== membership._id) {
       fail('DOODLE_DASH_NOT_DRAWER', 'Only the current drawer can use the canvas.');
     }
-    const widthAllowed =
-      (args.tool === 'pen' && (ALLOWED_PEN_WIDTHS as readonly number[]).includes(args.width)) ||
-      (args.tool === 'eraser' && (ALLOWED_ERASER_WIDTHS as readonly number[]).includes(args.width)) ||
-      (args.tool === 'fill' && args.width === 0);
-    const colorAllowed = args.tool === 'eraser' || (DOODLE_DASH_COLORS as readonly string[]).includes(args.color);
-    const pointCountAllowed =
-      args.tool === 'fill'
-        ? args.points.length === 1
-        : args.points.length >= 1 && args.points.length <= DOODLE_DASH_MAX_STROKE_POINTS;
-    if (
-      !pointCountAllowed ||
-      !widthAllowed ||
-      !colorAllowed ||
-      args.actionId.length < 1 ||
-      args.actionId.length > 80 ||
-      !/^[a-zA-Z0-9_-]+$/u.test(args.actionId)
-    ) {
-      fail('INVALID_DOODLE_DASH_STROKE', 'That drawing stroke is invalid.');
-    }
-    const existingStroke = await ctx.db
-      .query('doodleDashStrokes')
-      .withIndex('by_roundId_and_actionId', (index) => index.eq('roundId', round._id).eq('actionId', args.actionId))
-      .unique();
-    if (existingStroke !== null) return { sequence: existingStroke.sequence };
-    if (round.nextStrokeSequence > DOODLE_DASH_MAX_STROKES) {
-      fail('DOODLE_DASH_DRAWING_CLOSED', 'This canvas reached its stroke limit.');
-    }
-    const points = args.points.map(normalizePoint);
-    const sequence = round.nextStrokeSequence;
-    const undoneStrokes = await ctx.db
-      .query('doodleDashStrokes')
-      .withIndex('by_roundId_and_isUndone_and_sequence', (index) => index.eq('roundId', round._id).eq('isUndone', true))
-      .take(DOODLE_DASH_MAX_STROKES + 1);
-    if (undoneStrokes.length > DOODLE_DASH_MAX_STROKES) {
-      throw new Error('Doodle Dash stroke capacity invariant violated.');
-    }
-    for (const stroke of undoneStrokes) await ctx.db.delete('doodleDashStrokes', stroke._id);
-    await ctx.db.insert('doodleDashStrokes', {
-      roomId: room._id,
-      roundId: round._id,
-      sequence,
-      actionId: args.actionId,
-      tool: args.tool,
-      color: args.tool === 'eraser' ? '#ffffff' : args.color,
-      width: args.width,
-      points,
-      isUndone: false,
-      createdAt: Date.now(),
-    });
-    await ctx.db.patch('doodleDashRounds', round._id, { nextStrokeSequence: sequence + 1 });
-    const cleanupId: Id<'_scheduled_functions'> = await ctx.scheduler.runAfter(
-      0,
-      internal.doodleDash.cleanupLiveStrokeChunks,
-      { roundId: round._id, actionId: args.actionId }
-    );
-    void cleanupId;
-    return { sequence };
+    return await commitDoodleDashStroke(ctx, room, round, args, Date.now());
   },
 });
 
@@ -1171,7 +1258,7 @@ export const autoSelectWord = internalMutation({
     ) {
       return null;
     }
-    await beginDrawing(ctx, state, round, Math.floor(Math.random() * round.wordOptions.length), Date.now());
+    await beginDoodleDashDrawing(ctx, state, round, Math.floor(Math.random() * round.wordOptions.length), Date.now());
     return null;
   },
 });

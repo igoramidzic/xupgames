@@ -262,11 +262,6 @@ export const provision = internalMutation({
       await beginStoppingPlaytest(ctx, run, 'The room changed games.');
       return null;
     }
-    if (await currentRoomGameIsComplete(ctx, room)) {
-      await beginStoppingPlaytest(ctx, run, 'The game finished.');
-      return null;
-    }
-
     const remaining = run.requestedBotCount - run.provisionedBotCount;
     const availableSeats = Math.max(0, room.maxPlayers - room.activeMemberCount);
     const batchSize = Math.min(PROVISION_BATCH_SIZE, remaining, availableSeats);
@@ -368,10 +363,6 @@ export const tick = internalMutation({
     }
     if (room.gameType !== run.gameType) {
       await beginStoppingPlaytest(ctx, run, 'The room changed games.');
-      return null;
-    }
-    if (await currentRoomGameIsComplete(ctx, room)) {
-      await beginStoppingPlaytest(ctx, run, 'The game finished.');
       return null;
     }
     const now = Date.now();
