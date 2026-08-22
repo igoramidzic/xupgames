@@ -75,7 +75,7 @@ describe('DoodleDashCanvas', () => {
 
     fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 10, clientY: 10 });
     fireEvent.pointerMove(canvas, { pointerId: 1, clientX: 30, clientY: 20 });
-    await act(async () => vi.advanceTimersByTime(49));
+    await act(async () => vi.advanceTimersByTime(79));
     expect(onStream).not.toHaveBeenCalled();
     expect(onAppend).not.toHaveBeenCalled();
 
@@ -126,7 +126,7 @@ describe('DoodleDashCanvas', () => {
     fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 10, clientY: 10 });
     for (let index = 1; index <= 5; index += 1) {
       fireEvent.pointerMove(canvas, { pointerId: 1, clientX: 10 + index * 10, clientY: 10 + index * 5 });
-      await act(async () => vi.advanceTimersByTime(50));
+      await act(async () => vi.advanceTimersByTime(80));
     }
     expect(onStream).toHaveBeenCalledTimes(4);
 
@@ -378,7 +378,7 @@ describe('DoodleDashCanvas', () => {
     fireEvent.pointerDown(canvas, { pointerId: 2, clientX: 40, clientY: 40 });
     fireEvent.pointerMove(canvas, { pointerId: 2, clientX: 60, clientY: 60 });
     fireEvent.pointerMove(canvas, { pointerId: 2, clientX: 80, clientY: 40 });
-    await act(async () => vi.advanceTimersByTime(50));
+    await act(async () => vi.advanceTimersByTime(80));
 
     context.lineTo.mockClear();
     context.quadraticCurveTo.mockClear();

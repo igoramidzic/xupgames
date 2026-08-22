@@ -31,7 +31,7 @@ type PendingDoodleDashStroke = DoodleDashStrokePayload & {
 
 const WIDTHS = [5, 10, 18] as const;
 const MAX_BATCH_POINTS = 96;
-const STROKE_FLUSH_INTERVAL_MS = 50;
+const STROKE_FLUSH_INTERVAL_MS = 80;
 const MAX_CONCURRENT_LIVE_SENDS = 4;
 const LIVE_PLAYBACK_DELAY_MS = 50;
 const LIVE_PLAYBACK_DURATION_MS = 70;

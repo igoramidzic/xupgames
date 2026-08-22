@@ -70,10 +70,12 @@ function formatTimer(milliseconds: number) {
 export default function DoodleDashRoom({ guest, session }: { guest: GuestIdentity; session: ActiveSession }) {
   const navigate = useNavigate();
   const game = useQuery(api.doodleDash.getGame, { roomId: session.roomId, sessionToken: guest.sessionToken });
-  const liveStrokeChunks = useQuery(api.doodleDash.listLiveStrokeChunks, {
-    roomId: session.roomId,
-    sessionToken: guest.sessionToken,
-  });
+  const shouldSubscribeToLiveStrokes =
+    game !== undefined && game.phase === 'drawing' && game.round !== null && !game.round.isDrawer;
+  const liveStrokeChunks = useQuery(
+    api.doodleDash.listLiveStrokeChunks,
+    shouldSubscribeToLiveStrokes ? { roomId: session.roomId, sessionToken: guest.sessionToken } : 'skip'
+  );
   const startGame = useMutation(api.doodleDash.startGame);
   const chooseWord = useMutation(api.doodleDash.chooseWord);
   const submitGuess = useMutation(api.doodleDash.submitGuess);

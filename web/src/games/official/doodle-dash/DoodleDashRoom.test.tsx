@@ -7,6 +7,7 @@ import DoodleDashRoom from './DoodleDashRoom';
 const mocks = vi.hoisted(() => ({
   game: null as Record<string, unknown> | null,
   mutationIndex: 0,
+  queryCalls: [] as unknown[][],
   queryIndex: 0,
   startGame: vi.fn(),
   chooseWord: vi.fn(),
@@ -22,7 +23,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('convex/react', () => ({
-  useQuery: () => {
+  useQuery: (...args: unknown[]) => {
+    mocks.queryCalls.push(args);
     const result = mocks.queryIndex % 2 === 0 ? mocks.game : [];
     mocks.queryIndex += 1;
     return result;
@@ -195,6 +197,7 @@ function activeRound(overrides: Record<string, unknown> = {}) {
 describe('DoodleDashRoom', () => {
   beforeEach(() => {
     mocks.mutationIndex = 0;
+    mocks.queryCalls = [];
     mocks.queryIndex = 0;
     for (const mock of [
       mocks.startGame,
@@ -247,6 +250,7 @@ describe('DoodleDashRoom', () => {
     expect(within(players).getByText('Theo')).toBeInTheDocument();
     expect(within(players).getByText('Ready to play')).toBeInTheDocument();
     expect(screen.queryByText('Choose from three private words in 8 seconds.')).not.toBeInTheDocument();
+    expect(mocks.queryCalls[1]?.[1]).toBe('skip');
     await user.click(screen.getByRole('button', { name: 'Start Doodle Dash' }));
     expect(mocks.startGame).toHaveBeenCalledWith({ roomId: 'room-1', sessionToken: guest.sessionToken });
   });
@@ -330,6 +334,36 @@ describe('DoodleDashRoom', () => {
       sessionToken: guest.sessionToken,
       optionIndex: 0,
     });
+  });
+
+  it('subscribes to live stroke chunks only for spectators during drawing', () => {
+    mocks.game = activeRound();
+    const { unmount } = render(
+      <MemoryRouter>
+        <DoodleDashRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+    expect(mocks.queryCalls[1]?.[1]).toEqual({ roomId: 'room-1', sessionToken: guest.sessionToken });
+
+    unmount();
+    mocks.queryCalls = [];
+    mocks.queryIndex = 0;
+    mocks.mutationIndex = 0;
+    mocks.game = activeRound({
+      canGuess: false,
+      round: {
+        ...activeRound().round,
+        drawerMemberId: 'member-1',
+        drawerDisplayName: 'Ada',
+        isDrawer: true,
+      },
+    });
+    render(
+      <MemoryRouter>
+        <DoodleDashRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+    expect(mocks.queryCalls[1]?.[1]).toBe('skip');
   });
 
   it('uses content-sized cards for the active board and keeps the reveal below the canvas', () => {
