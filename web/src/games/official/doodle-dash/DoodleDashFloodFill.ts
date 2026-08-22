@@ -1,5 +1,11 @@
 export type DoodleDashRgba = readonly [red: number, green: number, blue: number, alpha: number];
 
+const OPAQUE_ALPHA = 255;
+const CANVAS_BACKGROUND_CHANNEL = 255;
+// Only translucent pixels use this tolerance; opaque ink remains the hard boundary.
+// This reaches the nearly opaque fringe of the darkest palette color when composited on white.
+const ANTIALIAS_VISIBLE_CHANNEL_TOLERANCE = 224;
+
 function matchesColor(data: Uint8ClampedArray, offset: number, color: DoodleDashRgba) {
   return (
     data[offset] === color[0] &&
@@ -7,6 +13,27 @@ function matchesColor(data: Uint8ClampedArray, offset: number, color: DoodleDash
     data[offset + 2] === color[2] &&
     data[offset + 3] === color[3]
   );
+}
+
+function visibleChannel(channel: number, alpha: number) {
+  return Math.round((channel * alpha + CANVAS_BACKGROUND_CHANNEL * (OPAQUE_ALPHA - alpha)) / OPAQUE_ALPHA);
+}
+
+function matchesFillRegion(data: Uint8ClampedArray, offset: number, target: DoodleDashRgba) {
+  if (matchesColor(data, offset, target)) return true;
+
+  const candidateAlpha = data[offset + 3] ?? 0;
+  if (target[3] !== 0 || candidateAlpha === OPAQUE_ALPHA) return false;
+
+  for (let channelIndex = 0; channelIndex < 3; channelIndex += 1) {
+    const candidateChannel = data[offset + channelIndex] ?? 0;
+    const candidateVisible = visibleChannel(candidateChannel, candidateAlpha);
+    const targetVisible = visibleChannel(target[channelIndex], target[3]);
+    if (Math.abs(candidateVisible - targetVisible) > ANTIALIAS_VISIBLE_CHANNEL_TOLERANCE) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function doodleDashHexToRgba(color: string): DoodleDashRgba {
@@ -60,7 +87,7 @@ export function floodFillDoodleDashPixels(
   const enqueueMatchingPixel = (candidate: number) => {
     if (visited[candidate] === 1) return;
     visited[candidate] = 1;
-    if (!matchesColor(data, candidate * 4, target)) return;
+    if (!matchesFillRegion(data, candidate * 4, target)) return;
     queue[writeIndex] = candidate;
     writeIndex += 1;
   };
