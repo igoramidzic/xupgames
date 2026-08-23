@@ -32,7 +32,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { GAME_LOBBY_CARD_HEIGHT_CLASS, GAME_LOBBY_FRAME_CLASS, GAME_LOBBY_GRID_CLASS } from '@/lib/gameLobbyLayout';
+import {
+  GAME_LOBBY_CARD_HEIGHT_CLASS,
+  GAME_LOBBY_FRAME_CLASS,
+  GAME_LOBBY_GRID_CLASS,
+  GAME_STANDINGS_SIDEBAR_HEIGHT_CLASS,
+} from '@/lib/gameLobbyLayout';
 import type { GuestIdentity } from '@/lib/guest';
 import { getRoomMembers } from '@/lib/roomSession';
 import { useListReorderAnimation } from '@/lib/useListReorderAnimation';
@@ -749,7 +754,10 @@ function StandingsPanel({
   const currentPlayer = game.leaderboard.find((entry) => entry.isCurrentPlayer) ?? null;
   return (
     <aside
-      className="order-1 flex max-h-[calc(100dvh-104px)] min-h-0 flex-col self-start overflow-hidden rounded-[15px_8px_17px_10px] border border-[#c8b9a6] bg-[#fffdf7] shadow-[4px_5px_0_#ded2c2] max-[1120px]:order-3 max-[1120px]:col-span-2 max-[1120px]:max-h-90 max-[760px]:col-span-1"
+      className={cn(
+        'order-1 flex flex-col overflow-hidden rounded-[15px_8px_17px_10px] border border-[#c8b9a6] bg-[#fffdf7] shadow-[4px_5px_0_#ded2c2] max-[1120px]:order-3 max-[1120px]:col-span-2 max-[1120px]:h-auto max-[1120px]:max-h-90 max-[760px]:col-span-1',
+        GAME_STANDINGS_SIDEBAR_HEIGHT_CLASS
+      )}
       data-slot="doodle-dash-standings-card"
     >
       <div className="mx-3 flex items-center justify-between border-b border-[#e4d9ca] pt-4 pb-3">

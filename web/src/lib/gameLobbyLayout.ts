@@ -9,3 +9,5 @@ export const GAME_LOBBY_CARD_HEIGHT_CLASS =
 
 export const GAME_LOBBY_SIDEBAR_HEIGHT_CLASS =
   'max-h-[clamp(640px,calc(100dvh-112px),768px)] min-h-0 self-start max-[820px]:max-h-96';
+
+export const GAME_STANDINGS_SIDEBAR_HEIGHT_CLASS = 'h-[calc(100dvh-104px)] min-h-0 self-start';

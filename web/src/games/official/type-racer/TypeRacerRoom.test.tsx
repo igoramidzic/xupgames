@@ -351,6 +351,10 @@ describe('TypeRacerRoom', () => {
     );
 
     const standings = within(screen.getByRole('list', { name: 'Racer standings' }));
+    expect(screen.getByRole('list', { name: 'Racer standings' }).closest('aside')).toHaveClass(
+      'h-[calc(100dvh-104px)]',
+      'max-[820px]:h-auto'
+    );
     expect(standings.getByText('Grace')).toBeInTheDocument();
     const input = screen.getByLabelText('Type the passage');
     expect(input).toBeEnabled();

@@ -148,6 +148,10 @@ describe('TrendlineRoom', () => {
       </MemoryRouter>
     );
     expect(screen.getByRole('heading', { name: 'Individuals using the Internet in Brazil' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Trendline standings' }).closest('aside')).toHaveClass(
+      'h-[calc(100dvh-104px)]',
+      'max-[820px]:h-auto'
+    );
     const chart = screen.getByRole('img', { name: /Prediction chart/ });
     expect(chart).toHaveClass('touch-none');
     expect(screen.queryByLabelText('Prediction year')).not.toBeInTheDocument();

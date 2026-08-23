@@ -397,7 +397,7 @@ describe('DoodleDashRoom', () => {
     expect(statusCard.parentElement).toBe(centerStack);
     expect(revealCard.parentElement).toBe(centerStack);
     expect(canvas.compareDocumentPosition(revealCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(standingsCard).toHaveClass('self-start', 'max-h-[calc(100dvh-104px)]');
+    expect(standingsCard).toHaveClass('self-start', 'h-[calc(100dvh-104px)]', 'max-[1120px]:h-auto');
     expect(guessesCard).toHaveClass('self-start', 'h-[calc(100dvh-104px)]');
   });
 

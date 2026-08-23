@@ -37,7 +37,7 @@ import {
   GAME_LOBBY_CARD_HEIGHT_CLASS,
   GAME_LOBBY_FRAME_CLASS,
   GAME_LOBBY_GRID_CLASS,
-  GAME_LOBBY_SIDEBAR_HEIGHT_CLASS,
+  GAME_STANDINGS_SIDEBAR_HEIGHT_CLASS,
 } from '@/lib/gameLobbyLayout';
 import type { GuestIdentity } from '@/lib/guest';
 import { getRoomMembers } from '@/lib/roomSession';
@@ -933,8 +933,8 @@ function RaceBoard({
   return (
     <aside
       className={cn(
-        'flex flex-col overflow-hidden rounded-[22px_12px_24px_14px] border border-[#9faed5] bg-[#2b1b45] text-white shadow-[7px_8px_0_#c7d3ef]',
-        GAME_LOBBY_SIDEBAR_HEIGHT_CLASS
+        'flex flex-col overflow-hidden rounded-[22px_12px_24px_14px] border border-[#9faed5] bg-[#2b1b45] text-white shadow-[7px_8px_0_#c7d3ef] max-[820px]:h-auto max-[820px]:max-h-96',
+        GAME_STANDINGS_SIDEBAR_HEIGHT_CLASS
       )}
     >
       <div className="flex items-center justify-between border-b border-white/12 px-5 py-5">
