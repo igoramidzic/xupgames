@@ -488,4 +488,27 @@ describe('DoodleDashRoom', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Send guess' })).toBeEnabled());
     expect(input).toHaveValue('giraffe');
   });
+
+  it('focuses the guess field and keeps the first key after guessing reopens', async () => {
+    mocks.game = activeRound({ phase: 'reveal', canGuess: false });
+    const user = userEvent.setup();
+    const room = (
+      <MemoryRouter>
+        <DoodleDashRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+    const { rerender } = render(room);
+    expect(screen.getByLabelText('Your guess')).toBeDisabled();
+
+    mocks.game = activeRound();
+    rerender(room);
+    const input = screen.getByLabelText('Your guess');
+    await waitFor(() => expect(input).toBeEnabled());
+    input.blur();
+
+    await user.keyboard('g');
+
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('g');
+  });
 });

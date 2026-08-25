@@ -833,12 +833,47 @@ function GuessPanel({
   onGuess: (event: FormEvent) => void;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const round = game.round;
   const messageCount = round?.messages.length ?? 0;
   useEffect(() => {
     void messageCount;
     endRef.current?.scrollIntoView?.({ block: 'nearest' });
   }, [messageCount]);
+  useEffect(() => {
+    function handleWindowKeyDown(event: KeyboardEvent) {
+      if (
+        !game.canGuess ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.key.length !== 1 ||
+        document.activeElement === inputRef.current ||
+        document.querySelector('[role="dialog"], [role="alertdialog"]') !== null
+      ) {
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLSelectElement ||
+        (activeElement instanceof HTMLElement && activeElement.isContentEditable)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      inputRef.current?.focus({ preventScroll: true });
+      onGuessChange(`${guess}${event.key}`.slice(0, 80));
+    }
+
+    window.addEventListener('keydown', handleWindowKeyDown);
+    return () => window.removeEventListener('keydown', handleWindowKeyDown);
+  }, [game.canGuess, guess, onGuessChange]);
   if (round === null) return null;
   const currentPlayer = game.leaderboard.find((entry) => entry.isCurrentPlayer) ?? null;
   const placeholder = !game.isParticipant
@@ -913,6 +948,7 @@ function GuessPanel({
         ) : null}
         <div className="flex gap-2">
           <input
+            ref={inputRef}
             className="h-10 min-w-0 flex-1 rounded-[9px_5px_10px_6px] border border-[#cfc2b0] bg-white px-3 text-sm outline-none placeholder:text-[#a79b89] focus:border-[#3155d9] focus:ring-3 focus:ring-[#3155d9]/15 disabled:bg-[#eee8df]"
             value={guess}
             maxLength={80}
