@@ -12,6 +12,12 @@ import {
   initializeDoodleDashGame,
   prepareDoodleDashGame,
 } from './officialGames/doodleDash/lifecycle';
+import {
+  initializeMiniGamesGame,
+  miniGamesGameIsComplete,
+  prepareMiniGamesGame,
+  syncMiniGamesMembership,
+} from './officialGames/miniGames/lifecycle';
 import { initializeTriviaGame, prepareTriviaGame, triviaGameIsComplete } from './officialGames/trivia/lifecycle';
 import {
   initializeTypeRacerGame,
@@ -33,6 +39,9 @@ export async function initializeGameState(ctx: MutationCtx, roomId: Id<'rooms'>,
   switch (gameType) {
     case 'doodleDash':
       await initializeDoodleDashGame(ctx, roomId);
+      return;
+    case 'miniGames':
+      await initializeMiniGamesGame(ctx, roomId);
       return;
     case 'trivia':
       await initializeTriviaGame(ctx, roomId);
@@ -62,6 +71,9 @@ export async function syncGameMembership(
   switch (room.gameType) {
     case 'doodleDash':
       return;
+    case 'miniGames':
+      await syncMiniGamesMembership(ctx, room._id, membership, now);
+      return;
     case 'trivia':
       return;
     case 'typeRacer':
@@ -81,6 +93,9 @@ export async function prepareGameState(ctx: MutationCtx, room: Doc<'rooms'>, gam
   switch (gameType) {
     case 'doodleDash':
       await prepareDoodleDashGame(ctx, room._id);
+      return;
+    case 'miniGames':
+      await prepareMiniGamesGame(ctx, room._id);
       return;
     case 'trivia':
       await prepareTriviaGame(ctx, room._id);
@@ -105,6 +120,8 @@ export async function gameStateIsComplete(ctx: DatabaseReaderContext, room: Doc<
   switch (room.gameType) {
     case 'doodleDash':
       return await doodleDashGameIsComplete(ctx, room._id);
+    case 'miniGames':
+      return await miniGamesGameIsComplete(ctx, room._id);
     case 'trivia':
       return await triviaGameIsComplete(ctx, room._id);
     case 'typeRacer':

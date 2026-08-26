@@ -26,6 +26,23 @@ const doodleDashRoundStatus = v.union(v.literal('choosing'), v.literal('drawing'
 const typeRacerPhase = v.union(v.literal('lobby'), v.literal('countdown'), v.literal('racing'), v.literal('complete'));
 const typeRacerProgressStatus = v.union(v.literal('waiting'), v.literal('racing'), v.literal('finished'));
 const typeRacerPassageKind = v.union(v.literal('phrase'), v.literal('sentence'), v.literal('paragraph'));
+const miniGamesPhase = v.union(
+  v.literal('lobby'),
+  v.literal('selecting'),
+  v.literal('playing'),
+  v.literal('roundResults'),
+  v.literal('complete')
+);
+const miniGameId = v.union(v.literal('straightLine'), v.literal('orangeEmojis'));
+const miniGameRoundStatus = v.union(v.literal('selecting'), v.literal('playing'), v.literal('results'));
+const miniGameResultStatus = v.union(v.literal('waiting'), v.literal('finished'), v.literal('timedOut'));
+const miniGameEmojiColor = v.union(
+  v.literal('orange'),
+  v.literal('blue'),
+  v.literal('green'),
+  v.literal('pink'),
+  v.literal('purple')
+);
 const playtestStatus = v.union(
   v.literal('provisioning'),
   v.literal('running'),
@@ -301,6 +318,71 @@ export default defineSchema({
     bestStreak: v.number(),
     updatedAt: v.number(),
   })
+    .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber'])
+    .index('by_roomId_and_gameNumber_and_memberId', ['roomId', 'gameNumber', 'memberId']),
+
+  miniGamesGameStates: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    phase: miniGamesPhase,
+    currentRoundId: v.union(v.id('miniGamesRounds'), v.null()),
+    currentRoundNumber: v.number(),
+    totalRounds: v.number(),
+    configuredRoundCount: v.optional(v.number()),
+    phaseStartedAt: v.union(v.number(), v.null()),
+    phaseEndsAt: v.union(v.number(), v.null()),
+    participantCount: v.number(),
+    finishedCount: v.number(),
+  }).index('by_roomId', ['roomId']),
+
+  miniGamesRounds: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    roundNumber: v.number(),
+    miniGameId,
+    status: miniGameRoundStatus,
+    selectionStartedAt: v.number(),
+    playStartsAt: v.number(),
+    playEndsAt: v.number(),
+    resultsStartedAt: v.union(v.number(), v.null()),
+    lineStartX: v.union(v.number(), v.null()),
+    lineStartY: v.union(v.number(), v.null()),
+    lineEndX: v.union(v.number(), v.null()),
+    lineEndY: v.union(v.number(), v.null()),
+    targetEmoji: v.optional(v.string()),
+    emojiItems: v.array(
+      v.object({
+        id: v.string(),
+        emoji: v.string(),
+        color: miniGameEmojiColor,
+        x: v.number(),
+        y: v.number(),
+        rotation: v.number(),
+      })
+    ),
+  })
+    .index('by_roomId_and_gameNumber_and_roundNumber', ['roomId', 'gameNumber', 'roundNumber'])
+    .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber']),
+
+  miniGamesResults: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    roundNumber: v.number(),
+    roundId: v.id('miniGamesRounds'),
+    memberId: v.id('roomMembers'),
+    displayName: v.string(),
+    miniGameId,
+    status: miniGameResultStatus,
+    startedAt: v.number(),
+    finishedAt: v.union(v.number(), v.null()),
+    timeMs: v.union(v.number(), v.null()),
+    score: v.number(),
+    straightness: v.union(v.number(), v.null()),
+    correctClicks: v.number(),
+    wrongClicks: v.number(),
+  })
+    .index('by_roundId', ['roundId'])
+    .index('by_roundId_and_memberId', ['roundId', 'memberId'])
     .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber'])
     .index('by_roomId_and_gameNumber_and_memberId', ['roomId', 'gameNumber', 'memberId']),
 

@@ -511,6 +511,11 @@ function gameAdapterCopy(gameType: ReadyPlaytestRoom['room']['gameType']) {
         description:
           'Bots choose words, make random doodles, and submit staggered correct guesses. They stay at the table until you remove them.',
       };
+    case 'miniGames':
+      return {
+        label: 'Mini Game Mix browser playtest',
+        description: 'Automated mini-game players are not available yet. Use real browser tabs to test this game.',
+      };
     case 'trivia':
       return {
         label: 'Trivia answer adapter',

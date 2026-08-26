@@ -1,16 +1,23 @@
 import type { api } from '@convex/_generated/api';
 import type { GameType as BackendGameType } from '@convex/gameRegistry';
 import type { FunctionReturnType } from 'convex/server';
-import { BrainCircuit, Keyboard, type LucideIcon, Paintbrush, TrendingUp } from 'lucide-react';
+import { BrainCircuit, Dices, Keyboard, type LucideIcon, Paintbrush, TrendingUp } from 'lucide-react';
 import type { ComponentType } from 'react';
 import TrendlinePreview from '@/games/community/trendline/TrendlinePreview';
 import DoodleDashPreview from '@/games/official/doodle-dash/DoodleDashPreview';
+import MiniGamesPreview from '@/games/official/mini-games/MiniGamesPreview';
 import TriviaPreview from '@/games/official/trivia/TriviaPreview';
 import TypeRacerPreview from '@/games/official/type-racer/TypeRacerPreview';
 import { cn } from '@/lib/utils';
 
 export type GameType = BackendGameType;
-export const GAME_TYPES = ['doodleDash', 'trivia', 'typeRacer', 'trendline'] as const satisfies readonly GameType[];
+export const GAME_TYPES = [
+  'doodleDash',
+  'miniGames',
+  'trivia',
+  'typeRacer',
+  'trendline',
+] as const satisfies readonly GameType[];
 export type GameCatalogEntry = FunctionReturnType<typeof api.games.listAvailable>[number];
 export type GameSource = GameCatalogEntry['source'];
 
@@ -29,6 +36,13 @@ const GAME_PRESENTATIONS: Record<GameType, GamePresentation> = {
     tint: '#e3e9ff',
     previewLabel: 'A preview of a Doodle Dash drawing turn',
     preview: DoodleDashPreview,
+  },
+  miniGames: {
+    icon: Dices,
+    color: '#e85d2a',
+    tint: '#fff0b8',
+    previewLabel: 'A preview of the Mini Game Mix challenge spinner',
+    preview: MiniGamesPreview,
   },
   trivia: {
     icon: BrainCircuit,

@@ -14,6 +14,8 @@ export async function initializeGameBot(ctx: MutationCtx, room: Doc<'rooms'>, bo
     case 'doodleDash':
       await initializeDoodleDashBot(ctx, bot);
       return;
+    case 'miniGames':
+      throw new Error('Mini Game Mix does not have a playtest bot adapter yet.');
     case 'trivia':
       await initializeTriviaBot(ctx, bot);
       return;
@@ -41,6 +43,8 @@ export async function runGameBotTick(
   switch (room.gameType) {
     case 'doodleDash':
       return await runDoodleDashBotTick(ctx, room, bot);
+    case 'miniGames':
+      throw new Error('Mini Game Mix does not have a playtest bot adapter yet.');
     case 'trivia':
       return await runTriviaBotTick(ctx, room, bot);
     case 'typeRacer':
@@ -62,6 +66,8 @@ export async function stopGameBot(
   switch (gameType) {
     case 'doodleDash':
       await stopDoodleDashBot(ctx, bot);
+      return;
+    case 'miniGames':
       return;
     case 'trivia':
       await stopTriviaBot(ctx, bot);
