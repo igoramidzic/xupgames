@@ -59,5 +59,9 @@ describe('LobbyPlayersSidebar', () => {
     expect(sidebar.style.getPropertyValue('--lobby-sidebar-background')).toBe('#123456');
     expect(sidebar.style.getPropertyValue('--lobby-sidebar-text')).toBe('#ffffff');
     expect(within(sidebar).getByRole('heading', { name: 'Players' })).toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: 'Invite more players' })).toHaveClass(
+      'enabled:hover:text-[var(--lobby-sidebar-invite-text)]',
+      'enabled:hover:bg-[var(--lobby-sidebar-invite-hover-background)]'
+    );
   });
 });

@@ -204,7 +204,9 @@ describe('MiniGamesRoom', () => {
     expect(screen.getByText('Round 1 scores')).toBeInTheDocument();
     expect(screen.getByText('+920')).toBeInTheDocument();
     expect(screen.getByText('98% straight · 2.1s')).toBeInTheDocument();
-    expect(screen.getByRole('timer', { name: /Next spin: \d seconds/ })).toHaveClass('rounded-full');
+    const timer = screen.getByRole('timer', { name: /Next spin: \d seconds/ });
+    expect(timer).toHaveClass('rounded-full');
+    expect(timer.getAttribute('style')).toContain('--countdown-progress:');
     expect(screen.queryByText(/Next spin in/)).not.toBeInTheDocument();
   });
 
@@ -255,6 +257,9 @@ describe('MiniGamesRoom', () => {
       </MemoryRouter>
     );
 
+    expect(screen.getByRole('timer', { name: /Time remaining: \d+ seconds/ }).getAttribute('style')).toContain(
+      '--countdown-progress:'
+    );
     expect(screen.getByLabelText('Target emoji 🐸')).toBeInTheDocument();
     expect(screen.getByText('Find this emoji:')).toBeInTheDocument();
     expect(screen.getByText('0 of 2 found')).toBeInTheDocument();

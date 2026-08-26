@@ -3,6 +3,7 @@ import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import { Check, Copy, Dices, DoorOpen, LoaderCircle, LockKeyhole, PencilLine, Play, Trophy } from 'lucide-react';
 import {
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   useEffect,
@@ -61,6 +62,8 @@ const ROULETTE_SLOT_IDS = [
 const ROULETTE_REST_MS = 420;
 const ROULETTE_SPIN_MS = 2_400;
 const ROUND_RESULTS_FADE_MS = 500;
+const MINI_GAME_ROUND_MS = 10_000;
+const MINI_GAME_RESULTS_MS = 4_000;
 
 function useClock(enabled: boolean) {
   const [now, setNow] = useState(Date.now());
@@ -85,15 +88,23 @@ function resultDetail(result: GameView['roundResults'][number], miniGameId: Mini
   return `${result.correctClicks} found · ${result.wrongClicks} wrong · ${formatTime(result.timeMs)}`;
 }
 
-function CountdownCircle({ seconds, label }: { seconds: number; label: string }) {
+function CountdownCircle({ remainingMs, totalMs, label }: { remainingMs: number; totalMs: number; label: string }) {
+  const seconds = Math.max(0, Math.ceil(remainingMs / 1_000));
+  const progress = Math.min(1, Math.max(0, remainingMs / totalMs));
+  const timerStyle = { '--countdown-progress': `${progress * 360}deg` } as CSSProperties;
+
   return (
-    <span
-      className="grid size-15 shrink-0 place-content-center rounded-full border-2 border-[#17203a] bg-[#ffd85c] font-display text-xl font-[900] shadow-[3px_3px_0_#17203a] tabular-nums"
+    <strong
+      className="grid size-16 shrink-0 place-items-center rounded-full bg-[conic-gradient(from_-90deg,#3155d9_var(--countdown-progress),#ccd6e6_0)] p-1 shadow-[3px_3px_0_#17203a] transition-[--countdown-progress] duration-100 before:col-start-1 before:row-start-1 before:size-13 before:rounded-full before:border-2 before:border-[#17203a] before:bg-[#ffd85c] before:content-[''] motion-reduce:transition-none data-[urgent=true]:bg-[conic-gradient(from_-90deg,#e85d2a_var(--countdown-progress),#ecd4c9_0)]"
+      style={timerStyle}
+      data-urgent={remainingMs <= 3_000}
       role="timer"
       aria-label={`${label}: ${seconds} seconds`}
     >
-      {seconds}
-    </span>
+      <span className="z-1 col-start-1 row-start-1 font-display text-xl leading-none font-[900] tabular-nums">
+        {seconds}
+      </span>
+    </strong>
   );
 }
 
@@ -420,7 +431,6 @@ function RoundResults({ game, now }: { game: GameView; now: number }) {
   const round = game.round;
   if (round === null) return null;
   const remainingMs = Math.max(0, (game.phaseEndsAt ?? now) - now);
-  const seconds = Math.ceil(remainingMs / 1_000);
   const isFadingToSpinner = round.roundNumber < game.totalRounds && remainingMs <= ROUND_RESULTS_FADE_MS;
   return (
     <section
@@ -436,7 +446,7 @@ function RoundResults({ game, now }: { game: GameView; now: number }) {
             {round.miniGame.title}
           </h1>
         </div>
-        <CountdownCircle seconds={seconds} label="Next spin" />
+        <CountdownCircle remainingMs={remainingMs} totalMs={MINI_GAME_RESULTS_MS} label="Next spin" />
       </div>
       <ol className="mt-8 grid list-none gap-2 p-0" aria-label="Round scores">
         {game.roundResults.map((result, index) => (
@@ -607,7 +617,6 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
   }
 
   const winner = game.standings[0] ?? null;
-  const roundSeconds = Math.max(0, Math.ceil(((game.phaseEndsAt ?? now) - now) / 1_000));
   const currentFinished = game.currentResult?.status === 'finished';
 
   return (
@@ -827,7 +836,11 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
                         {game.round.miniGame.title}
                       </h1>
                     </div>
-                    <CountdownCircle seconds={roundSeconds} label="Time remaining" />
+                    <CountdownCircle
+                      remainingMs={Math.max(0, (game.phaseEndsAt ?? now) - now)}
+                      totalMs={MINI_GAME_ROUND_MS}
+                      label="Time remaining"
+                    />
                   </div>
                   <div className="relative p-[clamp(14px,3vw,30px)]">
                     <p className="mt-0 mb-4 text-center text-xs font-[720] text-[#65738a]">

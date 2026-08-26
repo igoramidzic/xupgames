@@ -152,7 +152,7 @@ export default function LobbyPlayersSidebar({
         })}
       </ol>
       <Button
-        className="m-3 mt-0 inline-flex h-10 w-[calc(100%-24px)] shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--lobby-sidebar-invite-border)] bg-[var(--lobby-sidebar-invite-background)] px-3 text-xs font-[760] text-[var(--lobby-sidebar-invite-text)] hover:bg-[var(--lobby-sidebar-invite-hover-background)] [&_svg]:size-4"
+        className="m-3 mt-0 inline-flex h-10 w-[calc(100%-24px)] shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--lobby-sidebar-invite-border)] bg-[var(--lobby-sidebar-invite-background)] px-3 text-xs font-[760] text-[var(--lobby-sidebar-invite-text)] enabled:hover:border-[var(--lobby-sidebar-invite-border)] enabled:hover:bg-[var(--lobby-sidebar-invite-hover-background)] enabled:hover:text-[var(--lobby-sidebar-invite-text)] [&_svg]:size-4"
         type="button"
         onClick={onInvite}
         variant="paper"
