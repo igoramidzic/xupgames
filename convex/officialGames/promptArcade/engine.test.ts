@@ -34,9 +34,9 @@ const VALID_CODE = `window.registerPromptArcadeGame({
 });`;
 
 describe('Prompt Arcade engine', () => {
-  it('leaves eight seconds to introduce a game and read its round recap', () => {
+  it('leaves eight seconds to introduce a game and ten seconds to read its round recap', () => {
     expect(PROMPT_ARCADE_COUNTDOWN_MS).toBe(8_000);
-    expect(PROMPT_ARCADE_RESULTS_MS).toBe(8_000);
+    expect(PROMPT_ARCADE_RESULTS_MS).toBe(10_000);
   });
 
   it('scores every standardized mode and clamps client-controlled values', () => {

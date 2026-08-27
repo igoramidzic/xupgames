@@ -2,6 +2,7 @@ import { api } from '@convex/_generated/api';
 import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import {
+  Beaker,
   Check,
   Copy,
   Eye,
@@ -31,6 +32,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { isLocalhost } from '@/lib/environment';
 import {
   GAME_LOBBY_CARD_HEIGHT_CLASS,
   GAME_LOBBY_FRAME_CLASS,
@@ -265,6 +267,14 @@ export default function DoodleDashRoom({ guest, session }: { guest: GuestIdentit
             isClosed={isClosed}
             onOpen={() => setGameModeOpen(true)}
           />
+          {session.isOwner && !isClosed && isLocalhost() ? (
+            <Button asChild variant="paper" size="sm" className="max-[760px]:w-9 max-[760px]:px-0 [&_svg]:size-3.75">
+              <Link to={`/admin/${session.code}`}>
+                <Beaker aria-hidden="true" />
+                <span className="max-[760px]:hidden">Playtest</span>
+              </Link>
+            </Button>
+          ) : null}
           <RoomHeaderActions
             isOwner={session.isOwner}
             isClosed={isClosed}

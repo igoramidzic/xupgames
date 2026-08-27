@@ -22,10 +22,8 @@ type GameModeProps = {
 };
 
 export default function GameModeControl({
-  roomId,
   currentGameId,
   currentGameType,
-  sessionToken,
   isOwner,
   isClosed,
   onOpen,
@@ -36,10 +34,7 @@ export default function GameModeControl({
   buttonVariant?: 'paper' | 'type-paper';
   className?: string;
 }) {
-  const poll = useQuery(api.roomGames.getNextGamePoll, { roomId, sessionToken });
-  const hasActivePoll = poll !== undefined && poll !== null;
-
-  if (currentGameId === null || currentGameType === null || isClosed || hasActivePoll || !isOwner) {
+  if (currentGameId === null || currentGameType === null || isClosed || !isOwner) {
     return null;
   }
 
@@ -92,18 +87,11 @@ export function GameModeContent({
     setError(null);
   }, [open]);
 
-  useEffect(() => {
-    if ((manualVoteActive || hasOtherActivePoll) && open) {
-      onClose();
-    }
-  }, [hasOtherActivePoll, manualVoteActive, onClose, open]);
-
   if (
     currentGameId === null ||
     currentGameType === null ||
     isClosed ||
-    hasOtherActivePoll ||
-    (!manualVoteActive && (!isOwner || !open))
+    (!manualVoteActive && !(hasOtherActivePoll && isOwner && open) && (!isOwner || !open))
   ) {
     return children;
   }
@@ -137,7 +125,7 @@ export function GameModeContent({
     }
   }
 
-  if (manualVoteActive || view === 'vote') {
+  if (manualVoteActive || hasOtherActivePoll || view === 'vote') {
     return (
       <div className="grid min-h-[clamp(560px,calc(100dvh-112px),768px)] content-start gap-3 max-[760px]:min-h-140">
         <div className="flex items-start gap-2.5 rounded-[12px_8px_13px_9px] border border-[#c9d4e4] bg-[#eef2ff] px-4 py-3 text-xs leading-[1.45] font-[720] text-[#3155d9] shadow-[3px_4px_0_rgb(23_32_58/8%)]">

@@ -30,6 +30,7 @@ const PAD_STYLES = [
   { symbol: '■', label: 'Square', className: 'bg-[#8fafff]' },
   { symbol: '◆', label: 'Diamond', className: 'bg-[#82d9ac]' },
 ] as const;
+const COPYCAT_SEQUENCE_LEAD_IN_MS = 900;
 
 const SHAPE_GLYPHS: Record<string, string> = {
   star: '★',
@@ -139,12 +140,14 @@ function CopycatSequence({
   const [pressed, setPressed] = useState<number[]>([]);
   const submittedRef = useRef(false);
   if (challenge === null) return null;
-  const playbackElapsed = now - round.playStartsAt;
+  const playbackElapsed = now - round.playStartsAt - COPYCAT_SEQUENCE_LEAD_IN_MS;
   const playbackDuration = challenge.sequence.length * challenge.playbackStepMs;
-  const watching = playbackElapsed < playbackDuration;
-  const activePad = watching
-    ? challenge.sequence[Math.max(0, Math.floor(playbackElapsed / challenge.playbackStepMs))]
-    : null;
+  const preparing = playbackElapsed < 0;
+  const watching = preparing || playbackElapsed < playbackDuration;
+  const activePad =
+    !preparing && watching
+      ? challenge.sequence[Math.max(0, Math.floor(playbackElapsed / challenge.playbackStepMs))]
+      : null;
 
   function press(padId: number) {
     if (watching || disabled || submittedRef.current) return;
@@ -160,9 +163,11 @@ function CopycatSequence({
   return (
     <div className="mx-auto max-w-2xl text-center">
       <p className="mb-5 font-display text-2xl font-[850]" aria-live="polite">
-        {watching
-          ? `Watch… ${Math.min(challenge.sequence.length, Math.floor(playbackElapsed / challenge.playbackStepMs) + 1)} of ${challenge.sequence.length}`
-          : `Your turn · ${pressed.length} of ${challenge.sequence.length}`}
+        {preparing
+          ? 'Get ready…'
+          : watching
+            ? `Watch… ${Math.min(challenge.sequence.length, Math.floor(playbackElapsed / challenge.playbackStepMs) + 1)} of ${challenge.sequence.length}`
+            : `Your turn · ${pressed.length} of ${challenge.sequence.length}`}
       </p>
       <div className="mx-auto grid w-[min(82vw,520px)] grid-cols-2 gap-4 rounded-[24px_15px_26px_17px] border-2 border-[#17203a] bg-white p-5 shadow-[7px_7px_0_#a9c6ff]">
         {PAD_STYLES.map((pad, padId) => (

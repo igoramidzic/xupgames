@@ -101,6 +101,38 @@ describe('new Mini Game Mix challenges', () => {
     expect(onSubmit).toHaveBeenCalledWith({ kind: 'flashbackTiles', selectedTileIds: [0, 2] });
   });
 
+  it('waits for the board to settle before starting the Copycat sequence', () => {
+    const copycatRound = round('copycatSequence', {
+      kind: 'copycatSequence',
+      sequence: [0, 1, 2, 3, 0],
+      playbackStepMs: 460,
+    });
+    const view = render(
+      <NewMiniGameChallenge
+        round={copycatRound as never}
+        now={playStartsAt + 400}
+        disabled={false}
+        onSubmit={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Get ready…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Triangle pad' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Triangle pad' })).not.toHaveClass('scale-105');
+
+    view.rerender(
+      <NewMiniGameChallenge
+        round={copycatRound as never}
+        now={playStartsAt + 950}
+        disabled={false}
+        onSubmit={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Watch… 1 of 5')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Triangle pad' })).toHaveClass('scale-105');
+  });
+
   it('submits the full signal sequence', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();

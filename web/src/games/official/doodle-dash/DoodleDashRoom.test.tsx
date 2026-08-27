@@ -399,6 +399,7 @@ describe('DoodleDashRoom', () => {
     expect(canvas.parentElement?.parentElement).toBe(centerStack);
     expect(standingsCard).toHaveClass('self-start', 'h-[calc(100dvh-104px)]', 'max-[1120px]:h-auto');
     expect(guessesCard).toHaveClass('self-start', 'h-[calc(100dvh-104px)]');
+    expect(screen.getByRole('link', { name: 'Playtest' })).toHaveAttribute('href', '/admin/ABCDEFGH');
   });
 
   it('shows public guesses, hides correct text, and surfaces close feedback only to its author', async () => {

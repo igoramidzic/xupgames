@@ -130,6 +130,7 @@ describe('MiniGamesRoom', () => {
     expect(screen.getAllByText('10 mini-games').length).toBeGreaterThan(0);
     expect(screen.getByRole('region', { name: 'Mini Game Mix game configuration' })).toHaveTextContent('About 3½ min');
     expect(screen.getByRole('button', { name: 'Start the mix' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Playtest' })).toHaveAttribute('href', '/admin/ABCDEFGH');
     expect(screen.getByRole('region', { name: 'Mini Game Mix game configuration' })).toContainElement(
       screen.getByRole('button', { name: 'Configure' })
     );

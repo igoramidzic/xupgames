@@ -1,7 +1,7 @@
 import { api } from '@convex/_generated/api';
 import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
-import { Check, Copy, Dices, LoaderCircle, Play, Trophy } from 'lucide-react';
+import { Beaker, Check, Copy, Dices, LoaderCircle, Play, Trophy } from 'lucide-react';
 import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { isLocalhost } from '@/lib/environment';
 import {
   GAME_LOBBY_CARD_HEIGHT_CLASS,
   GAME_LOBBY_FRAME_CLASS,
@@ -788,6 +789,19 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
             onOpen={() => setGameModeOpen(true)}
             buttonVariant="type-paper"
           />
+          {session.isOwner && !isClosed && isLocalhost() ? (
+            <Button
+              asChild
+              variant="type-paper"
+              size="sm"
+              className="no-underline max-[760px]:w-9 max-[760px]:px-0 [&_svg]:size-3.75"
+            >
+              <Link to={`/admin/${session.code}`}>
+                <Beaker aria-hidden="true" />
+                <span className="max-[760px]:hidden">Playtest</span>
+              </Link>
+            </Button>
+          ) : null}
           <RoomHeaderActions
             isOwner={session.isOwner}
             isClosed={isClosed}

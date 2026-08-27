@@ -134,12 +134,14 @@ describe('GameModeControl', () => {
     expect(screen.queryByRole('button', { name: 'Change game' })).not.toBeInTheDocument();
   });
 
-  it('leaves the post-game ballot in the game result surface', () => {
+  it('keeps Change game visible for the owner and opens the active post-game ballot', async () => {
     mocks.poll = { trigger: 'gameComplete', pollId: 'poll-1' };
+    const user = userEvent.setup();
 
     const owner = renderControl(true);
     expect(screen.getByText('Current game card')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Change game' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Change game' }));
+    expect(screen.getByText('Live game ballot')).toBeInTheDocument();
 
     owner.unmount();
     renderControl(false);

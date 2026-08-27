@@ -3,8 +3,7 @@ import { useAction, useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
+  Beaker,
   Check,
   CircleDot,
   Clock3,
@@ -38,6 +37,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { isLocalhost } from '@/lib/environment';
 import {
   GAME_LOBBY_CARD_HEIGHT_CLASS,
   GAME_LOBBY_FRAME_CLASS,
@@ -64,6 +64,7 @@ const PROMPT_MAX_LENGTH = 1_000;
 const BUILD_STEPS = 4;
 const AUTHOR_SPOTLIGHT_MS = 2_400;
 const GAME_DETAILS_SPOTLIGHT_MS = 5_200;
+const ROUND_RESULTS_PROMPT_SPOTLIGHT_MS = 3_000;
 const PROMPT_ARCADE_LOBBY_SIDEBAR_THEME: LobbyPlayersSidebarTheme = {
   background: '#ecebff',
   border: '#aaa8cf',
@@ -500,6 +501,10 @@ function PromptComposer({
       </div>
       <p className="mt-3 mb-0 max-w-180 text-sm leading-[1.5] text-[#687389]">
         Describe the interaction and the win condition. Every player&apos;s prompt gets its own game.
+      </p>
+      <p className="mt-4 mb-0 flex w-fit items-center gap-2 rounded-[10px_7px_11px_8px] border border-[#c8c3ec] bg-[#efedff] px-3 py-2 text-xs font-[750] text-[#5148c5]">
+        <UsersRound className="size-3.5 shrink-0" aria-hidden="true" />
+        Everyone will see your prompt after they play your game.
       </p>
       {entry.errorMessage !== null ? (
         <p
@@ -1063,164 +1068,110 @@ function WaitingForCartridge({
   );
 }
 
-type RoundResult = GameView['roundResults'][number];
-
-type RoundRecapEntry = {
-  result: RoundResult;
-  standing: Standing;
-  previousRank: number;
-  rankChange: number;
-};
-
-function buildRoundRecap(game: GameView): RoundRecapEntry[] {
-  const scoreByMemberId = new Map(game.roundResults.map((result) => [result.memberId, result.score]));
-  const previousRankByMemberId = new Map(
-    game.standings
-      .map((standing) => ({
-        memberId: standing.memberId,
-        displayName: standing.displayName,
-        totalScore: standing.totalScore - (scoreByMemberId.get(standing.memberId) ?? 0),
-      }))
-      .sort(
-        (first, second) => second.totalScore - first.totalScore || first.displayName.localeCompare(second.displayName)
-      )
-      .map((standing, index) => [standing.memberId, index + 1] as const)
-  );
-  const standingByMemberId = new Map(game.standings.map((standing) => [standing.memberId, standing]));
-
-  return game.roundResults
-    .filter((result) => result.status !== 'waiting')
-    .flatMap((result) => {
-      const standing = standingByMemberId.get(result.memberId);
-      if (standing === undefined) return [];
-      const previousRank = previousRankByMemberId.get(result.memberId) ?? standing.rank;
-      return [{ result, standing, previousRank, rankChange: previousRank - standing.rank }];
-    });
-}
-
-function RankMovement({ entry }: { entry: RoundRecapEntry }) {
-  if (entry.rankChange > 0) {
-    return (
-      <>
-        <span className="inline-flex items-center gap-1 font-[820] text-[#16856b]" aria-hidden="true">
-          <span>#{entry.previousRank}</span>
-          <ArrowUp className="size-3" />
-          <span>#{entry.standing.rank}</span>
-        </span>
-        <span className="sr-only">
-          Moved from position {entry.previousRank} to {entry.standing.rank}
-        </span>
-      </>
-    );
-  }
-  if (entry.rankChange < 0) {
-    return (
-      <>
-        <span className="inline-flex items-center gap-1 font-[820] text-[#c25b3e]" aria-hidden="true">
-          <span>#{entry.previousRank}</span>
-          <ArrowDown className="size-3" />
-          <span>#{entry.standing.rank}</span>
-        </span>
-        <span className="sr-only">
-          Moved from position {entry.previousRank} to {entry.standing.rank}
-        </span>
-      </>
-    );
-  }
-  return (
-    <>
-      <span className="font-[760] text-[#7a8597]" aria-hidden="true">
-        Held #{entry.standing.rank}
-      </span>
-      <span className="sr-only">Held position {entry.standing.rank}</span>
-    </>
-  );
-}
-
-function RoundResults({ game, playIntro }: { game: GameView; playIntro: boolean }) {
+function RoundResults({ game, now, playIntro }: { game: GameView; now: number; playIntro: boolean }) {
   if (game.round === null) return null;
-  const recap = buildRoundRecap(game);
-  const podium = recap.slice(0, 3);
-  const toughestRound = recap.length > 3 ? recap.at(-1) : undefined;
+  const resultsStartedAt = game.round.resultsStartedAt ?? game.phaseStartedAt ?? now;
+  const elapsedMs = Math.max(0, now - resultsStartedAt);
+  const showScores = elapsedMs >= ROUND_RESULTS_PROMPT_SPOTLIGHT_MS;
+  const remainingMs = Math.max(0, (game.phaseEndsAt ?? now) - now);
+  const podium = game.roundResults.filter((result) => result.status !== 'waiting').slice(0, 3);
   return (
-    <div className="min-h-[clamp(440px,calc(100dvh-220px),640px)] bg-[#f8f9ff] p-5 max-[520px]:p-3">
-      <div className="mx-auto max-w-205">
-        <div
+    <div
+      className="min-h-[clamp(500px,calc(100dvh-150px),700px)] overflow-hidden bg-[#f8f7ff] px-5 py-6 max-[520px]:px-3 max-[520px]:py-4"
+      data-results-stage={showScores ? 'scores' : 'prompt'}
+    >
+      <div className="mx-auto flex min-h-[clamp(450px,calc(100dvh-200px),640px)] max-w-210 flex-col">
+        <div className="flex items-center justify-between gap-4">
+          <p className="m-0 text-[9px] font-[880] tracking-[0.15em] text-[#ef7543] uppercase">
+            Round {game.round.roundNumber} complete
+          </p>
+          <p className="m-0 text-[10px] font-[780] text-[#6e7890] tabular-nums" role="timer">
+            Next game in {formatSeconds(remainingMs)}
+          </p>
+        </div>
+
+        <section
           className={cn(
-            'mb-5 rounded-[14px_9px_15px_10px] border border-[#bfc9d8] bg-white px-4 py-3 text-sm leading-[1.45] text-[#58657b] shadow-[0_3px_0_#d4dbe6]',
+            'relative mt-5 grid overflow-hidden rounded-[22px_14px_24px_16px] border-2 border-[#17203a] bg-white px-[clamp(22px,5vw,54px)] text-center shadow-[7px_7px_0_#17203a] transition-[min-height,padding] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
+            showScores ? 'min-h-48 content-center py-7' : 'min-h-92 flex-1 place-content-center py-12',
             playIntro &&
-              'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-both motion-safe:duration-500'
+              'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:fill-mode-both motion-safe:duration-700'
           )}
+          aria-labelledby="round-prompt-title"
         >
-          <strong className="text-[#17203a]">What the builder made:</strong> {game.round.artifact.interpretation}
-        </div>
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div>
-            <p className="mb-1 text-[9px] font-[850] tracking-[0.14em] text-[#564dd8] uppercase">Round podium</p>
-            <h2 className="m-0 font-display text-[clamp(26px,4vw,38px)] leading-none font-[890] tracking-[-0.05em]">
-              Top scorers this game
-            </h2>
-          </div>
-          <Trophy className="size-7 shrink-0 text-[#d0a018]" aria-hidden="true" />
-        </div>
-        <ol
-          className="m-0 grid list-none grid-cols-3 gap-2 p-0 max-[620px]:grid-cols-1"
-          aria-label="Top scorers this round"
-        >
-          {podium.map((entry, index) => (
-            <li
-              className={cn(
-                'relative grid min-h-31 content-between overflow-hidden rounded-[15px_9px_16px_10px] border border-[#c3ccda] bg-white p-3 shadow-[0_3px_0_#d7deea]',
-                index === 0 && 'border-[#d0a018] bg-[#fff8d7]',
-                entry.result.isCurrentPlayer && 'ring-2 ring-[#665edb]/35',
-                playIntro &&
-                  'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:fill-mode-both motion-safe:duration-500'
-              )}
-              key={entry.result.memberId}
-              style={playIntro ? { animationDelay: `${140 + index * 110}ms` } : undefined}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="grid size-8 place-items-center rounded-full bg-[#17203a] text-[10px] font-[850] text-white">
-                  {index + 1}
-                </span>
-                <strong className="font-display text-xl font-[900] text-[#564dd8] tabular-nums">
-                  +{formatPoints(entry.result.score)}
-                </strong>
-              </div>
-              <div className="mt-3 min-w-0">
-                <strong className="block overflow-hidden text-sm text-ellipsis whitespace-nowrap text-[#17203a]">
-                  {entry.result.displayName}
-                </strong>
-                <small className="mt-1 block text-[10px] text-[#748095]">
-                  <RankMovement entry={entry} /> overall
-                </small>
-              </div>
-            </li>
-          ))}
-        </ol>
-        {toughestRound !== undefined ? (
-          <div
-            className={cn(
-              'mt-4 flex items-center justify-between gap-4 rounded-[13px_8px_14px_9px] border border-[#e0b09f] bg-[#fff1eb] px-4 py-3 text-sm shadow-[0_3px_0_#ead1c7]',
-              playIntro &&
-                'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-both motion-safe:duration-500 motion-safe:delay-500'
-            )}
+          <Sparkles className="mx-auto mb-4 size-5 text-[#564dd8]" aria-hidden="true" />
+          <h1 className="m-0 text-[9px] font-[880] tracking-[0.16em] text-[#564dd8] uppercase" id="round-prompt-title">
+            The prompt everyone played
+          </h1>
+          <blockquote className="mx-auto mt-4 mb-0 max-w-180 font-display text-[clamp(25px,4.5vw,46px)] leading-[1.05] font-[900] tracking-[-0.05em] text-[#17203a]">
+            “{game.round.entry.prompt}”
+          </blockquote>
+          <p className="mt-4 mb-0 text-xs font-[760] text-[#768197]">Written by {game.round.entry.displayName}</p>
+        </section>
+
+        {showScores ? (
+          <section
+            className="mt-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-700"
+            aria-labelledby="round-winners-title"
           >
-            <div className="min-w-0">
-              <p className="mb-0.5 text-[9px] font-[850] tracking-[0.12em] text-[#b44f34] uppercase">Tough break</p>
-              <strong className="block truncate text-[#4f352e]">{toughestRound.result.displayName}</strong>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="mb-1 text-[9px] font-[850] tracking-[0.14em] text-[#564dd8] uppercase">Final scores</p>
+                <h2
+                  className="m-0 font-display text-[clamp(24px,4vw,34px)] leading-none font-[900] tracking-[-0.05em]"
+                  id="round-winners-title"
+                >
+                  Round winners
+                </h2>
+              </div>
+              <Trophy className="size-6 shrink-0 text-[#c79412]" aria-hidden="true" />
             </div>
-            <div className="shrink-0 text-right">
-              <strong className="block text-[#b44f34] tabular-nums">+{formatPoints(toughestRound.result.score)}</strong>
-              <small className="text-[10px]">
-                <RankMovement entry={toughestRound} /> overall
-              </small>
-            </div>
-          </div>
-        ) : null}
-        <p className="mt-4 mb-0 text-center text-xs font-[720] text-[#748095]">
-          Standings lock in, then the next creator gets the spotlight.
-        </p>
+            {podium.length > 0 ? (
+              <ol
+                className="m-0 grid list-none grid-cols-3 gap-2.5 p-0 max-[620px]:grid-cols-1"
+                aria-label="Top scorers this round"
+              >
+                {podium.map((result, index) => (
+                  <li
+                    className={cn(
+                      'flex min-h-23 items-center gap-3 rounded-[14px_9px_15px_10px] border border-[#c9d1df] bg-white p-3.5 shadow-[0_3px_0_#d9deea] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:fill-mode-both motion-safe:duration-500',
+                      index === 0 && 'border-[#d0a018] bg-[#fff8d7]',
+                      result.isCurrentPlayer && 'ring-2 ring-[#665edb]/30'
+                    )}
+                    key={result.memberId}
+                    style={{ animationDelay: `${index * 140}ms` }}
+                  >
+                    <span
+                      className={cn(
+                        'grid size-9 shrink-0 place-items-center rounded-full bg-[#e9ecf3] font-display text-sm font-[900] text-[#566177]',
+                        index === 0 && 'bg-[#ffd75a] text-[#17203a]'
+                      )}
+                    >
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <strong className="block truncate text-sm text-[#17203a]">{result.displayName}</strong>
+                      <small className="mt-0.5 block text-[10px] text-[#7a8597]">
+                        {index === 0 ? 'Round winner' : `${index + 1}${index === 1 ? 'nd' : 'rd'} place`}
+                      </small>
+                    </span>
+                    <strong className="shrink-0 font-display text-xl font-[900] text-[#564dd8] tabular-nums">
+                      +{formatPoints(result.score)}
+                    </strong>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="m-0 rounded-[14px_9px_15px_10px] border border-[#c9d1df] bg-white p-4 text-sm text-[#687389]">
+                No scores were recorded this round.
+              </p>
+            )}
+          </section>
+        ) : (
+          <p className="mt-5 mb-0 text-center text-xs font-[720] text-[#7a8597]" aria-live="polite">
+            Scores coming up…
+          </p>
+        )}
       </div>
     </div>
   );
@@ -1381,12 +1332,7 @@ function ActiveRoundSurface({
         <GameSurfaceTransition
           showResults={game.phase === 'roundResults'}
           surfaceKey={surfaceKey}
-          results={({ playIntro }) => (
-            <>
-              <RoundHeader game={game} now={now} />
-              <RoundResults game={game} playIntro={playIntro} />
-            </>
-          )}
+          results={({ playIntro }) => <RoundResults game={game} now={now} playIntro={playIntro} />}
         >
           {game.phase === 'countdown' ? null : <RoundHeader game={game} now={now} />}
           {content}
@@ -1474,7 +1420,7 @@ export default function PromptArcadeRoom({ guest, session }: { guest: GuestIdent
   const [closeSucceeded, setCloseSucceeded] = useState(false);
   const [gameModeOpen, setGameModeOpen] = useState(false);
   const isClosed = session.status === 'closed' || closeSucceeded;
-  const timerEnabled = game?.phase === 'countdown' || game?.phase === 'playing';
+  const timerEnabled = game?.phase === 'countdown' || game?.phase === 'playing' || game?.phase === 'roundResults';
   const now = useClock(timerEnabled);
   const members = useMemo(() => getRoomMembers(session), [session]);
   const roundPhaseKey = game?.round?.roundId;
@@ -1733,6 +1679,14 @@ export default function PromptArcadeRoom({ guest, session }: { guest: GuestIdent
             isClosed={isClosed}
             onOpen={() => setGameModeOpen(true)}
           />
+          {game.isOwner && !isClosed && isLocalhost() ? (
+            <Button asChild variant="paper" size="sm" className="max-[760px]:w-9 max-[760px]:px-0 [&_svg]:size-3.75">
+              <Link to={`/admin/${session.code}`}>
+                <Beaker aria-hidden="true" />
+                <span className="max-[760px]:hidden">Playtest</span>
+              </Link>
+            </Button>
+          ) : null}
           <RoomHeaderActions
             isOwner={game.isOwner}
             isClosed={isClosed}

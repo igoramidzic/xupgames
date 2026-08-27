@@ -182,6 +182,8 @@ describe('PromptArcadeRoom', () => {
     renderRoom();
 
     expect(screen.getByRole('heading', { name: 'What should everyone play?' })).toBeInTheDocument();
+    expect(screen.getByText('Everyone will see your prompt after they play your game.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Playtest' })).toHaveAttribute('href', '/admin/FACTORY');
     expect(screen.getByRole('complementary', { name: 'Prompt Arcade players' })).toBeInTheDocument();
     const buildRoster = screen.getByRole('list', { name: 'Build status for 3 players' });
     expect(within(buildRoster).getAllByRole('listitem')).toHaveLength(3);
@@ -457,7 +459,7 @@ describe('PromptArcadeRoom', () => {
       ...(mocks.game as typeof baseGame),
       phase: 'roundResults',
       phaseStartedAt: now,
-      phaseEndsAt: now + 8_000,
+      phaseEndsAt: now + 10_000,
       round: { ...round, status: 'results', resultsStartedAt: now },
     };
     view.rerender(
@@ -473,7 +475,7 @@ describe('PromptArcadeRoom', () => {
     ]);
   });
 
-  it('replaces the full round list with a top-three recap and one tough break', () => {
+  it('shows the prompt first, then reveals a simplified top-three scoreboard', () => {
     const now = Date.now();
     const juneStanding = {
       rank: 3,
@@ -511,7 +513,7 @@ describe('PromptArcadeRoom', () => {
       ...baseGame,
       phase: 'roundResults',
       phaseStartedAt: now,
-      phaseEndsAt: now + 8_000,
+      phaseEndsAt: now + 10_000,
       currentRoundNumber: 1,
       playlistStarted: true,
       round: {
@@ -543,15 +545,39 @@ describe('PromptArcadeRoom', () => {
       standings,
     };
 
-    renderRoom();
+    const view = renderRoom();
 
+    expect(document.querySelector('[data-results-stage="prompt"]')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'The prompt everyone played' })).toBeInTheDocument();
+    expect(screen.getByText('“Catch the blue dot”')).toBeInTheDocument();
+    expect(screen.getByText('Written by Maya')).toBeInTheDocument();
+    expect(screen.getByText('Scores coming up…')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Top scorers this round' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Catch a moving target before time runs out.')).not.toBeInTheDocument();
+
+    mocks.game = {
+      ...(mocks.game as typeof baseGame),
+      phaseStartedAt: now - 3_500,
+      phaseEndsAt: now + 6_500,
+      round: {
+        ...(mocks.game as { round: Record<string, unknown> }).round,
+        resultsStartedAt: now - 3_500,
+      },
+    };
+    view.rerender(
+      <MemoryRouter>
+        <PromptArcadeRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    expect(document.querySelector('[data-results-stage="scores"]')).toBeInTheDocument();
     const podium = screen.getByRole('list', { name: 'Top scorers this round' });
     expect(within(podium).getAllByRole('listitem')).toHaveLength(3);
     expect(within(podium).getByText('Maya')).toBeInTheDocument();
     expect(within(podium).getByText('Theo')).toBeInTheDocument();
     expect(within(podium).getByText('June')).toBeInTheDocument();
-    expect(screen.getByText('Tough break')).toBeInTheDocument();
-    expect(screen.getByText('Moved from position 1 to 4')).toBeInTheDocument();
+    expect(within(podium).getByText('Round winner')).toBeInTheDocument();
+    expect(screen.queryByText('Tough break')).not.toBeInTheDocument();
   });
 
   it('starts automatically when everyone is ready and hides the manual control', () => {
