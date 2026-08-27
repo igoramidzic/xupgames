@@ -8,10 +8,9 @@ import {
   PROMPT_ARCADE_ARTIFACT_GRACE_MS,
   PROMPT_ARCADE_COUNTDOWN_MS,
   PROMPT_ARCADE_MAX_PLAYERS,
-  PROMPT_ARCADE_RATING_MS,
+  PROMPT_ARCADE_RESULTS_MS,
   scorePromptArcadeResult,
 } from './engine';
-import { applyPromptArcadeCreatorBonuses } from './ratings';
 import { listPromptArcadeEntries, withdrawInactiveUnusablePromptEntries } from './state';
 
 type RoundScheduleArgs = {
@@ -219,9 +218,9 @@ export async function showPromptArcadeRoundResults(
   await ctx.db.patch('promptArcadeGameStates', state._id, {
     phase: 'roundResults',
     phaseStartedAt: now,
-    phaseEndsAt: now + PROMPT_ARCADE_RATING_MS,
+    phaseEndsAt: now + PROMPT_ARCADE_RESULTS_MS,
   });
-  await ctx.scheduler.runAfter(PROMPT_ARCADE_RATING_MS, internal.promptArcade.advanceRound, {
+  await ctx.scheduler.runAfter(PROMPT_ARCADE_RESULTS_MS, internal.promptArcade.advanceRound, {
     stateId: state._id,
     gameNumber: state.gameNumber,
     roundNumber: round.roundNumber,
@@ -302,7 +301,6 @@ export async function settleIdlePromptArcadePlaylist(
     entries.length > 0 &&
     entries.every((candidate) => candidate.status === 'played' || candidate.status === 'withdrawn');
   if (allTerminal) {
-    await applyPromptArcadeCreatorBonuses(ctx, state, now);
     await ctx.db.patch('promptArcadeGameStates', state._id, {
       phase: 'complete',
       phaseStartedAt: now,

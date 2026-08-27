@@ -85,24 +85,9 @@ export const promptArcadeStandingValidator = v.object({
   memberId: v.id('roomMembers'),
   displayName: v.string(),
   totalScore: v.number(),
-  creatorBonus: v.number(),
   roundsFinished: v.number(),
   isCurrentPlayer: v.boolean(),
   isActive: v.boolean(),
-});
-
-export const promptArcadeGameRankingValidator = v.object({
-  rank: v.number(),
-  entryId: v.id('promptArcadeEntries'),
-  memberId: v.id('roomMembers'),
-  displayName: v.string(),
-  title: v.string(),
-  interpretation: v.string(),
-  averageRating: v.union(v.number(), v.null()),
-  ratingCount: v.number(),
-  isWinner: v.boolean(),
-  creatorBonus: v.number(),
-  isCurrentPlayer: v.boolean(),
 });
 
 const generationSummaryValidator = v.object({
@@ -160,12 +145,5 @@ export const promptArcadeGameViewValidator = v.object({
   ),
   currentResult: v.union(v.null(), promptArcadeResultViewValidator),
   roundResults: v.array(promptArcadeResultViewValidator),
-  currentGameRating: v.object({
-    rating: v.union(v.number(), v.null()),
-    canRate: v.boolean(),
-    ratingCount: v.number(),
-    eligibleRaterCount: v.number(),
-  }),
-  gameRankings: v.array(promptArcadeGameRankingValidator),
   standings: v.array(promptArcadeStandingValidator),
 });

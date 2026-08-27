@@ -3,10 +3,9 @@ import {
   type GeneratedPromptArcadeArtifact,
   normalizePromptArcadePrompt,
   PROMPT_ARCADE_COUNTDOWN_MS,
-  PROMPT_ARCADE_CREATOR_BONUS_POINTS,
   PROMPT_ARCADE_MAX_PLAYERS,
   PROMPT_ARCADE_MAX_PROMPT_CHARACTERS,
-  PROMPT_ARCADE_RATING_MS,
+  PROMPT_ARCADE_RESULTS_MS,
   parseGeneratedArtifact,
   scorePromptArcadeResult,
   validateGeneratedArtifact,
@@ -35,10 +34,9 @@ const VALID_CODE = `window.registerPromptArcadeGame({
 });`;
 
 describe('Prompt Arcade engine', () => {
-  it('leaves eight seconds for the introduction and five seconds for peer ratings', () => {
+  it('leaves eight seconds to introduce a game and read its round recap', () => {
     expect(PROMPT_ARCADE_COUNTDOWN_MS).toBe(8_000);
-    expect(PROMPT_ARCADE_RATING_MS).toBe(5_000);
-    expect(PROMPT_ARCADE_CREATOR_BONUS_POINTS).toBe(500);
+    expect(PROMPT_ARCADE_RESULTS_MS).toBe(8_000);
   });
 
   it('scores every standardized mode and clamps client-controlled values', () => {

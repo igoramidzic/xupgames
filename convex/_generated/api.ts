@@ -50,7 +50,6 @@ import type * as officialGames_promptArcade_game from "../officialGames/promptAr
 import type * as officialGames_promptArcade_generation from "../officialGames/promptArcade/generation.js";
 import type * as officialGames_promptArcade_lifecycle from "../officialGames/promptArcade/lifecycle.js";
 import type * as officialGames_promptArcade_providerRetry from "../officialGames/promptArcade/providerRetry.js";
-import type * as officialGames_promptArcade_ratings from "../officialGames/promptArcade/ratings.js";
 import type * as officialGames_promptArcade_rounds from "../officialGames/promptArcade/rounds.js";
 import type * as officialGames_promptArcade_state from "../officialGames/promptArcade/state.js";
 import type * as officialGames_promptArcade_validators from "../officialGames/promptArcade/validators.js";
@@ -133,7 +132,6 @@ const fullApi: ApiFromModules<{
   "officialGames/promptArcade/generation": typeof officialGames_promptArcade_generation;
   "officialGames/promptArcade/lifecycle": typeof officialGames_promptArcade_lifecycle;
   "officialGames/promptArcade/providerRetry": typeof officialGames_promptArcade_providerRetry;
-  "officialGames/promptArcade/ratings": typeof officialGames_promptArcade_ratings;
   "officialGames/promptArcade/rounds": typeof officialGames_promptArcade_rounds;
   "officialGames/promptArcade/state": typeof officialGames_promptArcade_state;
   "officialGames/promptArcade/validators": typeof officialGames_promptArcade_validators;

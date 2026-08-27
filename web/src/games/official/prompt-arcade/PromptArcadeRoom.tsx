@@ -51,8 +51,6 @@ import { useRoomPresence } from '@/lib/useRoomPresence';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
 import GeneratedGameFrame, { type GeneratedGameFinish, prefetchGeneratedGame } from './GeneratedGameFrame';
-import PromptArcadeGameShowcase from './PromptArcadeGameShowcase';
-import PromptArcadeRatingPanel from './PromptArcadeRatingPanel';
 
 type SessionResult = FunctionReturnType<typeof api.rooms.getSession>;
 type ActiveSession = Extract<SessionResult, { kind: 'session' }>;
@@ -829,13 +827,11 @@ function RoundStandings({ game, copied, onInvite }: { game: GameView; copied: bo
                 <small className="overflow-hidden text-[9px] text-ellipsis whitespace-nowrap text-[#8993a3]">
                   {!entry.isActive
                     ? 'Left the room'
-                    : game.phase === 'complete' && entry.creatorBonus > 0
-                      ? `Top-rated creator · +${formatPoints(entry.creatorBonus)} bonus`
-                      : roundResult?.status === 'finished'
-                        ? 'Finished this game'
-                        : roundResult?.status === 'timedOut'
-                          ? 'Time expired'
-                          : `${entry.roundsFinished} ${entry.roundsFinished === 1 ? 'game' : 'games'} scored`}
+                    : roundResult?.status === 'finished'
+                      ? 'Finished this game'
+                      : roundResult?.status === 'timedOut'
+                        ? 'Time expired'
+                        : `${entry.roundsFinished} ${entry.roundsFinished === 1 ? 'game' : 'games'} scored`}
                 </small>
               </span>
               <span className="grid justify-items-end">
@@ -1141,17 +1137,7 @@ function RankMovement({ entry }: { entry: RoundRecapEntry }) {
   );
 }
 
-function RoundResults({
-  game,
-  now,
-  playIntro,
-  onRateGame,
-}: {
-  game: GameView;
-  now: number;
-  playIntro: boolean;
-  onRateGame: (rating: number) => Promise<void>;
-}) {
+function RoundResults({ game, playIntro }: { game: GameView; playIntro: boolean }) {
   if (game.round === null) return null;
   const recap = buildRoundRecap(game);
   const podium = recap.slice(0, 3);
@@ -1159,18 +1145,6 @@ function RoundResults({
   return (
     <div className="min-h-[clamp(440px,calc(100dvh-220px),640px)] bg-[#f8f9ff] p-5 max-[520px]:p-3">
       <div className="mx-auto max-w-205">
-        <PromptArcadeRatingPanel
-          title={game.round.artifact.title}
-          phaseEndsAt={game.phaseEndsAt}
-          now={now}
-          rating={game.currentGameRating.rating}
-          canRate={game.currentGameRating.canRate}
-          isAuthor={game.round.entry.memberId === game.entries.find((entry) => entry.isCurrentPlayer)?.memberId}
-          isParticipant={game.currentResult !== null}
-          ratingCount={game.currentGameRating.ratingCount}
-          eligibleRaterCount={game.currentGameRating.eligibleRaterCount}
-          onRate={onRateGame}
-        />
         <div
           className={cn(
             'mb-5 rounded-[14px_9px_15px_10px] border border-[#bfc9d8] bg-white px-4 py-3 text-sm leading-[1.45] text-[#58657b] shadow-[0_3px_0_#d4dbe6]',
@@ -1256,7 +1230,6 @@ function ActiveRoundSurface({
   game,
   now,
   onFinish,
-  onRateGame,
   resultPending,
   failedFinish,
   onRetryFinish,
@@ -1269,7 +1242,6 @@ function ActiveRoundSurface({
   game: GameView;
   now: number;
   onFinish: (result: GeneratedGameFinish) => void;
-  onRateGame: (rating: number) => Promise<void>;
   resultPending: boolean;
   failedFinish: FailedFinish | null;
   onRetryFinish: () => void;
@@ -1412,7 +1384,7 @@ function ActiveRoundSurface({
           results={({ playIntro }) => (
             <>
               <RoundHeader game={game} now={now} />
-              <RoundResults game={game} now={now} playIntro={playIntro} onRateGame={onRateGame} />
+              <RoundResults game={game} playIntro={playIntro} />
             </>
           )}
         >
@@ -1440,8 +1412,6 @@ function CompleteSurface({
   copied: boolean;
   onInvite: () => void;
 }) {
-  const [showPlayerScores, setShowPlayerScores] = useState(game.gameRankings.length === 0);
-  const showScores = useCallback(() => setShowPlayerScores(true), []);
   const podiumEntries = game.standings.slice(0, 3).map((entry) => ({
     id: entry.memberId,
     place: entry.rank,
@@ -1449,40 +1419,33 @@ function CompleteSurface({
     result: `${formatPoints(entry.totalScore)} points`,
   }));
   return (
-    <main className={GAME_LOBBY_FRAME_CLASS}>
-      <GameSurfaceTransition
-        showResults={showPlayerScores}
-        results={({ playIntro }) => (
-          <div className="grid grid-cols-[minmax(0,1fr)_300px] items-start gap-4.5 max-[860px]:grid-cols-1">
-            <section className="min-w-0">
-              <PostGameBoard
-                eyebrow="Factory closed · Final player scores"
-                title={
-                  game.standings[0] === undefined
-                    ? 'Arcade complete.'
-                    : `${game.standings[0].displayName} wins the arcade.`
-                }
-                detail={`${game.summary.played} player-made ${game.summary.played === 1 ? 'game' : 'games'} made it through the playlist. Creator bonuses are included.`}
-                icon={Trophy}
-                accent="#564dd8"
-                accentTint="#e8e4ff"
-                roomId={session.roomId}
-                currentGameId={session.currentGameId}
-                currentGameType={session.gameType}
-                sessionToken={guest.sessionToken}
-                isOwner={game.isOwner}
-                isClosed={isClosed}
-                closedMessage="Room closed. The final Prompt Arcade scores stay visible."
-                summary={<PostGamePodium entries={podiumEntries} label="Prompt Arcade player podium" />}
-                playIntro={playIntro}
-              />
-            </section>
-            <RoundStandings game={game} copied={copied} onInvite={onInvite} />
-          </div>
-        )}
-      >
-        <PromptArcadeGameShowcase rankings={game.gameRankings} onFinished={showScores} />
-      </GameSurfaceTransition>
+    <main
+      className={cn(
+        GAME_LOBBY_FRAME_CLASS,
+        'grid grid-cols-[minmax(0,1fr)_300px] items-start gap-4.5 max-[860px]:grid-cols-1'
+      )}
+    >
+      <section className="min-w-0">
+        <PostGameBoard
+          eyebrow="Factory closed · Final scores"
+          title={
+            game.standings[0] === undefined ? 'Arcade complete.' : `${game.standings[0].displayName} wins the arcade.`
+          }
+          detail={`${game.summary.played} player-made ${game.summary.played === 1 ? 'game' : 'games'} made it through the playlist.`}
+          icon={Trophy}
+          accent="#564dd8"
+          accentTint="#e8e4ff"
+          roomId={session.roomId}
+          currentGameId={session.currentGameId}
+          currentGameType={session.gameType}
+          sessionToken={guest.sessionToken}
+          isOwner={game.isOwner}
+          isClosed={isClosed}
+          closedMessage="Room closed. The final Prompt Arcade scores stay visible."
+          summary={<PostGamePodium entries={podiumEntries} label="Prompt Arcade podium" />}
+        />
+      </section>
+      <RoundStandings game={game} copied={copied} onInvite={onInvite} />
     </main>
   );
 }
@@ -1496,7 +1459,6 @@ export default function PromptArcadeRoom({ guest, session }: { guest: GuestIdent
   const startPlaylist = useMutation(api.promptArcade.startPlaylist);
   const finishStalledPlaylist = useMutation(api.promptArcade.finishStalledPlaylist);
   const submitResult = useMutation(api.promptArcade.submitResult);
-  const submitRating = useMutation(api.promptArcade.submitRating);
   const leaveRoom = useMutation(api.rooms.leave);
   const closeRoom = useMutation(api.rooms.close);
   const { onlineByMemberId } = useRoomPresence({ roomId: session.roomId, sessionToken: guest.sessionToken });
@@ -1512,7 +1474,7 @@ export default function PromptArcadeRoom({ guest, session }: { guest: GuestIdent
   const [closeSucceeded, setCloseSucceeded] = useState(false);
   const [gameModeOpen, setGameModeOpen] = useState(false);
   const isClosed = session.status === 'closed' || closeSucceeded;
-  const timerEnabled = game?.phase === 'countdown' || game?.phase === 'playing' || game?.phase === 'roundResults';
+  const timerEnabled = game?.phase === 'countdown' || game?.phase === 'playing';
   const now = useClock(timerEnabled);
   const members = useMemo(() => getRoomMembers(session), [session]);
   const roundPhaseKey = game?.round?.roundId;
@@ -1638,26 +1600,6 @@ export default function PromptArcadeRoom({ guest, session }: { guest: GuestIdent
     if (failedFinish !== null) void sendFinish(failedFinish);
   }, [failedFinish, sendFinish]);
 
-  const handleRateGame = useCallback(
-    async (rating: number) => {
-      const roundId = game?.round?.roundId;
-      if (roundId === undefined) throw new Error('The Prompt Arcade rating round is no longer available.');
-      setNotice(null);
-      try {
-        await submitRating({
-          roomId: session.roomId,
-          sessionToken: guest.sessionToken,
-          roundId,
-          rating,
-        });
-      } catch (ratingError) {
-        setNotice(userFacingError(ratingError, 'Your game rating could not be recorded.'));
-        throw ratingError;
-      }
-    },
-    [game?.round?.roundId, guest.sessionToken, session.roomId, submitRating]
-  );
-
   const handleRuntimeError = useCallback((message: string) => {
     setNotice(`This generated game stopped: ${message}`);
   }, []);
@@ -1743,7 +1685,6 @@ export default function PromptArcadeRoom({ guest, session }: { guest: GuestIdent
         game={game}
         now={now}
         onFinish={handleFinish}
-        onRateGame={handleRateGame}
         resultPending={resultPending}
         failedFinish={failedFinish}
         onRetryFinish={handleRetryFinish}

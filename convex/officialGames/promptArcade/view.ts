@@ -1,7 +1,6 @@
 import type { Doc, Id } from '../../_generated/dataModel';
 import type { QueryCtx } from '../../_generated/server';
 import { PROMPT_ARCADE_MAX_PLAYERS, PROMPT_ARCADE_STALE_GENERATION_MS } from './engine';
-import { getPromptArcadeGameRankings } from './ratings';
 import { findPromptArcadeState, listPromptArcadeEntries, requirePromptArcadeMember } from './state';
 
 const GENERATION_STATUSES = new Set(['queued', 'generating', 'validating', 'repairing']);
@@ -66,21 +65,6 @@ export async function getPromptArcadeGame(ctx: QueryCtx, args: { roomId: Id<'roo
       throw new Error('Prompt Arcade round capacity invariant violated.');
     }
   }
-  let currentRating: number | null = null;
-  let ratingCount = 0;
-  let eligibleRaterCount = 0;
-  if (round !== null && roundEntry !== null) {
-    const ratings = await ctx.db
-      .query('promptArcadeRatings')
-      .withIndex('by_roundId', (index) => index.eq('roundId', round._id))
-      .take(PROMPT_ARCADE_MAX_PLAYERS + 1);
-    if (ratings.length > PROMPT_ARCADE_MAX_PLAYERS) {
-      throw new Error('Prompt Arcade round rating capacity invariant violated.');
-    }
-    currentRating = ratings.find((rating) => rating.raterMemberId === membership._id)?.rating ?? null;
-    ratingCount = ratings.length;
-    eligibleRaterCount = results.filter((result) => result.memberId !== roundEntry.memberId).length;
-  }
   const resultViews = results
     .map((result) => ({
       memberId: result.memberId,
@@ -113,7 +97,6 @@ export async function getPromptArcadeGame(ctx: QueryCtx, args: { roomId: Id<'roo
       memberId: score.memberId,
       displayName: score.displayName,
       totalScore: score.totalScore,
-      creatorBonus: score.creatorBonus ?? 0,
       roundsFinished: score.roundsFinished,
       isCurrentPlayer: score.memberId === membership._id,
       isActive: activeByMemberId.get(score.memberId) ?? false,
@@ -122,13 +105,6 @@ export async function getPromptArcadeGame(ctx: QueryCtx, args: { roomId: Id<'roo
       (first, second) => second.totalScore - first.totalScore || first.displayName.localeCompare(second.displayName)
     )
     .map((standing, index) => ({ ...standing, rank: index + 1 }));
-  const gameRankings =
-    state.phase === 'complete'
-      ? (await getPromptArcadeGameRankings(ctx, args.roomId, state.gameNumber, entries)).map((ranking) => ({
-          ...ranking,
-          isCurrentPlayer: ranking.memberId === membership._id,
-        }))
-      : [];
 
   const eligibleEntryCount = entries.filter((entry) => {
     if (entry.status === 'withdrawn') return false;
@@ -179,19 +155,6 @@ export async function getPromptArcadeGame(ctx: QueryCtx, args: { roomId: Id<'roo
           },
     currentResult: resultViews.find((result) => result.isCurrentPlayer) ?? null,
     roundResults: resultViews,
-    currentGameRating: {
-      rating: currentRating,
-      canRate:
-        state.phase === 'roundResults' &&
-        round !== null &&
-        roundEntry !== null &&
-        membership.isActive &&
-        membership._id !== roundEntry.memberId &&
-        results.some((result) => result.memberId === membership._id),
-      ratingCount,
-      eligibleRaterCount,
-    },
-    gameRankings,
     standings,
   };
 }

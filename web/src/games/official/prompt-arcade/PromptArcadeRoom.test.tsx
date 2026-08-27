@@ -1,7 +1,7 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PromptArcadeRoom from './PromptArcadeRoom';
 
 const mocks = vi.hoisted(() => ({
@@ -132,20 +132,12 @@ const baseGame = {
   round: null,
   currentResult: null,
   roundResults: [],
-  currentGameRating: {
-    rating: null,
-    canRate: false,
-    ratingCount: 0,
-    eligibleRaterCount: 0,
-  },
-  gameRankings: [],
   standings: [
     {
       rank: 1,
       memberId: 'member-1',
       displayName: 'Igor',
       totalScore: 0,
-      creatorBonus: 0,
       roundsFinished: 0,
       isCurrentPlayer: true,
       isActive: true,
@@ -155,7 +147,6 @@ const baseGame = {
       memberId: 'member-2',
       displayName: 'Maya',
       totalScore: 0,
-      creatorBonus: 0,
       roundsFinished: 0,
       isCurrentPlayer: false,
       isActive: true,
@@ -165,7 +156,6 @@ const baseGame = {
       memberId: 'member-3',
       displayName: 'Theo',
       totalScore: 0,
-      creatorBonus: 0,
       roundsFinished: 0,
       isCurrentPlayer: false,
       isActive: true,
@@ -185,10 +175,6 @@ describe('PromptArcadeRoom', () => {
   beforeEach(() => {
     mocks.game = baseGame;
     mocks.mutation.mockClear();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it('shows honest player stages and sends every player prompt, including emoji', async () => {
@@ -568,85 +554,6 @@ describe('PromptArcadeRoom', () => {
     expect(screen.getByText('Moved from position 1 to 4')).toBeInTheDocument();
   });
 
-  it('gives every non-author player five seconds to submit a one-to-five star rating', async () => {
-    const user = userEvent.setup();
-    const now = Date.now();
-    const results = baseGame.standings.map((standing, index) => ({
-      memberId: standing.memberId,
-      displayName: standing.displayName,
-      status: 'finished',
-      quality: 1,
-      elapsedMs: 3_000 + index * 500,
-      score: 700 - index * 100,
-      metricLabel: null,
-      metricValue: null,
-      isCurrentPlayer: standing.isCurrentPlayer,
-      isActive: true,
-    }));
-    mocks.game = {
-      ...baseGame,
-      phase: 'roundResults',
-      phaseStartedAt: now,
-      phaseEndsAt: now + 5_000,
-      currentRoundNumber: 1,
-      playlistStarted: true,
-      round: {
-        roundId: 'round-1',
-        roundNumber: 1,
-        status: 'results',
-        countdownStartedAt: now - 28_000,
-        playStartsAt: now - 20_000,
-        playEndsAt: now,
-        resultsStartedAt: now,
-        entry: {
-          entryId: 'entry-2',
-          memberId: 'member-2',
-          displayName: 'Maya',
-          prompt: 'Catch the blue dot',
-        },
-        artifact: {
-          artifactId: 'artifact-1',
-          title: 'Dot Catcher',
-          interpretation: 'Catch a moving target before time runs out.',
-          instructions: 'Tap the blue dot five times.',
-          durationMs: 20_000,
-          scoringMode: 'speed',
-          codeUrl: null,
-        },
-      },
-      currentResult: results[0],
-      roundResults: results,
-      currentGameRating: {
-        rating: null,
-        canRate: true,
-        ratingCount: 1,
-        eligibleRaterCount: 2,
-      },
-    };
-
-    renderRoom();
-
-    expect(screen.getByRole('heading', { name: 'Rate Dot Catcher' })).toBeInTheDocument();
-    expect(screen.getByRole('progressbar', { name: 'Rating time remaining' })).toHaveAttribute('aria-valuemax', '5000');
-    const stars = screen.getAllByRole('radio');
-    await user.hover(stars[4]);
-    for (const star of stars) {
-      expect(star.querySelector('svg')).toHaveAttribute('fill', 'currentColor');
-    }
-    await user.unhover(stars[4]);
-    for (const star of stars) {
-      expect(star.querySelector('svg')).toHaveAttribute('fill', 'none');
-    }
-    await user.click(screen.getByRole('radio', { name: '5 out of 5 stars' }));
-    expect(mocks.mutation).toHaveBeenCalledWith({
-      roomId: 'room-1',
-      sessionToken: guest.sessionToken,
-      roundId: 'round-1',
-      rating: 5,
-    });
-    expect(screen.getByText('5 / 5')).toBeInTheDocument();
-  });
-
   it('starts automatically when everyone is ready and hides the manual control', () => {
     mocks.game = {
       ...baseGame,
@@ -773,77 +680,25 @@ describe('PromptArcadeRoom', () => {
     expect(screen.queryByRole('button', { name: 'Finish without unfinished prompts' })).not.toBeInTheDocument();
   });
 
-  it('reveals the top-rated games before fading into the final player scores', () => {
-    vi.useFakeTimers();
+  it('keeps the final standings visible beside the post-game board', () => {
     mocks.game = {
       ...baseGame,
       phase: 'complete',
       playlistStarted: true,
       summary: { ...baseGame.summary, writing: 0, generating: 0, ready: 0, played: 3 },
       standings: [
-        { ...baseGame.standings[1], rank: 1, totalScore: 2_400, creatorBonus: 500 },
+        { ...baseGame.standings[1], rank: 1, totalScore: 2_400 },
         { ...baseGame.standings[0], rank: 2, totalScore: 1_900 },
         { ...baseGame.standings[2], rank: 3, totalScore: 1_250 },
-      ],
-      gameRankings: [
-        {
-          rank: 1,
-          entryId: 'entry-2',
-          memberId: 'member-2',
-          displayName: 'Maya',
-          title: 'Dot Catcher',
-          interpretation: 'Catch a moving target before time runs out.',
-          averageRating: 4.8,
-          ratingCount: 2,
-          isWinner: true,
-          creatorBonus: 500,
-          isCurrentPlayer: false,
-        },
-        {
-          rank: 2,
-          entryId: 'entry-3',
-          memberId: 'member-3',
-          displayName: 'Theo',
-          title: 'Asteroid Pocket',
-          interpretation: 'Thread a ship through a tiny asteroid field.',
-          averageRating: 4.4,
-          ratingCount: 2,
-          isWinner: false,
-          creatorBonus: 0,
-          isCurrentPlayer: false,
-        },
-        {
-          rank: 3,
-          entryId: 'entry-1',
-          memberId: 'member-1',
-          displayName: 'Igor',
-          title: 'Circle Lab',
-          interpretation: 'Draw the cleanest circle you can.',
-          averageRating: 4.1,
-          ratingCount: 2,
-          isWinner: false,
-          creatorBonus: 0,
-          isCurrentPlayer: true,
-        },
       ],
     };
 
     renderRoom();
 
-    expect(screen.getByRole('heading', { name: 'The arcade has spoken.' })).toBeInTheDocument();
-    expect(screen.getByText('Third place · Circle Lab by Igor')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Maya wins the arcade.' })).not.toBeInTheDocument();
-
-    act(() => vi.advanceTimersByTime(3_000));
-    expect(screen.getByText('Top-rated game · Dot Catcher by Maya')).toBeInTheDocument();
-
-    act(() => vi.advanceTimersByTime(3_500));
-    act(() => vi.advanceTimersByTime(280));
     expect(screen.getByRole('heading', { name: 'Maya wins the arcade.' })).toBeInTheDocument();
     const standings = screen.getByRole('complementary', { name: 'Prompt Arcade standings' });
     expect(standings).toHaveTextContent('Maya');
     expect(standings).toHaveTextContent('2,400');
-    expect(standings).toHaveTextContent('Top-rated creator · +500 bonus');
     expect(standings).toHaveClass('h-[calc(100dvh-104px)]', 'max-[860px]:h-auto');
   });
 });

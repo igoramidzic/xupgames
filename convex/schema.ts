@@ -526,28 +526,12 @@ export default defineSchema({
     .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber'])
     .index('by_roomId_and_gameNumber_and_memberId', ['roomId', 'gameNumber', 'memberId']),
 
-  promptArcadeRatings: defineTable({
-    roomId: v.id('rooms'),
-    gameNumber: v.number(),
-    roundNumber: v.number(),
-    roundId: v.id('promptArcadeRounds'),
-    entryId: v.id('promptArcadeEntries'),
-    raterMemberId: v.id('roomMembers'),
-    rating: v.number(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index('by_roundId', ['roundId'])
-    .index('by_roundId_and_raterMemberId', ['roundId', 'raterMemberId'])
-    .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber']),
-
   promptArcadeScores: defineTable({
     roomId: v.id('rooms'),
     gameNumber: v.number(),
     memberId: v.id('roomMembers'),
     displayName: v.string(),
     totalScore: v.number(),
-    creatorBonus: v.optional(v.number()),
     roundsFinished: v.number(),
     updatedAt: v.number(),
   })
