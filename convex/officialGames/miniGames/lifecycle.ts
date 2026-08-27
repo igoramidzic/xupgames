@@ -1,7 +1,7 @@
 import type { Doc, Id } from '../../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../../_generated/server';
-import { enrollMiniGamesMember } from '../../miniGames';
-import { MINI_GAMES_DEFAULT_ROUND_COUNT, normalizeMiniGamesRoundCount } from '../../miniGamesEngine';
+import { MINI_GAMES_DEFAULT_ROUND_COUNT, normalizeMiniGamesRoundCount } from './registry';
+import { enrollMiniGamesMember } from './state';
 
 type DatabaseReaderContext = Pick<QueryCtx, 'db'>;
 

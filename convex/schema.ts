@@ -33,7 +33,15 @@ const miniGamesPhase = v.union(
   v.literal('roundResults'),
   v.literal('complete')
 );
-const miniGameId = v.union(v.literal('straightLine'), v.literal('orangeEmojis'));
+const miniGameId = v.union(
+  v.literal('straightLine'),
+  v.literal('orangeEmojis'),
+  v.literal('guessPercentage'),
+  v.literal('circleCenter'),
+  v.literal('guessDistance'),
+  v.literal('pointOnMap'),
+  v.literal('batteryPercentage')
+);
 const miniGameRoundStatus = v.union(v.literal('selecting'), v.literal('playing'), v.literal('results'));
 const miniGameResultStatus = v.union(v.literal('waiting'), v.literal('finished'), v.literal('timedOut'));
 const miniGameEmojiColor = v.union(
@@ -43,6 +51,8 @@ const miniGameEmojiColor = v.union(
   v.literal('pink'),
   v.literal('purple')
 );
+const miniGamePercentageColor = v.union(v.literal('coral'), v.literal('gold'), v.literal('mint'), v.literal('blue'));
+const miniGameDistanceUnit = v.union(v.literal('kilometers'), v.literal('miles'));
 const playtestStatus = v.union(
   v.literal('provisioning'),
   v.literal('running'),
@@ -360,6 +370,26 @@ export default defineSchema({
         rotation: v.number(),
       })
     ),
+    percentageTargetColor: v.optional(miniGamePercentageColor),
+    percentageSegments: v.optional(v.array(v.object({ color: miniGamePercentageColor, percentage: v.number() }))),
+    batteryPercentage: v.optional(v.number()),
+    circleCenterX: v.optional(v.number()),
+    circleCenterY: v.optional(v.number()),
+    circleRadius: v.optional(v.number()),
+    circleGapRotation: v.optional(v.number()),
+    mapFirstName: v.optional(v.string()),
+    mapFirstX: v.optional(v.number()),
+    mapFirstY: v.optional(v.number()),
+    mapSecondName: v.optional(v.string()),
+    mapSecondX: v.optional(v.number()),
+    mapSecondY: v.optional(v.number()),
+    mapTargetName: v.optional(v.string()),
+    mapTargetLatitude: v.optional(v.number()),
+    mapTargetLongitude: v.optional(v.number()),
+    mapTargetX: v.optional(v.number()),
+    mapTargetY: v.optional(v.number()),
+    distanceUnit: v.optional(miniGameDistanceUnit),
+    numericAnswer: v.optional(v.number()),
   })
     .index('by_roomId_and_gameNumber_and_roundNumber', ['roomId', 'gameNumber', 'roundNumber'])
     .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber']),
@@ -380,6 +410,8 @@ export default defineSchema({
     straightness: v.union(v.number(), v.null()),
     correctClicks: v.number(),
     wrongClicks: v.number(),
+    metric: v.optional(v.number()),
+    numericGuess: v.optional(v.number()),
   })
     .index('by_roundId', ['roundId'])
     .index('by_roundId_and_memberId', ['roundId', 'memberId'])

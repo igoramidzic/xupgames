@@ -1,4 +1,4 @@
-import { MousePointer2, PencilLine, Sparkles } from 'lucide-react';
+import { BatteryCharging, PencilLine, Sparkles } from 'lucide-react';
 
 export default function MiniGamesPreview() {
   return (
@@ -23,8 +23,8 @@ export default function MiniGamesPreview() {
             <strong className="text-sm">Find this emoji</strong>
           </span>
           <span className="grid h-31 w-48 -rotate-1 place-content-center rounded-[20px_12px_22px_14px] border-2 border-[#17203a] bg-[#d9f7ca] text-center shadow-[5px_5px_0_#17203a]">
-            <MousePointer2 className="mx-auto mb-2 size-7 text-[#16815f]" />
-            <strong className="text-sm">Your next idea</strong>
+            <BatteryCharging className="mx-auto mb-2 size-7 text-[#16815f]" />
+            <strong className="text-sm">Guess the battery</strong>
           </span>
         </div>
         <span className="absolute top-0 left-1/2 h-full w-0.75 -translate-x-1/2 bg-[#e85d2a]" />

@@ -1,7 +1,7 @@
 import { api } from '@convex/_generated/api';
 import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
-import { Check, Copy, Dices, DoorOpen, LoaderCircle, LockKeyhole, PencilLine, Play, Trophy } from 'lucide-react';
+import { Check, Copy, Dices, DoorOpen, LoaderCircle, LockKeyhole, Play, Trophy } from 'lucide-react';
 import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -36,6 +36,7 @@ import { getRoomMembers } from '@/lib/roomSession';
 import { useRoomPresence } from '@/lib/useRoomPresence';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
+import MiniGameChallenge, { type MiniGamePoint } from './MiniGameChallenges';
 import MiniGamesConfigurationDialog, { formatMiniGamesDuration } from './MiniGamesConfigurationDialog';
 
 type SessionResult = FunctionReturnType<typeof api.rooms.getSession>;
@@ -61,9 +62,18 @@ const ROULETTE_SLOT_IDS = [
 ] as const;
 const ROULETTE_REST_MS = 420;
 const ROULETTE_SPIN_MS = 2_400;
-const ROUND_RESULTS_FADE_MS = 500;
 const MINI_GAME_ROUND_MS = 10_000;
 const MINI_GAME_RESULTS_MS = 4_000;
+const MINI_GAME_GLYPHS: Record<MiniGameRound['miniGame']['id'], string> = {
+  straightLine: '✏️',
+  orangeEmojis: '🍊',
+  guessPercentage: '◔',
+  circleCenter: '◎',
+  guessDistance: '↔️',
+  pointOnMap: '📍',
+  batteryPercentage: '🔋',
+};
+const MINI_GAME_CARD_COLORS = ['bg-[#bde8ff]', 'bg-[#fff0b8]', 'bg-[#eadfff]', 'bg-[#d9f7ca]', 'bg-[#ffdcd7]'] as const;
 
 function useClock(enabled: boolean) {
   const [now, setNow] = useState(Date.now());
@@ -81,11 +91,19 @@ function formatTime(timeMs: number | null) {
   return `${(timeMs / 1_000).toFixed(1)}s`;
 }
 
-function resultDetail(result: GameView['roundResults'][number], miniGameId: MiniGameRound['miniGame']['id']) {
+function resultDetail(result: GameView['roundResults'][number], round: MiniGameRound) {
+  const miniGameId = round.miniGame.id;
   if (result.status === 'timedOut') return 'Time expired';
   if (miniGameId === 'straightLine')
     return `${Math.round(result.straightness ?? 0)}% straight · ${formatTime(result.timeMs)}`;
-  return `${result.correctClicks} found · ${result.wrongClicks} wrong · ${formatTime(result.timeMs)}`;
+  if (miniGameId === 'orangeEmojis')
+    return `${result.correctClicks} found · ${result.wrongClicks} wrong · ${formatTime(result.timeMs)}`;
+  if (miniGameId === 'guessPercentage' || miniGameId === 'batteryPercentage')
+    return `${result.numericGuess ?? 0}% guess · ${result.metric ?? 0} points off`;
+  if (miniGameId === 'circleCenter') return `${result.metric ?? 0}% of a radius from center`;
+  if (miniGameId === 'guessDistance')
+    return `${Math.round(result.numericGuess ?? 0).toLocaleString()} ${round.distancePlaces?.unit ?? ''} · ${result.metric ?? 0}% off`;
+  return `${Math.round(result.metric ?? 0).toLocaleString()} km away`;
 }
 
 function CountdownCircle({ remainingMs, totalMs, label }: { remainingMs: number; totalMs: number; label: string }) {
@@ -105,6 +123,40 @@ function CountdownCircle({ remainingMs, totalMs, label }: { remainingMs: number;
         {seconds}
       </span>
     </strong>
+  );
+}
+
+function MiniGameRoundHeader({
+  round,
+  totalRounds,
+  remainingMs,
+  totalMs,
+  timerLabel,
+  scoreView = false,
+}: {
+  round: MiniGameRound;
+  totalRounds: number;
+  remainingMs: number;
+  totalMs: number;
+  timerLabel: string;
+  scoreView?: boolean;
+}) {
+  return (
+    <div
+      className="flex items-center justify-between gap-4 border-b border-[#d5ddea] bg-white px-5 py-4"
+      data-mini-game-round-header
+    >
+      <div>
+        <p className="mb-1 text-[9px] font-[850] tracking-[0.14em] text-[#e85d2a] uppercase">
+          {round.miniGame.eyebrow} · Round {round.roundNumber} of {totalRounds}
+          {scoreView ? ' · Scores' : ''}
+        </p>
+        <h1 className="m-0 font-display text-[clamp(25px,4vw,38px)] leading-none font-[880] tracking-[-0.05em]">
+          {round.miniGame.title}
+        </h1>
+      </div>
+      <CountdownCircle remainingMs={remainingMs} totalMs={totalMs} label={timerLabel} />
+    </div>
   );
 }
 
@@ -142,7 +194,7 @@ function RoulettePanel({ round, miniGames }: { round: MiniGameRound; miniGames: 
 
   return (
     <section
-      className="relative grid min-h-[clamp(470px,calc(100dvh-210px),680px)] place-content-center overflow-hidden rounded-[26px_16px_28px_18px] border-2 border-[#17203a] bg-[#fff9e8] px-0 py-10 shadow-[8px_9px_0_#a9c6ff] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500 motion-safe:ease-out"
+      className="relative grid min-h-[clamp(470px,calc(100dvh-210px),680px)] place-content-center overflow-hidden px-0 py-10"
       aria-label="Mini-game roulette"
     >
       <div className="mb-8 px-5 text-center">
@@ -164,18 +216,14 @@ function RoulettePanel({ round, miniGames }: { round: MiniGameRound; miniGames: 
               key={slotId}
               className={cn(
                 'grid h-38 w-[min(68vw,240px)] shrink-0 place-content-center rounded-[20px_12px_22px_14px] border-2 border-[#17203a] px-5 text-center shadow-[5px_5px_0_#17203a]',
-                game.id === 'straightLine' ? 'bg-[#bde8ff]' : 'bg-[#fff0b8]',
+                MINI_GAME_CARD_COLORS[index % MINI_GAME_CARD_COLORS.length],
                 index % 2 === 0 ? '-rotate-1' : 'rotate-1'
               )}
               data-roulette-target={index === targetIndex || undefined}
             >
-              {game.id === 'straightLine' ? (
-                <PencilLine className="mx-auto mb-2 size-8 text-[#3155d9]" aria-hidden="true" />
-              ) : (
-                <span className="mb-1 text-4xl" aria-hidden="true">
-                  🍊
-                </span>
-              )}
+              <span className="mb-1 text-4xl" aria-hidden="true">
+                {MINI_GAME_GLYPHS[game.id]}
+              </span>
               <strong className="font-display text-lg font-[850] tracking-[-0.035em]">{game.title}</strong>
               <small className="mt-1 text-[9px] font-[760] tracking-[0.08em] text-[#68758b] uppercase">
                 {game.eyebrow}
@@ -350,7 +398,7 @@ function StraightLineChallenge({
         onKeyDown={handleKeyDown}
       />
       <p id="straight-line-keyboard-help" className="mt-3 mb-0 text-center text-xs font-[680] text-[#68758b]">
-        One stroke only. Use a pointer, or press Enter and steer with the arrow keys; press Enter again to lock in.
+        One stroke only. Draw from the blue start dot to the orange finish dot.
       </p>
     </div>
   );
@@ -407,7 +455,7 @@ function EmojiChallenge({
               key={item.id}
               type="button"
               className={cn(
-                'absolute grid size-[clamp(44px,6vw,62px)] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-transparent bg-white/72 text-[clamp(25px,4vw,38px)] shadow-[0_4px_10px_rgb(23_32_58/10%)] transition-[transform,opacity,border-color,background-color] hover:scale-110 focus-visible:border-[#3155d9] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#3155d9]/30 disabled:cursor-default motion-reduce:transition-none data-[clicked=true]:scale-75 data-[clicked=true]:opacity-55',
+                'absolute grid size-[clamp(34px,5vw,50px)] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-transparent bg-white/72 text-[clamp(20px,3.2vw,30px)] shadow-[0_4px_10px_rgb(23_32_58/10%)] transition-[transform,opacity,border-color,background-color] hover:scale-110 focus-visible:border-[#3155d9] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#3155d9]/30 disabled:cursor-default motion-reduce:transition-none data-[clicked=true]:scale-75 data-[clicked=true]:opacity-55',
                 clicked && isTarget && 'border-[#16815f] bg-[#dcf7ea]',
                 clicked && !isTarget && 'border-[#c94b3f] bg-[#fff0ed]'
               )}
@@ -431,24 +479,17 @@ function RoundResults({ game, now }: { game: GameView; now: number }) {
   const round = game.round;
   if (round === null) return null;
   const remainingMs = Math.max(0, (game.phaseEndsAt ?? now) - now);
-  const isFadingToSpinner = round.roundNumber < game.totalRounds && remainingMs <= ROUND_RESULTS_FADE_MS;
   return (
-    <section
-      className="min-h-[clamp(470px,calc(100dvh-210px),680px)] rounded-[26px_16px_28px_18px] border-2 border-[#17203a] bg-[#fff9e8] p-[clamp(22px,4vw,48px)] opacity-100 shadow-[8px_9px_0_#a9c6ff] transition-opacity duration-500 ease-in data-[transition=spinner-out]:opacity-0 motion-reduce:transition-none"
-      data-transition={isFadingToSpinner ? 'spinner-out' : 'scores'}
-    >
-      <div className="flex items-start justify-between gap-4 max-[560px]:grid">
-        <div>
-          <p className="mb-1.5 text-[10px] font-[850] tracking-[0.15em] text-[#e85d2a] uppercase">
-            Round {round.roundNumber} scores
-          </p>
-          <h1 className="m-0 font-display text-[clamp(38px,6vw,62px)] leading-[0.9] font-[890] tracking-[-0.065em]">
-            {round.miniGame.title}
-          </h1>
-        </div>
-        <CountdownCircle remainingMs={remainingMs} totalMs={MINI_GAME_RESULTS_MS} label="Next spin" />
-      </div>
-      <ol className="mt-8 grid list-none gap-2 p-0" aria-label="Round scores">
+    <section className="min-h-[clamp(470px,calc(100dvh-210px),680px)]">
+      <MiniGameRoundHeader
+        round={round}
+        totalRounds={game.totalRounds}
+        remainingMs={remainingMs}
+        totalMs={MINI_GAME_RESULTS_MS}
+        timerLabel="Next spin"
+        scoreView
+      />
+      <ol className="m-0 grid list-none gap-2 p-[clamp(14px,3vw,30px)]" aria-label="Round scores">
         {game.roundResults.map((result, index) => (
           <li
             key={result.memberId}
@@ -462,7 +503,7 @@ function RoundResults({ game, now }: { game: GameView; now: number }) {
                 {result.displayName}
                 {result.isCurrentPlayer ? ' (you)' : ''}
               </strong>
-              <small className="text-[10px] text-[#78869a]">{resultDetail(result, round.miniGame.id)}</small>
+              <small className="text-[10px] text-[#78869a]">{resultDetail(result, round)}</small>
             </span>
             <strong className="font-display text-xl font-[880] text-[#e85d2a] tabular-nums">+{result.score}</strong>
           </li>
@@ -524,6 +565,9 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
   const configureGame = useMutation(api.miniGames.configureGame);
   const submitStraightLine = useMutation(api.miniGames.submitStraightLine);
   const submitOrangeEmojis = useMutation(api.miniGames.submitOrangeEmojis);
+  const submitEstimate = useMutation(api.miniGames.submitEstimate);
+  const submitCircleCenter = useMutation(api.miniGames.submitCircleCenter);
+  const submitMapPoint = useMutation(api.miniGames.submitMapPoint);
   const leaveRoom = useMutation(api.rooms.leave);
   const closeRoom = useMutation(api.rooms.close);
   const { onlineByMemberId } = useRoomPresence({ roomId: session.roomId, sessionToken: guest.sessionToken });
@@ -584,6 +628,33 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
     }
   }
 
+  async function submitNumericEstimate(guess: number) {
+    setNotice(null);
+    try {
+      await submitEstimate({ roomId: session.roomId, sessionToken: guest.sessionToken, guess });
+    } catch (error) {
+      setNotice(userFacingError(error, 'Your estimate could not be scored.'));
+    }
+  }
+
+  async function submitCirclePoint(point: MiniGamePoint) {
+    setNotice(null);
+    try {
+      await submitCircleCenter({ roomId: session.roomId, sessionToken: guest.sessionToken, point });
+    } catch (error) {
+      setNotice(userFacingError(error, 'Your center point could not be scored.'));
+    }
+  }
+
+  async function submitMapPin(point: MiniGamePoint) {
+    setNotice(null);
+    try {
+      await submitMapPoint({ roomId: session.roomId, sessionToken: guest.sessionToken, point });
+    } catch (error) {
+      setNotice(userFacingError(error, 'Your map pin could not be scored.'));
+    }
+  }
+
   async function confirmAction() {
     const action = confirmation;
     setConfirmation(null);
@@ -617,6 +688,10 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
   }
 
   const winner = game.standings[0] ?? null;
+  const surfaceKey =
+    game.phase === 'lobby' || game.phase === 'complete'
+      ? game.phase
+      : `${game.phase}:${game.round?.roundId ?? game.currentRoundNumber}`;
   const currentFinished = game.currentResult?.status === 'finished';
 
   return (
@@ -695,183 +770,202 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
             open={gameModeOpen}
             onClose={() => setGameModeOpen(false)}
           >
-            <GameSurfaceTransition
-              showResults={game.phase === 'complete'}
-              results={({ playIntro }) => (
-                <PostGameBoard
-                  eyebrow={`${game.totalRounds} mini-games · Final score`}
-                  title={winner ? `${winner.displayName} wins the mix.` : 'Mix complete.'}
-                  detail={
-                    winner
-                      ? `${winner.totalScore.toLocaleString()} total points across ${winner.roundsFinished} rounds.`
-                      : 'The final scores are locked in.'
-                  }
-                  icon={Trophy}
-                  accent="#e85d2a"
-                  accentTint="#fff0b8"
-                  roomId={session.roomId}
-                  currentGameId={session.currentGameId}
-                  currentGameType={session.gameType}
-                  sessionToken={guest.sessionToken}
-                  isOwner={session.isOwner}
-                  isClosed={isClosed}
-                  closedMessage="This room is closed. The final standings stay here to view."
-                  playIntro={playIntro}
-                  summary={
-                    <PostGamePodium
-                      label="Final Mini Game Mix podium"
-                      animate={playIntro}
-                      entries={game.standings.slice(0, 3).map((standing) => ({
-                        id: standing.memberId,
-                        place: standing.rank,
-                        name: standing.displayName,
-                        result: `${standing.totalScore.toLocaleString()} pts`,
-                      }))}
-                    />
-                  }
-                />
+            <section
+              className={cn(
+                'relative w-full overflow-hidden rounded-[26px_16px_28px_18px] border-2 border-[#17203a] bg-[#fff9e8] shadow-[8px_9px_0_#a9c6ff]',
+                game.phase === 'lobby' && GAME_LOBBY_CARD_HEIGHT_CLASS
               )}
+              data-mini-game-surface-card
             >
-              {game.phase === 'lobby' ? (
-                <section
-                  className={cn(
-                    'relative flex w-full flex-col overflow-hidden rounded-[28px_18px_30px_20px] border-2 border-[#17203a] bg-[#fff9e8] shadow-[9px_10px_0_#a9c6ff]',
-                    GAME_LOBBY_CARD_HEIGHT_CLASS
-                  )}
-                >
-                  <div
-                    className="pointer-events-none absolute -top-20 right-[8%] size-80 rotate-12 rounded-[36px_19px_40px_23px] bg-[#dfe7ff]"
-                    aria-hidden="true"
-                  />
-                  <div
-                    className="pointer-events-none absolute top-[18%] right-[18%] size-26 -rotate-8 rounded-full border-2 border-dashed border-[#3155d9]/25"
-                    aria-hidden="true"
-                  />
-
-                  <div className="relative z-1 flex flex-1 flex-col items-start justify-center px-[clamp(34px,7vw,92px)] pt-[clamp(42px,7vw,78px)] pb-8 max-[760px]:px-6 max-[760px]:pt-16">
-                    <p className="mb-3 text-[10px] font-[850] tracking-[0.18em] text-[#e85d2a] uppercase">
-                      Spin · Play · Score · Repeat
-                    </p>
-                    <h1 className="m-0 max-w-190 font-display text-[clamp(66px,10vw,108px)] leading-[0.77] font-[920] tracking-[-0.085em] max-[520px]:text-[clamp(58px,20vw,82px)]">
-                      Tiny games.
-                      <br />
-                      <span className="text-[#3155d9]">One big score.</span>
-                    </h1>
-
-                    <div className="my-7 flex flex-wrap gap-x-7 gap-y-3 border-y border-[#d5dce8] py-4 text-[11px] font-[650] text-[#748096] [&_strong]:mr-1 [&_strong]:text-[15px] [&_strong]:text-[#17203a]">
-                      <span>
-                        <strong>{session.activeMemberCount}</strong>{' '}
-                        {session.activeMemberCount === 1 ? 'player' : 'players'} ready
-                      </span>
-                      <span>
-                        <strong>{game.configuration.roundCount}</strong> mini-games
-                      </span>
-                      <span>
-                        <strong>10s</strong> each
-                      </span>
-                      <span>
-                        <strong>~{formatMiniGamesDuration(game.estimatedDurationMs)}</strong> game time
-                      </span>
-                    </div>
-
-                    {isClosed ? (
-                      <p className="m-0 rounded-[10px_6px_11px_7px] border border-[#cbd3e0] bg-[#eef1f6] px-4 py-3 text-xs font-bold text-[#667186]">
-                        This room is closed.
-                      </p>
-                    ) : session.isOwner ? (
-                      <Button className="h-13.5 min-w-50" variant="brand" size="xl" onClick={start} disabled={starting}>
-                        {starting ? <LoaderCircle className="animate-spin" /> : <Play />}{' '}
-                        {starting ? 'Shuffling…' : 'Start the mix'}
-                      </Button>
-                    ) : (
-                      <p className="m-0 rounded-[10px_6px_11px_7px] border border-[#cbd3e0] bg-[#eef1f6] px-4 py-3 text-xs font-bold text-[#667186]">
-                        Waiting for {ownerName} to start
-                      </p>
-                    )}
-
-                    {!isClosed ? (
-                      <Button className="mt-4.5" type="button" variant="paper" size="sm" onClick={copyRoomLink}>
-                        {copied ? <Check /> : <Copy />} {copied ? 'Invite link copied' : 'Copy invite link'}
-                      </Button>
-                    ) : null}
-                  </div>
-
-                  <section
-                    className="relative z-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-t border-[#d5dce8] bg-[rgb(239_243_252/88%)] px-[clamp(24px,4vw,48px)] py-4.5 max-[520px]:grid-cols-1 max-[520px]:gap-3.5"
-                    aria-label="Mini Game Mix game configuration"
-                  >
-                    <div className="min-w-0">
-                      <h2 className="m-0 text-[11px] font-[850] tracking-[0.12em] text-[#2748bd] uppercase">
-                        Game setup
-                      </h2>
-                      <p className="mt-1.5 mb-0 truncate text-xs leading-5 text-[#667186] max-[520px]:whitespace-normal">
-                        <strong className="text-[#34445d]">{game.configuration.roundCount} mini-games</strong>
-                        {' · '}10s each
-                        {' · '}About {formatMiniGamesDuration(game.estimatedDurationMs)}
-                        {' · '}2 challenges in rotation
-                      </p>
-                    </div>
-                    {session.isOwner && !isClosed ? (
-                      <MiniGamesConfigurationDialog
-                        configuration={game.configuration}
-                        onSave={async (roundCount) => {
-                          await configureGame({ roomId: session.roomId, sessionToken: guest.sessionToken, roundCount });
-                        }}
+              <GameSurfaceTransition
+                showResults={game.phase === 'complete'}
+                surfaceKey={surfaceKey}
+                results={({ playIntro }) => (
+                  <PostGameBoard
+                    className="min-h-[clamp(600px,calc(100dvh-112px),768px)] rounded-none border-0 bg-transparent shadow-none"
+                    eyebrow={`${game.totalRounds} mini-games · Final score`}
+                    title={winner ? `${winner.displayName} wins the mix.` : 'Mix complete.'}
+                    detail={
+                      winner
+                        ? `${winner.totalScore.toLocaleString()} total points across ${winner.roundsFinished} rounds.`
+                        : 'The final scores are locked in.'
+                    }
+                    icon={Trophy}
+                    accent="#e85d2a"
+                    accentTint="#fff0b8"
+                    roomId={session.roomId}
+                    currentGameId={session.currentGameId}
+                    currentGameType={session.gameType}
+                    sessionToken={guest.sessionToken}
+                    isOwner={session.isOwner}
+                    isClosed={isClosed}
+                    closedMessage="This room is closed. The final standings stay here to view."
+                    playIntro={playIntro}
+                    summary={
+                      <PostGamePodium
+                        label="Final Mini Game Mix podium"
+                        animate={playIntro}
+                        entries={game.standings.slice(0, 3).map((standing) => ({
+                          id: standing.memberId,
+                          place: standing.rank,
+                          name: standing.displayName,
+                          result: `${standing.totalScore.toLocaleString()} pts`,
+                        }))}
                       />
-                    ) : null}
-                  </section>
-                </section>
-              ) : game.phase === 'selecting' && game.round !== null ? (
-                <RoulettePanel key={game.round.roundId} round={game.round} miniGames={game.miniGames} />
-              ) : game.phase === 'roundResults' ? (
-                <RoundResults game={game} now={now} />
-              ) : game.phase === 'playing' && game.round !== null ? (
-                <section className="overflow-hidden rounded-[26px_16px_28px_18px] border-2 border-[#17203a] bg-[#fff9e8] shadow-[8px_9px_0_#a9c6ff]">
-                  <div className="flex items-center justify-between gap-4 border-b border-[#d5ddea] bg-white px-5 py-4">
-                    <div>
-                      <p className="mb-1 text-[9px] font-[850] tracking-[0.14em] text-[#e85d2a] uppercase">
-                        {game.round.miniGame.eyebrow} · Round {game.currentRoundNumber} of {game.totalRounds}
+                    }
+                  />
+                )}
+              >
+                {game.phase === 'lobby' ? (
+                  <section
+                    className={cn('relative flex w-full flex-col overflow-hidden', GAME_LOBBY_CARD_HEIGHT_CLASS)}
+                  >
+                    <div
+                      className="pointer-events-none absolute -top-20 right-[8%] size-80 rotate-12 rounded-[36px_19px_40px_23px] bg-[#dfe7ff]"
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="pointer-events-none absolute top-[18%] right-[18%] size-26 -rotate-8 rounded-full border-2 border-dashed border-[#3155d9]/25"
+                      aria-hidden="true"
+                    />
+
+                    <div className="relative z-1 flex flex-1 flex-col items-start justify-center px-[clamp(34px,7vw,92px)] pt-[clamp(42px,7vw,78px)] pb-8 max-[760px]:px-6 max-[760px]:pt-16">
+                      <p className="mb-3 text-[10px] font-[850] tracking-[0.18em] text-[#e85d2a] uppercase">
+                        Spin · Play · Score · Repeat
                       </p>
-                      <h1 className="m-0 font-display text-[clamp(25px,4vw,38px)] leading-none font-[880] tracking-[-0.05em]">
-                        {game.round.miniGame.title}
+                      <h1 className="m-0 max-w-190 font-display text-[clamp(66px,10vw,108px)] leading-[0.77] font-[920] tracking-[-0.085em] max-[520px]:text-[clamp(58px,20vw,82px)]">
+                        Tiny games.
+                        <br />
+                        <span className="text-[#3155d9]">One big score.</span>
                       </h1>
+
+                      <div className="my-7 flex flex-wrap gap-x-7 gap-y-3 border-y border-[#d5dce8] py-4 text-[11px] font-[650] text-[#748096] [&_strong]:mr-1 [&_strong]:text-[15px] [&_strong]:text-[#17203a]">
+                        <span>
+                          <strong>{session.activeMemberCount}</strong>{' '}
+                          {session.activeMemberCount === 1 ? 'player' : 'players'} ready
+                        </span>
+                        <span>
+                          <strong>{game.configuration.roundCount}</strong> mini-games
+                        </span>
+                        <span>
+                          <strong>10s</strong> each
+                        </span>
+                        <span>
+                          <strong>~{formatMiniGamesDuration(game.estimatedDurationMs)}</strong> game time
+                        </span>
+                      </div>
+
+                      {isClosed ? (
+                        <p className="m-0 rounded-[10px_6px_11px_7px] border border-[#cbd3e0] bg-[#eef1f6] px-4 py-3 text-xs font-bold text-[#667186]">
+                          This room is closed.
+                        </p>
+                      ) : session.isOwner ? (
+                        <Button
+                          className="h-13.5 min-w-50"
+                          variant="brand"
+                          size="xl"
+                          onClick={start}
+                          disabled={starting}
+                        >
+                          {starting ? <LoaderCircle className="animate-spin" /> : <Play />}{' '}
+                          {starting ? 'Shuffling…' : 'Start the mix'}
+                        </Button>
+                      ) : (
+                        <p className="m-0 rounded-[10px_6px_11px_7px] border border-[#cbd3e0] bg-[#eef1f6] px-4 py-3 text-xs font-bold text-[#667186]">
+                          Waiting for {ownerName} to start
+                        </p>
+                      )}
+
+                      {!isClosed ? (
+                        <Button className="mt-4.5" type="button" variant="paper" size="sm" onClick={copyRoomLink}>
+                          {copied ? <Check /> : <Copy />} {copied ? 'Invite link copied' : 'Copy invite link'}
+                        </Button>
+                      ) : null}
                     </div>
-                    <CountdownCircle
+
+                    <section
+                      className="relative z-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-t border-[#d5dce8] bg-[rgb(239_243_252/88%)] px-[clamp(24px,4vw,48px)] py-4.5 max-[520px]:grid-cols-1 max-[520px]:gap-3.5"
+                      aria-label="Mini Game Mix game configuration"
+                    >
+                      <div className="min-w-0">
+                        <h2 className="m-0 text-[11px] font-[850] tracking-[0.12em] text-[#2748bd] uppercase">
+                          Game setup
+                        </h2>
+                        <p className="mt-1.5 mb-0 truncate text-xs leading-5 text-[#667186] max-[520px]:whitespace-normal">
+                          <strong className="text-[#34445d]">{game.configuration.roundCount} mini-games</strong>
+                          {' · '}10s each
+                          {' · '}About {formatMiniGamesDuration(game.estimatedDurationMs)}
+                          {' · '}
+                          {game.miniGames.length} challenges in rotation
+                        </p>
+                      </div>
+                      {session.isOwner && !isClosed ? (
+                        <MiniGamesConfigurationDialog
+                          configuration={game.configuration}
+                          onSave={async (roundCount) => {
+                            await configureGame({
+                              roomId: session.roomId,
+                              sessionToken: guest.sessionToken,
+                              roundCount,
+                            });
+                          }}
+                        />
+                      ) : null}
+                    </section>
+                  </section>
+                ) : game.phase === 'selecting' && game.round !== null ? (
+                  <RoulettePanel key={game.round.roundId} round={game.round} miniGames={game.miniGames} />
+                ) : game.phase === 'roundResults' ? (
+                  <RoundResults game={game} now={now} />
+                ) : game.phase === 'playing' && game.round !== null ? (
+                  <section className="overflow-hidden">
+                    <MiniGameRoundHeader
+                      round={game.round}
+                      totalRounds={game.totalRounds}
                       remainingMs={Math.max(0, (game.phaseEndsAt ?? now) - now)}
                       totalMs={MINI_GAME_ROUND_MS}
-                      label="Time remaining"
+                      timerLabel="Time remaining"
                     />
-                  </div>
-                  <div className="relative p-[clamp(14px,3vw,30px)]">
-                    <p className="mt-0 mb-4 text-center text-xs font-[720] text-[#65738a]">
-                      {game.round.miniGame.instructions}
-                    </p>
-                    {game.round.miniGame.id === 'straightLine' ? (
-                      <StraightLineChallenge
-                        key={game.round.roundId}
-                        round={game.round}
-                        disabled={currentFinished || isClosed}
-                        onSubmit={(points) => void submitLine(points)}
-                      />
-                    ) : (
-                      <EmojiChallenge
-                        key={game.round.roundId}
-                        round={game.round}
-                        disabled={currentFinished || isClosed}
-                        onSubmit={(ids) => void submitEmojis(ids)}
-                      />
-                    )}
-                    {currentFinished ? (
-                      <div className="absolute inset-0 grid place-content-center bg-[#fff9e8]/88 text-center backdrop-blur-[2px]">
-                        <Check className="mx-auto mb-3 size-11 rounded-full bg-[#16815f] p-2 text-white" />
-                        <strong className="font-display text-2xl font-[870]">Score locked in.</strong>
-                        <span className="mt-1 text-xs text-[#68758b]">Waiting for the other players…</span>
-                      </div>
-                    ) : null}
-                  </div>
-                </section>
-              ) : null}
-            </GameSurfaceTransition>
+                    <div className="relative p-[clamp(14px,3vw,30px)]">
+                      <p className="mt-0 mb-4 text-center text-xs font-[720] text-[#65738a]">
+                        {game.round.miniGame.instructions}
+                      </p>
+                      {game.round.miniGame.id === 'straightLine' ? (
+                        <StraightLineChallenge
+                          key={game.round.roundId}
+                          round={game.round}
+                          disabled={currentFinished || isClosed}
+                          onSubmit={(points) => void submitLine(points)}
+                        />
+                      ) : game.round.miniGame.id === 'orangeEmojis' ? (
+                        <EmojiChallenge
+                          key={game.round.roundId}
+                          round={game.round}
+                          disabled={currentFinished || isClosed}
+                          onSubmit={(ids) => void submitEmojis(ids)}
+                        />
+                      ) : (
+                        <MiniGameChallenge
+                          key={game.round.roundId}
+                          round={game.round}
+                          disabled={currentFinished || isClosed}
+                          onEstimate={(guess) => void submitNumericEstimate(guess)}
+                          onCirclePoint={(point) => void submitCirclePoint(point)}
+                          onMapPoint={(point) => void submitMapPin(point)}
+                        />
+                      )}
+                      {currentFinished ? (
+                        <div className="absolute inset-0 grid place-content-center bg-[#fff9e8]/88 text-center backdrop-blur-[2px]">
+                          <Check className="mx-auto mb-3 size-11 rounded-full bg-[#16815f] p-2 text-white" />
+                          <strong className="font-display text-2xl font-[870]">Score locked in.</strong>
+                          <span className="mt-1 text-xs text-[#68758b]">Waiting for the other players…</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </section>
+                ) : null}
+              </GameSurfaceTransition>
+            </section>
           </GameModeContent>
           {notice ? (
             <p

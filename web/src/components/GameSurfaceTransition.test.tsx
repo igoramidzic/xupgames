@@ -50,4 +50,61 @@ describe('GameSurfaceTransition', () => {
     expect(screen.getByText('Restored round over')).toBeInTheDocument();
     expect(screen.queryByText('Last question')).not.toBeInTheDocument();
   });
+
+  it('fades out and then fades in every keyed game surface change', () => {
+    vi.useFakeTimers();
+    const view = render(
+      <GameSurfaceTransition showResults={false} surfaceKey="lobby" results={null}>
+        <div>Start screen</div>
+      </GameSurfaceTransition>
+    );
+
+    view.rerender(
+      <GameSurfaceTransition showResults={false} surfaceKey="spinner:round-1" results={null}>
+        <div>Spinner screen</div>
+      </GameSurfaceTransition>
+    );
+
+    expect(screen.getByText('Start screen')).toBeInTheDocument();
+    expect(screen.queryByText('Spinner screen')).not.toBeInTheDocument();
+    expect(screen.getByText('Start screen').parentElement).toHaveAttribute('data-transition', 'surface-out');
+
+    act(() => vi.advanceTimersByTime(GAME_SURFACE_FADE_OUT_MS));
+
+    expect(screen.queryByText('Start screen')).not.toBeInTheDocument();
+    expect(screen.getByText('Spinner screen')).toBeInTheDocument();
+    expect(screen.getByText('Spinner screen').parentElement).toHaveAttribute('data-transition', 'surface-in');
+
+    act(() => vi.advanceTimersByTime(20));
+
+    expect(screen.getByText('Spinner screen').parentElement).toHaveAttribute('data-transition', 'surface');
+  });
+
+  it('keeps the outgoing surface mounted when its fade-out begins', () => {
+    vi.useFakeTimers();
+    const view = render(
+      <GameSurfaceTransition showResults={false} surfaceKey="lobby" results={null}>
+        <div>Start screen</div>
+      </GameSurfaceTransition>
+    );
+
+    view.rerender(
+      <GameSurfaceTransition showResults={false} surfaceKey="spinner:round-1" results={null}>
+        <div>Spinner screen</div>
+      </GameSurfaceTransition>
+    );
+    act(() => vi.advanceTimersByTime(GAME_SURFACE_FADE_OUT_MS + 20));
+
+    const spinner = screen.getByText('Spinner screen');
+
+    view.rerender(
+      <GameSurfaceTransition showResults={false} surfaceKey="playing:round-1" results={null}>
+        <div>Mini game screen</div>
+      </GameSurfaceTransition>
+    );
+
+    expect(screen.getByText('Spinner screen')).toBe(spinner);
+    expect(spinner.parentElement).toHaveAttribute('data-transition', 'surface-out');
+    expect(screen.queryByText('Mini game screen')).not.toBeInTheDocument();
+  });
 });
