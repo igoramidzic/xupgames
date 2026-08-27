@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -28,7 +28,7 @@ vi.mock('@/components/GameSurfaceTransition', () => ({
     children: React.ReactNode;
     showResults: boolean;
     results: (args: { playIntro: boolean }) => React.ReactNode;
-  }) => (showResults ? results({ playIntro: false }) : children),
+  }) => <div data-game-surface-transition>{showResults ? results({ playIntro: false }) : children}</div>,
 }));
 
 const session = {
@@ -86,6 +86,11 @@ const baseGame = {
       eyebrow: 'Match maker',
       instructions: 'Click every copy of the emoji shown above the board.',
     },
+    { id: 'guessPercentage', title: 'Guess the percentage', eyebrow: 'Slice sense', instructions: 'Estimate it.' },
+    { id: 'circleCenter', title: 'Click the circle center', eyebrow: 'Bullseye', instructions: 'Find it.' },
+    { id: 'guessDistance', title: 'Guess the distance', eyebrow: 'Route reader', instructions: 'Estimate it.' },
+    { id: 'pointOnMap', title: 'Point on the map', eyebrow: 'Pin drop', instructions: 'Place it.' },
+    { id: 'batteryPercentage', title: 'Guess the battery', eyebrow: 'Charge check', instructions: 'Estimate it.' },
   ],
   round: null,
   currentResult: null,
@@ -122,9 +127,12 @@ describe('MiniGamesRoom', () => {
     expect(screen.getByRole('region', { name: 'Mini Game Mix game configuration' })).toContainElement(
       screen.getByRole('button', { name: 'Configure' })
     );
+    expect(screen.getByRole('region', { name: 'Mini Game Mix game configuration' })).toHaveTextContent(
+      '7 challenges in rotation'
+    );
   });
 
-  it('renders the synchronized spinner with a staged ease-in and fade', async () => {
+  it('renders the synchronized spinner with a staged ease-in', async () => {
     mocks.game = {
       ...baseGame,
       gameNumber: 1,
@@ -153,7 +161,6 @@ describe('MiniGamesRoom', () => {
     expect(screen.getByRole('heading', { name: 'Spin the mix.' })).toBeInTheDocument();
     expect(screen.getByText('Round 2 · Picking the next challenge')).toBeInTheDocument();
     expect(screen.getAllByText('Find this emoji').length).toBeGreaterThan(1);
-    expect(screen.getByRole('region', { name: 'Mini-game roulette' })).toHaveClass('motion-safe:fade-in');
     await waitFor(() =>
       expect(view.container.querySelector('[data-roulette-track="true"]')).toHaveStyle({
         transition: 'transform 2400ms cubic-bezier(.42,0,.18,1) 420ms',
@@ -201,13 +208,82 @@ describe('MiniGamesRoom', () => {
         <MiniGamesRoom guest={guest} session={session as never} />
       </MemoryRouter>
     );
-    expect(screen.getByText('Round 1 scores')).toBeInTheDocument();
+    expect(screen.getByText('Steady hand · Round 1 of 10 · Scores')).toBeInTheDocument();
     expect(screen.getByText('+920')).toBeInTheDocument();
     expect(screen.getByText('98% straight · 2.1s')).toBeInTheDocument();
     const timer = screen.getByRole('timer', { name: /Next spin: \d seconds/ });
     expect(timer).toHaveClass('rounded-full');
     expect(timer.getAttribute('style')).toContain('--countdown-progress:');
     expect(screen.queryByText(/Next spin in/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the card shell mounted and uses the same header layout from play to scores', () => {
+    const round = {
+      roundId: 'round-percentage',
+      roundNumber: 1,
+      miniGame: baseGame.miniGames[2],
+      selectionStartedAt: Date.now() - 3_200,
+      playStartsAt: Date.now(),
+      playEndsAt: Date.now() + 10_000,
+      lineTarget: null,
+      emojiItems: [],
+      targetEmoji: null,
+      targetCount: 0,
+      percentageTargetColor: 'coral',
+      percentageSegments: [
+        { color: 'coral', percentage: 42 },
+        { color: 'gold', percentage: 28 },
+        { color: 'mint', percentage: 30 },
+      ],
+      batteryPercentage: null,
+      circleTarget: null,
+      distancePlaces: null,
+      mapTargetName: null,
+      mapAnswerPoint: null,
+      numericAnswer: null,
+    };
+    const playingGame = {
+      ...baseGame,
+      gameNumber: 1,
+      phase: 'playing',
+      phaseStartedAt: Date.now(),
+      phaseEndsAt: Date.now() + 10_000,
+      currentRoundNumber: 1,
+      participantCount: 1,
+      round,
+    };
+    mocks.game = playingGame;
+    const view = render(
+      <MemoryRouter>
+        <MiniGamesRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    const card = view.container.querySelector<HTMLElement>('[data-mini-game-surface-card]');
+    const playHeader = view.container.querySelector<HTMLElement>('[data-mini-game-round-header]');
+    const transition = view.container.querySelector<HTMLElement>('[data-game-surface-transition]');
+    expect(card).not.toBeNull();
+    expect(playHeader).not.toBeNull();
+    expect(card).toContainElement(transition);
+
+    mocks.game = {
+      ...playingGame,
+      phase: 'roundResults',
+      phaseEndsAt: Date.now() + 4_000,
+      roundResults: [],
+    };
+    view.rerender(
+      <MemoryRouter>
+        <MiniGamesRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    const scoreCard = view.container.querySelector<HTMLElement>('[data-mini-game-surface-card]');
+    const scoreHeader = view.container.querySelector<HTMLElement>('[data-mini-game-round-header]');
+    expect(scoreCard).toBe(card);
+    expect(scoreHeader).not.toBeNull();
+    expect(scoreHeader?.className).toBe(playHeader?.className);
+    expect(scoreHeader).toHaveTextContent('Slice sense · Round 1 of 10 · Scores');
   });
 
   it('shows the random target and submits after every matching copy is clicked', async () => {
@@ -275,5 +351,211 @@ describe('MiniGamesRoom', () => {
         clickedIds: ['wrong', 'target-1', 'target-2'],
       })
     );
+  });
+
+  it('renders the percentage dial and submits the selected estimate', async () => {
+    const user = userEvent.setup();
+    mocks.game = {
+      ...baseGame,
+      gameNumber: 1,
+      phase: 'playing',
+      phaseStartedAt: Date.now(),
+      phaseEndsAt: Date.now() + 10_000,
+      currentRoundNumber: 1,
+      participantCount: 1,
+      round: {
+        roundId: 'round-percentage',
+        roundNumber: 1,
+        miniGame: baseGame.miniGames[2],
+        selectionStartedAt: Date.now() - 3_200,
+        playStartsAt: Date.now(),
+        playEndsAt: Date.now() + 10_000,
+        lineTarget: null,
+        emojiItems: [],
+        targetEmoji: null,
+        targetCount: 0,
+        percentageTargetColor: 'coral',
+        percentageSegments: [
+          { color: 'coral', percentage: 42 },
+          { color: 'gold', percentage: 28 },
+          { color: 'mint', percentage: 30 },
+        ],
+        batteryPercentage: null,
+        circleTarget: null,
+        distancePlaces: null,
+        mapTargetName: null,
+        mapAnswerPoint: null,
+        numericAnswer: null,
+      },
+      currentResult: {
+        memberId: 'member-1',
+        displayName: 'Igor',
+        status: 'waiting',
+        score: 0,
+        timeMs: null,
+        straightness: null,
+        correctClicks: 0,
+        wrongClicks: 0,
+        metric: null,
+        numericGuess: null,
+        isCurrentPlayer: true,
+        isActive: true,
+      },
+    };
+    render(
+      <MemoryRouter>
+        <MiniGamesRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('img', { name: 'A three-color pie chart' })).toBeInTheDocument();
+    const estimate = screen.getByLabelText('Your estimate');
+    expect(estimate).toHaveAttribute('type', 'number');
+    expect(estimate).toHaveAttribute('max', '100');
+    expect(estimate).toHaveValue(null);
+    expect(screen.getByRole('button', { name: 'Lock it in' })).toBeDisabled();
+    fireEvent.change(estimate, { target: { value: '42' } });
+    await user.click(screen.getByRole('button', { name: 'Lock it in' }));
+    expect(mocks.mutation).toHaveBeenCalledWith({
+      roomId: 'room-1',
+      sessionToken: guest.sessionToken,
+      guess: 42,
+    });
+  });
+
+  it('starts the distance estimate empty and submits the entered distance', async () => {
+    const user = userEvent.setup();
+    mocks.game = {
+      ...baseGame,
+      gameNumber: 1,
+      phase: 'playing',
+      phaseStartedAt: Date.now(),
+      phaseEndsAt: Date.now() + 10_000,
+      currentRoundNumber: 1,
+      participantCount: 1,
+      round: {
+        roundId: 'round-distance',
+        roundNumber: 1,
+        miniGame: baseGame.miniGames[4],
+        selectionStartedAt: Date.now() - 3_200,
+        playStartsAt: Date.now(),
+        playEndsAt: Date.now() + 10_000,
+        lineTarget: null,
+        emojiItems: [],
+        targetEmoji: null,
+        targetCount: 0,
+        percentageTargetColor: null,
+        percentageSegments: [],
+        batteryPercentage: null,
+        circleTarget: null,
+        distancePlaces: {
+          first: { name: 'London', x: 0.5, y: 0.21 },
+          second: { name: 'New York City', x: 0.29, y: 0.27 },
+          unit: 'kilometers',
+        },
+        mapTargetName: null,
+        mapAnswerPoint: null,
+        numericAnswer: null,
+      },
+      currentResult: {
+        memberId: 'member-1',
+        displayName: 'Igor',
+        status: 'waiting',
+        score: 0,
+        timeMs: null,
+        straightness: null,
+        correctClicks: 0,
+        wrongClicks: 0,
+        metric: null,
+        numericGuess: null,
+        isCurrentPlayer: true,
+        isActive: true,
+      },
+    };
+    const view = render(
+      <MemoryRouter>
+        <MiniGamesRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(view.container.querySelectorAll('[data-map-route-segment] polyline')).toHaveLength(2));
+    const estimate = screen.getByLabelText('Your estimate');
+    expect(estimate).toHaveValue(null);
+    expect(screen.getByRole('button', { name: 'Lock it in' })).toBeDisabled();
+    fireEvent.change(estimate, { target: { value: '5570' } });
+    await user.click(screen.getByRole('button', { name: 'Lock it in' }));
+    expect(mocks.mutation).toHaveBeenCalledWith({
+      roomId: 'room-1',
+      sessionToken: guest.sessionToken,
+      guess: 5_570,
+    });
+  });
+
+  it('submits direct pointer placement for the point-on-map challenge', async () => {
+    mocks.game = {
+      ...baseGame,
+      gameNumber: 1,
+      phase: 'playing',
+      phaseStartedAt: Date.now(),
+      phaseEndsAt: Date.now() + 10_000,
+      currentRoundNumber: 1,
+      participantCount: 1,
+      round: {
+        roundId: 'round-map',
+        roundNumber: 1,
+        miniGame: baseGame.miniGames[5],
+        selectionStartedAt: Date.now() - 3_200,
+        playStartsAt: Date.now(),
+        playEndsAt: Date.now() + 10_000,
+        lineTarget: null,
+        emojiItems: [],
+        targetEmoji: null,
+        targetCount: 0,
+        percentageTargetColor: null,
+        percentageSegments: [],
+        batteryPercentage: null,
+        circleTarget: null,
+        distancePlaces: null,
+        mapTargetName: 'Tokyo',
+        mapAnswerPoint: null,
+        numericAnswer: null,
+      },
+      currentResult: {
+        memberId: 'member-1',
+        displayName: 'Igor',
+        status: 'waiting',
+        score: 0,
+        timeMs: null,
+        straightness: null,
+        correctClicks: 0,
+        wrongClicks: 0,
+        metric: null,
+        numericGuess: null,
+        isCurrentPlayer: true,
+        isActive: true,
+      },
+    };
+    render(
+      <MemoryRouter>
+        <MiniGamesRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+    const map = await screen.findByRole('button', { name: 'Place a pin near Tokyo' });
+    vi.spyOn(map, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 1_000,
+      bottom: 500,
+      width: 1_000,
+      height: 500,
+      toJSON: () => ({}),
+    });
+    fireEvent.pointerDown(map, { clientX: 600, clientY: 250 });
+    expect(mocks.mutation).toHaveBeenCalledWith({
+      roomId: 'room-1',
+      sessionToken: guest.sessionToken,
+      point: { x: 0.6, y: 0.5 },
+    });
   });
 });
