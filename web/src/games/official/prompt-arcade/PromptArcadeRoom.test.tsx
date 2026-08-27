@@ -626,8 +626,17 @@ describe('PromptArcadeRoom', () => {
 
     renderRoom();
 
-    expect(screen.getByRole('heading', { name: 'How was Dot Catcher?' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Rate Dot Catcher' })).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Rating time remaining' })).toHaveAttribute('aria-valuemax', '5000');
+    const stars = screen.getAllByRole('radio');
+    await user.hover(stars[4]);
+    for (const star of stars) {
+      expect(star.querySelector('svg')).toHaveAttribute('fill', 'currentColor');
+    }
+    await user.unhover(stars[4]);
+    for (const star of stars) {
+      expect(star.querySelector('svg')).toHaveAttribute('fill', 'none');
+    }
     await user.click(screen.getByRole('radio', { name: '5 out of 5 stars' }));
     expect(mocks.mutation).toHaveBeenCalledWith({
       roomId: 'room-1',
@@ -635,7 +644,7 @@ describe('PromptArcadeRoom', () => {
       roundId: 'round-1',
       rating: 5,
     });
-    expect(screen.getByText('5 out of 5 selected. You can change it while the booth is open.')).toBeInTheDocument();
+    expect(screen.getByText('5 / 5')).toBeInTheDocument();
   });
 
   it('starts automatically when everyone is ready and hides the manual control', () => {

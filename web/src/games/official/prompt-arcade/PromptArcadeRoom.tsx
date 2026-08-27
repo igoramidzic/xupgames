@@ -1161,7 +1161,6 @@ function RoundResults({
       <div className="mx-auto max-w-205">
         <PromptArcadeRatingPanel
           title={game.round.artifact.title}
-          authorName={game.round.entry.displayName}
           phaseEndsAt={game.phaseEndsAt}
           now={now}
           rating={game.currentGameRating.rating}

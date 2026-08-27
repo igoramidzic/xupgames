@@ -1,4 +1,4 @@
-import { Check, LoaderCircle, Star, Timer } from 'lucide-react';
+import { LoaderCircle, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -7,7 +7,6 @@ export const PROMPT_ARCADE_RATING_DURATION_MS = 5_000;
 
 export default function PromptArcadeRatingPanel({
   title,
-  authorName,
   phaseEndsAt,
   now,
   rating,
@@ -19,7 +18,6 @@ export default function PromptArcadeRatingPanel({
   onRate,
 }: {
   title: string;
-  authorName: string;
   phaseEndsAt: number | null;
   now: number;
   rating: number | null;
@@ -31,6 +29,7 @@ export default function PromptArcadeRatingPanel({
   onRate: (rating: number) => Promise<void>;
 }) {
   const [selectedRating, setSelectedRating] = useState(rating);
+  const [previewRating, setPreviewRating] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const remainingMs = Math.max(0, (phaseEndsAt ?? now) - now);
   const progress = Math.min(100, (remainingMs / PROMPT_ARCADE_RATING_DURATION_MS) * 100);
@@ -39,6 +38,7 @@ export default function PromptArcadeRatingPanel({
 
   useEffect(() => {
     setSelectedRating(rating);
+    setPreviewRating(null);
     setSubmitting(false);
   }, [rating]);
 
@@ -58,28 +58,19 @@ export default function PromptArcadeRatingPanel({
 
   return (
     <section
-      className="relative mb-5 overflow-hidden rounded-[18px_11px_20px_13px] border-2 border-[#17203a] bg-[#2d285f] px-5 py-5 text-white shadow-[6px_6px_0_#17203a] max-[520px]:px-3.5"
+      className="relative mb-5 overflow-hidden rounded-[20px_12px_22px_14px] border-3 border-[#17203a] bg-[#2d285f] px-6 pt-5 pb-4 text-white shadow-[8px_8px_0_#17203a] max-[520px]:px-3.5"
       aria-labelledby="prompt-arcade-rating-title"
     >
-      <span
-        className="pointer-events-none absolute -top-10 -right-7 size-32 rotate-12 rounded-[38%_62%_48%_52%] bg-[#7168dc]/35"
-        aria-hidden="true"
-      />
       <div className="relative z-1">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="mb-1 text-[9px] font-[880] tracking-[0.16em] text-[#ffd75a] uppercase">
-              Rating booth · creator bonus
-            </p>
-            <h2
-              className="m-0 font-display text-[clamp(26px,5vw,42px)] leading-[0.95] font-[910] tracking-[-0.055em]"
-              id="prompt-arcade-rating-title"
-            >
-              {isAuthor ? 'Your game is on the marquee.' : `How was ${title}?`}
-            </h2>
-          </div>
+        <div className="flex items-center justify-between gap-4">
+          <h2
+            className="m-0 min-w-0 truncate font-display text-[clamp(24px,4vw,36px)] leading-none font-[910] tracking-[-0.045em]"
+            id="prompt-arcade-rating-title"
+          >
+            {isAuthor ? title : `Rate ${title}`}
+          </h2>
           <span
-            className="grid size-12 shrink-0 place-items-center rounded-[15px_9px_17px_11px] border-2 border-[#17203a] bg-[#ffd75a] font-display text-sm font-[920] text-[#17203a] tabular-nums shadow-[3px_3px_0_#151128]"
+            className="grid size-13 shrink-0 place-items-center rounded-[16px_9px_18px_11px] border-2 border-[#17203a] bg-[#ffd75a] font-display text-base font-[920] text-[#17203a] tabular-nums shadow-[3px_3px_0_#151128]"
             role="timer"
             aria-label={`${seconds} ${seconds === 1 ? 'second' : 'seconds'} left to rate`}
           >
@@ -88,15 +79,26 @@ export default function PromptArcadeRatingPanel({
         </div>
 
         {canRate ? (
-          <div className="mt-5">
-            <div className="grid grid-cols-5 gap-2" role="radiogroup" aria-label={`Rate ${title}`}>
+          <div className="mt-3">
+            <div
+              className="grid grid-cols-5 gap-1 rounded-[17px_10px_19px_12px] border-2 border-[#7770ba] bg-[#211d4b] px-2 py-2 shadow-[inset_0_2px_0_rgb(255_255_255/6%)]"
+              role="radiogroup"
+              aria-label={`Rate ${title}`}
+              onMouseLeave={() => setPreviewRating(null)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setPreviewRating(null);
+              }}
+            >
               {[1, 2, 3, 4, 5].map((value) => {
-                const selected = selectedRating !== null && value <= selectedRating;
+                const previewed = previewRating !== null && value <= previewRating;
+                const selected = previewRating === null && selectedRating !== null && value <= selectedRating;
+                const filled = previewed || selected;
                 return (
                   <Button
                     className={cn(
-                      'h-15 min-w-0 rounded-[12px_7px_13px_8px] border-2 border-[#aaa4df] bg-[#f8f7ff] px-0 text-[#8179bd] shadow-[0_4px_0_#151128] enabled:hover:border-[#ffd75a] enabled:hover:bg-white enabled:hover:text-[#e4ac12] max-[420px]:h-13',
-                      selected && 'border-[#ffd75a] bg-[#fff4bd] text-[#d49c00] shadow-[0_4px_0_#c58f00]'
+                      'h-20 min-w-0 rounded-xl border-0 bg-transparent px-0 text-[#8f88c8] shadow-none hover:bg-transparent focus-visible:outline-[#ffd75a] active:translate-y-0 max-[420px]:h-16',
+                      filled && 'text-[#ffd75a]',
+                      previewRating === value && 'scale-[1.08]'
                     )}
                     key={value}
                     type="button"
@@ -106,11 +108,13 @@ export default function PromptArcadeRatingPanel({
                     aria-label={`${value} out of 5 stars`}
                     data-selected={selectedRating === value}
                     disabled={ratingClosed || submitting}
+                    onMouseEnter={() => setPreviewRating(value)}
+                    onFocus={() => setPreviewRating(value)}
                     onClick={() => void chooseRating(value)}
                   >
                     <Star
-                      className="size-7 max-[420px]:size-6"
-                      fill={selected ? 'currentColor' : 'none'}
+                      className="size-12 stroke-[2.25] transition-[color,fill,transform] duration-100 motion-reduce:transition-none max-[520px]:size-10 max-[380px]:size-8"
+                      fill={filled ? 'currentColor' : 'none'}
                       aria-hidden="true"
                     />
                   </Button>
@@ -118,50 +122,33 @@ export default function PromptArcadeRatingPanel({
               })}
             </div>
             <p
-              className="mt-3 mb-0 flex min-h-5 items-center justify-center gap-1.5 text-center text-xs font-[720] text-[#d7d3f6]"
+              className="mt-2 mb-0 flex min-h-5 items-center justify-center gap-1.5 text-center text-xs font-[820] text-[#d7d3f6]"
               aria-live="polite"
             >
               {submitting ? (
                 <>
                   <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-                  Sending {selectedRating}-star rating…
+                  Saving…
                 </>
               ) : selectedRating === null ? (
-                'Pick quickly. Your last choice before time expires counts.'
+                'Choose 1–5'
               ) : (
-                <>
-                  <Check className="size-3.5 text-[#7de2c7]" aria-hidden="true" />
-                  {selectedRating} out of 5 selected. You can change it while the booth is open.
-                </>
+                `${selectedRating} / 5`
               )}
             </p>
           </div>
         ) : (
-          <div className="mt-5 rounded-[13px_8px_14px_9px] border border-[#7770ba] bg-[#211d4b] px-4 py-4 text-sm leading-[1.5] text-[#dedbf7]">
-            <strong className="block text-white">
-              {isAuthor
-                ? `${authorName}, everyone else has five seconds to rate your game.`
-                : isParticipant
-                  ? 'Your rating is locked for this cartridge.'
-                  : 'Voting is for players who played this cartridge.'}
-            </strong>
-            <span className="mt-1 block text-xs text-[#aaa5d7]">
-              The highest-rated creator earns a 500-point bonus after the playlist.
-            </span>
+          <div className="mt-4 grid min-h-24 place-items-center rounded-[17px_10px_19px_12px] border-2 border-[#7770ba] bg-[#211d4b] px-4 text-center font-display text-xl font-[850] text-[#ffd75a]">
+            {isAuthor ? 'Players are rating' : isParticipant ? 'Rating locked' : 'Watching the ratings'}
           </div>
         )}
 
-        <div className="mt-4">
-          <div className="flex items-center justify-between gap-3 text-[9px] font-[820] tracking-[0.1em] text-[#bdb8e5] uppercase">
-            <span className="inline-flex items-center gap-1.5">
-              <Timer className="size-3.5 text-[#ffd75a]" aria-hidden="true" /> Rate before the bell
-            </span>
-            <span className="tabular-nums">
-              {ratingCount} of {eligibleRaterCount} rated
-            </span>
-          </div>
+        <div className="mt-3">
+          <span className="sr-only" aria-live="polite">
+            {ratingCount} of {eligibleRaterCount} players rated
+          </span>
           <div
-            className="mt-2 h-2 overflow-hidden rounded-full border border-[#7770ba] bg-[#171337]"
+            className="h-2.5 overflow-hidden rounded-full border border-[#7770ba] bg-[#171337]"
             role="progressbar"
             aria-label="Rating time remaining"
             aria-valuemin={0}
