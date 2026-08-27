@@ -4,6 +4,7 @@ import { env, type MutationCtx } from '../../_generated/server';
 import { activateCurrentRoomGame } from '../../roomGames';
 import { listActiveHumanRoomMembers, listActiveRoomMembers } from '../../roomMembers';
 import { normalizePromptArcadePrompt, PROMPT_ARCADE_MAX_PLAYERS, PROMPT_ARCADE_STALE_GENERATION_MS } from './engine';
+import { recordPromptArcadeRating } from './ratings';
 import { recordPromptArcadeResult, settleIdlePromptArcadePlaylist, startReadyPromptArcadePlaylist } from './rounds';
 import {
   findPromptArcadeEntry,
@@ -26,7 +27,7 @@ export function analyzeStalledPromptArcadeEntries<TEntry extends { status: strin
   };
 }
 
-async function requireActivePromptArcadeRoomGame(ctx: MutationCtx, room: Doc<'rooms'>): Promise<void> {
+export async function requireActivePromptArcadeRoomGame(ctx: MutationCtx, room: Doc<'rooms'>): Promise<void> {
   if (room.status === 'closed') promptArcadeFail('ROOM_CLOSED', 'This room is closed.');
   if (room.currentGameId === undefined) {
     promptArcadeFail('STALE_ROOM_GAME', 'Prompt Arcade is no longer the current room game.');
@@ -106,6 +107,7 @@ export async function startPromptArcadeGame(ctx: MutationCtx, args: GameRequest)
       memberId: member._id,
       displayName: member.displayName,
       totalScore: 0,
+      creatorBonus: 0,
       roundsFinished: 0,
       updatedAt: now,
     });
@@ -365,4 +367,19 @@ export async function submitPromptArcadeResult(
     args.metricValue,
     now
   );
+}
+
+export async function submitPromptArcadeRating(
+  ctx: MutationCtx,
+  args: GameRequest & { roundId: Id<'promptArcadeRounds'>; rating: number }
+) {
+  const { room, membership } = await requirePromptArcadeMember(ctx, args.roomId, args.sessionToken, true);
+  await requireActivePromptArcadeRoomGame(ctx, room);
+  const state = await findPromptArcadeState(ctx, args.roomId);
+  if (state === null || state.currentRoundId === null || state.currentRoundId !== args.roundId) {
+    promptArcadeFail('PROMPT_ARCADE_STALE_ROUND', 'That rating belongs to an earlier Prompt Arcade game.');
+  }
+  const round = await ctx.db.get('promptArcadeRounds', state.currentRoundId);
+  if (round === null) throw new Error('The current Prompt Arcade round is missing.');
+  return await recordPromptArcadeRating(ctx, state, round, membership._id, args.rating, Date.now());
 }

@@ -2,6 +2,7 @@ import type { Doc } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
 import { queuePromptArcadeBotPrompt } from '../officialGames/promptArcade/game';
 import { enrollPromptArcadePlaytestBot } from '../officialGames/promptArcade/lifecycle';
+import { recordPromptArcadeRating } from '../officialGames/promptArcade/ratings';
 import { recordPromptArcadeResult, startReadyPromptArcadePlaylist } from '../officialGames/promptArcade/rounds';
 import { findPromptArcadeEntry, findPromptArcadeState } from '../officialGames/promptArcade/state';
 
@@ -97,6 +98,11 @@ export function buildPromptArcadeBotResultPlan(
   };
 }
 
+export function buildPromptArcadeBotRating(roundNumber: number, botNumber: number): number {
+  const random = seededRandom(roundNumber, botNumber, 0x5a17);
+  return 3 + Math.floor(random() * 3);
+}
+
 export async function initializePromptArcadeBot(
   ctx: MutationCtx,
   bot: Doc<'playtestBots'>
@@ -169,6 +175,25 @@ export async function runPromptArcadeBotTick(
       );
     }
     return { cursor: { x: 0.28, y: cursorY } };
+  }
+
+  if (gameState.phase === 'roundResults' && gameState.currentRoundId !== null) {
+    const round = await ctx.db.get('promptArcadeRounds', gameState.currentRoundId);
+    if (round === null || round.status !== 'results' || now > (gameState.phaseEndsAt ?? 0)) {
+      return { cursor: { x: 0.72, y: cursorY } };
+    }
+    const entry = await ctx.db.get('promptArcadeEntries', round.entryId);
+    if (entry !== null && entry.memberId !== bot.memberId) {
+      await recordPromptArcadeRating(
+        ctx,
+        gameState,
+        round,
+        bot.memberId,
+        buildPromptArcadeBotRating(round.roundNumber, bot.botNumber),
+        now
+      );
+    }
+    return { cursor: { x: 0.72, y: cursorY } };
   }
 
   if (gameState.phase !== 'playing' || gameState.currentRoundId === null) {

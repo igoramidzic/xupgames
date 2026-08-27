@@ -6,6 +6,7 @@ import {
   startPromptArcadeGame,
   startPromptArcadePlaylist,
   submitPromptArcadePrompt,
+  submitPromptArcadeRating,
   submitPromptArcadeResult,
 } from './officialGames/promptArcade/game';
 import {
@@ -80,6 +81,16 @@ export const submitResult = mutation({
   },
   returns: v.object({ score: v.number(), elapsedMs: v.number() }),
   handler: submitPromptArcadeResult,
+});
+
+export const submitRating = mutation({
+  args: {
+    ...gameRequestArgs,
+    roundId: v.id('promptArcadeRounds'),
+    rating: v.number(),
+  },
+  returns: v.object({ rating: v.number() }),
+  handler: submitPromptArcadeRating,
 });
 
 const generationLeaseArgs = {

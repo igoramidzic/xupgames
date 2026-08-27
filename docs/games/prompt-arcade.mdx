@@ -10,7 +10,7 @@ there is no vote, top-N filter, or unrelated fallback game.
 ## Lifecycle
 
 ```text
-lobby -> prompting -> generating -> countdown -> playing -> roundResults
+lobby -> prompting -> generating -> countdown -> playing -> roundResults (5-second peer rating)
                        ^                                      |
                        |--------------------------------------|
                                                                -> complete
@@ -80,6 +80,20 @@ number before applying the selected formula:
 keeps arbitrary interaction mechanics compatible with one leaderboard while
 leaving final timing and scoring authority on the backend.
 
+After each generated game ends, every player who participated in that round
+except the prompt author gets five seconds to submit a 1–5 star rating. Ratings
+are upserted during the server-owned `roundResults` window, so a player may
+change their choice before the deadline but cannot rate after the scheduled
+advance or rate their own game. Players who joined after the round began are
+spectators and cannot rate it.
+
+When the playlist completes, games are ranked by average peer rating, then by
+rating count and original playlist order for deterministic presentation. Every
+creator tied for the highest rated average receives a 500-point creator bonus;
+the bonus is applied idempotently to the authoritative player total. The final
+UI reveals the top three rated game cartridges first, then fades into the
+player-score winner and podium.
+
 The normalized quality value necessarily originates in the generated browser
 game. A determined player could forge that input, so this MVP is an
 honest-client scoring system for the stated internal-use environment, not an
@@ -111,6 +125,11 @@ parent timeout runs. Strong hostile-code isolation would require a worker-based
 rendering contract or a separately hosted execution boundary; Prompt Arcade's
 MVP instead combines strict generation instructions, static rejection, and the
 internal-use threat model.
+
+Final game awards use generated title and interpretation metadata as a
+cartridge-poster preview. The parent does not capture the iframe DOM as an image:
+doing so would require weakening the opaque-origin sandbox or adding a new,
+explicit screenshot protocol to the generated-game contract.
 
 ## Capacity and operations
 

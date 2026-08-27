@@ -1,6 +1,7 @@
 import type { Doc, Id } from '../../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../../_generated/server';
 import { PROMPT_ARCADE_MAX_PLAYERS } from './engine';
+import { applyPromptArcadeCreatorBonuses } from './ratings';
 import { findPromptArcadeEntry, findPromptArcadeState, listPromptArcadeEntries } from './state';
 
 type DatabaseReaderContext = Pick<QueryCtx, 'db'>;
@@ -51,6 +52,8 @@ export async function closePromptArcadeGame(ctx: MutationCtx, roomId: Id<'rooms'
     });
   }
 
+  await applyPromptArcadeCreatorBonuses(ctx, state, now);
+
   await ctx.db.patch('promptArcadeGameStates', state._id, {
     phase: 'complete',
     currentRoundId: null,
@@ -98,6 +101,7 @@ async function enrollPromptArcadeParticipant(
     memberId: membership._id,
     displayName: membership.displayName,
     totalScore: 0,
+    creatorBonus: 0,
     roundsFinished: 0,
     updatedAt: now,
   });

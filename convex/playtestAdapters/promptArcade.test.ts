@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getGamePlaytestBotTargetLimit } from './index';
-import { buildPromptArcadeBotPrompt, buildPromptArcadeBotResultPlan } from './promptArcade';
+import { buildPromptArcadeBotPrompt, buildPromptArcadeBotRating, buildPromptArcadeBotResultPlan } from './promptArcade';
 
 describe('Prompt Arcade playtest adapter', () => {
   it('caps Prompt Arcade playtests at the game participant limit', () => {
@@ -31,5 +31,17 @@ describe('Prompt Arcade playtest adapter', () => {
       expect(plan.quality).toBeGreaterThanOrEqual(0);
       expect(plan.quality).toBeLessThanOrEqual(1);
     }
+  });
+
+  it('gives bots deterministic ratings on the five-star scale', () => {
+    const ratings = Array.from({ length: 30 }, (_, index) => buildPromptArcadeBotRating(4, index + 1));
+
+    expect(new Set(ratings).size).toBeGreaterThan(1);
+    for (const rating of ratings) {
+      expect(rating).toBeGreaterThanOrEqual(3);
+      expect(rating).toBeLessThanOrEqual(5);
+      expect(Number.isInteger(rating)).toBe(true);
+    }
+    expect(buildPromptArcadeBotRating(4, 9)).toBe(buildPromptArcadeBotRating(4, 9));
   });
 });
