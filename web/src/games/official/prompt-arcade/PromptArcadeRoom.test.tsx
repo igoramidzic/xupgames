@@ -183,7 +183,10 @@ describe('PromptArcadeRoom', () => {
 
     expect(screen.getByRole('heading', { name: 'What should everyone play?' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Prompt Arcade players' })).toBeInTheDocument();
-    expect(screen.getByRole('progressbar', { name: '1 of 3 player-made games are ready' })).toBeInTheDocument();
+    const buildRoster = screen.getByRole('list', { name: 'Build status for 3 players' });
+    expect(within(buildRoster).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(buildRoster).getByRole('listitem', { name: '2. Maya: Building the game' })).toBeInTheDocument();
+    expect(within(buildRoster).getByRole('listitem', { name: '3. Theo: Ready to play' })).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Maya: Building the game' })).toHaveAttribute('aria-valuenow', '2');
     expect(screen.getByText('Asteroid Pocket')).toBeInTheDocument();
 
@@ -264,6 +267,291 @@ describe('PromptArcadeRoom', () => {
     expect(screen.getByRole('button', { name: 'Start early with 3 ready' })).toBeEnabled();
     expect(screen.getByText('1 building')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Invite more players' })).toBeInTheDocument();
+  });
+
+  it('reveals the creator before the game title and instructions', () => {
+    const now = Date.now();
+    const round = {
+      roundId: 'round-1',
+      roundNumber: 1,
+      status: 'countdown',
+      countdownStartedAt: now,
+      playStartsAt: now + 8_000,
+      playEndsAt: now + 28_000,
+      resultsStartedAt: null,
+      entry: {
+        entryId: 'entry-2',
+        memberId: 'member-2',
+        displayName: 'Maya',
+        prompt: 'Catch the blue dot',
+      },
+      artifact: {
+        artifactId: 'artifact-1',
+        title: 'Dot Catcher',
+        interpretation: 'Catch a moving target before time runs out.',
+        instructions: 'Tap the blue dot five times.',
+        durationMs: 20_000,
+        scoringMode: 'speed',
+        codeUrl: null,
+      },
+    };
+    mocks.game = {
+      ...baseGame,
+      phase: 'countdown',
+      phaseStartedAt: now,
+      phaseEndsAt: now + 8_000,
+      currentRoundNumber: 1,
+      playlistStarted: true,
+      round,
+      currentResult: null,
+    };
+    const view = renderRoom();
+
+    expect(document.querySelector('[data-reveal-stage="author"]')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Maya' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Dot Catcher' })).not.toBeInTheDocument();
+
+    mocks.game = {
+      ...(mocks.game as typeof baseGame),
+      round: { ...round, countdownStartedAt: now - 3_000 },
+    };
+    view.rerender(
+      <MemoryRouter>
+        <PromptArcadeRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    expect(document.querySelector('[data-reveal-stage="game"]')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Dot Catcher' })).toBeInTheDocument();
+    expect(screen.getByText('Tap the blue dot five times.')).toBeInTheDocument();
+
+    mocks.game = {
+      ...(mocks.game as typeof baseGame),
+      round: { ...round, countdownStartedAt: now - 6_000 },
+    };
+    view.rerender(
+      <MemoryRouter>
+        <PromptArcadeRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    expect(document.querySelector('[data-reveal-stage="countdown"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-countdown-content]')).toHaveClass('flex');
+    for (const section of document.querySelectorAll('[data-countdown-section]')) {
+      expect(section).not.toHaveClass('absolute');
+    }
+    expect(document.querySelector('[data-countdown-section="timer"]')).toHaveAttribute('aria-hidden', 'false');
+    expect(screen.getByText(/Starts in \d/)).toBeInTheDocument();
+  });
+
+  it('keeps standings lanes fixed during play, shows points gained, then applies the final order', () => {
+    const now = Date.now();
+    const round = {
+      roundId: 'round-1',
+      roundNumber: 1,
+      status: 'playing',
+      countdownStartedAt: now - 8_000,
+      playStartsAt: now - 4_000,
+      playEndsAt: now + 16_000,
+      resultsStartedAt: null,
+      entry: {
+        entryId: 'entry-2',
+        memberId: 'member-2',
+        displayName: 'Maya',
+        prompt: 'Catch the blue dot',
+      },
+      artifact: {
+        artifactId: 'artifact-1',
+        title: 'Dot Catcher',
+        interpretation: 'Catch a moving target before time runs out.',
+        instructions: 'Tap the blue dot five times.',
+        durationMs: 20_000,
+        scoringMode: 'speed',
+        codeUrl: null,
+      },
+    };
+    const waitingResults = baseGame.standings.map((standing) => ({
+      memberId: standing.memberId,
+      displayName: standing.displayName,
+      status: 'waiting',
+      quality: null,
+      elapsedMs: null,
+      score: 0,
+      metricLabel: null,
+      metricValue: null,
+      isCurrentPlayer: standing.isCurrentPlayer,
+      isActive: true,
+    }));
+    mocks.game = {
+      ...baseGame,
+      phase: 'playing',
+      phaseStartedAt: now - 4_000,
+      phaseEndsAt: now + 16_000,
+      currentRoundNumber: 1,
+      playlistStarted: true,
+      round,
+      currentResult: waitingResults[0],
+      roundResults: waitingResults,
+      standings: [
+        { ...baseGame.standings[0], rank: 1, totalScore: 1_000 },
+        { ...baseGame.standings[1], rank: 2, totalScore: 900 },
+        { ...baseGame.standings[2], rank: 3, totalScore: 800 },
+      ],
+    };
+    let view = renderRoom();
+    const namesInOrder = () =>
+      within(screen.getByRole('list', { name: 'Player standings' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent);
+
+    expect(namesInOrder()).toEqual([
+      expect.stringContaining('Igor'),
+      expect.stringContaining('Maya'),
+      expect.stringContaining('Theo'),
+    ]);
+
+    const mayaFinished = {
+      ...waitingResults[1],
+      status: 'finished',
+      quality: 1,
+      elapsedMs: 4_000,
+      score: 500,
+    };
+    mocks.game = {
+      ...(mocks.game as typeof baseGame),
+      currentResult: waitingResults[0],
+      roundResults: [waitingResults[0], mayaFinished, waitingResults[2]],
+      standings: [
+        { ...baseGame.standings[1], rank: 1, totalScore: 1_400, roundsFinished: 1 },
+        { ...baseGame.standings[0], rank: 2, totalScore: 1_000 },
+        { ...baseGame.standings[2], rank: 3, totalScore: 800 },
+      ],
+    };
+    view.rerender(
+      <MemoryRouter>
+        <PromptArcadeRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    expect(namesInOrder()).toEqual([
+      expect.stringContaining('Igor'),
+      expect.stringContaining('Maya'),
+      expect.stringContaining('Theo'),
+    ]);
+    const mayaLiveRow = within(screen.getByRole('list', { name: 'Player standings' }))
+      .getByText('Maya')
+      .closest('li');
+    expect(mayaLiveRow).toHaveAttribute('data-display-rank', '2');
+    expect(mayaLiveRow).toHaveAttribute('data-authoritative-rank', '1');
+    expect(mayaLiveRow).toHaveTextContent('+500 points gained this round');
+
+    view.unmount();
+    view = renderRoom();
+    expect(namesInOrder()).toEqual([
+      expect.stringContaining('Igor'),
+      expect.stringContaining('Maya'),
+      expect.stringContaining('Theo'),
+    ]);
+
+    mocks.game = {
+      ...(mocks.game as typeof baseGame),
+      phase: 'roundResults',
+      phaseStartedAt: now,
+      phaseEndsAt: now + 8_000,
+      round: { ...round, status: 'results', resultsStartedAt: now },
+    };
+    view.rerender(
+      <MemoryRouter>
+        <PromptArcadeRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    expect(namesInOrder()).toEqual([
+      expect.stringContaining('Maya'),
+      expect.stringContaining('Igor'),
+      expect.stringContaining('Theo'),
+    ]);
+  });
+
+  it('replaces the full round list with a top-three recap and one tough break', () => {
+    const now = Date.now();
+    const juneStanding = {
+      rank: 3,
+      memberId: 'member-4',
+      displayName: 'June',
+      totalScore: 1_050,
+      roundsFinished: 1,
+      isCurrentPlayer: false,
+      isActive: true,
+    };
+    const standings = [
+      { ...baseGame.standings[1], rank: 1, totalScore: 1_500, roundsFinished: 1 },
+      { ...baseGame.standings[2], rank: 2, totalScore: 1_200, roundsFinished: 1 },
+      juneStanding,
+      { ...baseGame.standings[0], rank: 4, totalScore: 1_000, roundsFinished: 1 },
+    ];
+    const results = [
+      { standing: standings[0], score: 600, elapsedMs: 3_000, status: 'finished' },
+      { standing: standings[1], score: 400, elapsedMs: 5_000, status: 'finished' },
+      { standing: standings[2], score: 350, elapsedMs: 6_000, status: 'finished' },
+      { standing: standings[3], score: 0, elapsedMs: 20_000, status: 'timedOut' },
+    ].map(({ standing, score, elapsedMs, status }) => ({
+      memberId: standing.memberId,
+      displayName: standing.displayName,
+      status,
+      quality: status === 'finished' ? 1 : null,
+      elapsedMs,
+      score,
+      metricLabel: null,
+      metricValue: null,
+      isCurrentPlayer: standing.isCurrentPlayer,
+      isActive: true,
+    }));
+    mocks.game = {
+      ...baseGame,
+      phase: 'roundResults',
+      phaseStartedAt: now,
+      phaseEndsAt: now + 8_000,
+      currentRoundNumber: 1,
+      playlistStarted: true,
+      round: {
+        roundId: 'round-1',
+        roundNumber: 1,
+        status: 'results',
+        countdownStartedAt: now - 28_000,
+        playStartsAt: now - 20_000,
+        playEndsAt: now,
+        resultsStartedAt: now,
+        entry: {
+          entryId: 'entry-2',
+          memberId: 'member-2',
+          displayName: 'Maya',
+          prompt: 'Catch the blue dot',
+        },
+        artifact: {
+          artifactId: 'artifact-1',
+          title: 'Dot Catcher',
+          interpretation: 'Catch a moving target before time runs out.',
+          instructions: 'Tap the blue dot five times.',
+          durationMs: 20_000,
+          scoringMode: 'speed',
+          codeUrl: null,
+        },
+      },
+      currentResult: results[3],
+      roundResults: results,
+      standings,
+    };
+
+    renderRoom();
+
+    const podium = screen.getByRole('list', { name: 'Top scorers this round' });
+    expect(within(podium).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(podium).getByText('Maya')).toBeInTheDocument();
+    expect(within(podium).getByText('Theo')).toBeInTheDocument();
+    expect(within(podium).getByText('June')).toBeInTheDocument();
+    expect(screen.getByText('Tough break')).toBeInTheDocument();
+    expect(screen.getByText('Moved from position 1 to 4')).toBeInTheDocument();
   });
 
   it('starts automatically when everyone is ready and hides the manual control', () => {

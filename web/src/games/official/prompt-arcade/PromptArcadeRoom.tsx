@@ -3,6 +3,8 @@ import { useAction, useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Check,
   CircleDot,
   Clock3,
@@ -11,6 +13,7 @@ import {
   Gamepad2,
   Gauge,
   LoaderCircle,
+  Medal,
   Play,
   Send,
   Sparkles,
@@ -22,6 +25,7 @@ import {
 import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GameModeControl, { GameModeContent } from '@/components/GameModeControl';
+import GameSurfaceTransition from '@/components/GameSurfaceTransition';
 import LobbyPlayersSidebar, { type LobbyPlayersSidebarTheme } from '@/components/LobbyPlayersSidebar';
 import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
 import RoomHeaderActions from '@/components/RoomHeaderActions';
@@ -42,6 +46,7 @@ import {
 } from '@/lib/gameLobbyLayout';
 import type { GuestIdentity } from '@/lib/guest';
 import { getRoomMembers } from '@/lib/roomSession';
+import { useListReorderAnimation } from '@/lib/useListReorderAnimation';
 import { useRoomPresence } from '@/lib/useRoomPresence';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
@@ -57,6 +62,8 @@ type FailedFinish = { roundId: RoundId; result: GeneratedGameFinish };
 
 const PROMPT_MAX_LENGTH = 1_000;
 const BUILD_STEPS = 4;
+const AUTHOR_SPOTLIGHT_MS = 2_400;
+const GAME_DETAILS_SPOTLIGHT_MS = 5_200;
 const PROMPT_ARCADE_LOBBY_SIDEBAR_THEME: LobbyPlayersSidebarTheme = {
   background: '#ecebff',
   border: '#aaa8cf',
@@ -79,13 +86,14 @@ const PROMPT_ARCADE_LOBBY_SIDEBAR_THEME: LobbyPlayersSidebarTheme = {
 };
 const STATUS_PRESENTATION: Record<
   EntryStatus,
-  { label: string; shortLabel: string; step: number; tone: string; icon: typeof CircleDot }
+  { label: string; shortLabel: string; step: number; tone: string; dotTone: string; icon: typeof CircleDot }
 > = {
   writing: {
     label: 'Writing a prompt',
     shortLabel: 'Writing',
     step: 0,
     tone: 'border-[#bdc7d8] bg-[#f7f9fc] text-[#68758b]',
+    dotTone: 'border-[#8e9bb0] bg-[#bcc6d5] text-[#26334d]',
     icon: CircleDot,
   },
   queued: {
@@ -93,6 +101,7 @@ const STATUS_PRESENTATION: Record<
     shortLabel: 'Queued',
     step: 1,
     tone: 'border-[#d2b844] bg-[#fff7c9] text-[#79650d]',
+    dotTone: 'border-[#a98d13] bg-[#f3d95f] text-[#4d4105]',
     icon: Clock3,
   },
   generating: {
@@ -100,6 +109,7 @@ const STATUS_PRESENTATION: Record<
     shortLabel: 'Building',
     step: 2,
     tone: 'border-[#6e67da] bg-[#eeebff] text-[#5148c5]',
+    dotTone: 'border-[#5c52cc] bg-[#9288ef] text-white motion-safe:animate-pulse',
     icon: WandSparkles,
   },
   validating: {
@@ -107,6 +117,7 @@ const STATUS_PRESENTATION: Record<
     shortLabel: 'Checking',
     step: 3,
     tone: 'border-[#31a59b] bg-[#e3f8f4] text-[#197f77]',
+    dotTone: 'border-[#277fa0] bg-[#69c4e5] text-[#123b4d]',
     icon: Gauge,
   },
   repairing: {
@@ -114,6 +125,7 @@ const STATUS_PRESENTATION: Record<
     shortLabel: 'Repairing',
     step: 3,
     tone: 'border-[#e18449] bg-[#fff0df] text-[#a84f25]',
+    dotTone: 'border-[#bc5f2d] bg-[#f1a068] text-[#5b2c14] motion-safe:animate-pulse',
     icon: Wrench,
   },
   ready: {
@@ -121,6 +133,7 @@ const STATUS_PRESENTATION: Record<
     shortLabel: 'Ready',
     step: 4,
     tone: 'border-[#249780] bg-[#dff7ed] text-[#15705f]',
+    dotTone: 'border-[#20816c] bg-[#65d6b8] text-[#103f36]',
     icon: Check,
   },
   needsRevision: {
@@ -128,6 +141,7 @@ const STATUS_PRESENTATION: Record<
     shortLabel: 'Revise',
     step: 0,
     tone: 'border-[#d26c55] bg-[#fff0ea] text-[#a34430]',
+    dotTone: 'border-[#b9533e] bg-[#f39a83] text-[#5f2418]',
     icon: AlertTriangle,
   },
   withdrawn: {
@@ -135,6 +149,7 @@ const STATUS_PRESENTATION: Record<
     shortLabel: 'Withdrawn',
     step: 0,
     tone: 'border-[#c4cad4] bg-[#eef0f4] text-[#70798a]',
+    dotTone: 'border-[#626d7f] bg-[#7f8999] text-white',
     icon: DoorOpen,
   },
   played: {
@@ -142,6 +157,7 @@ const STATUS_PRESENTATION: Record<
     shortLabel: 'Played',
     step: 4,
     tone: 'border-[#4d60a8] bg-[#e9edff] text-[#3c4d92]',
+    dotTone: 'border-[#344783] bg-[#586cae] text-white',
     icon: Gamepad2,
   },
 };
@@ -252,6 +268,31 @@ function PlayerCartridge({ entry }: { entry: PromptEntry }) {
   );
 }
 
+function PlayerBuildRoster({ entries }: { entries: GameView['entries'] }) {
+  return (
+    <div className="border-b border-[#26324a] bg-[#37435b] px-3 py-3">
+      <ol
+        className="m-0 flex list-none flex-wrap gap-1.5 p-0"
+        aria-label={`Build status for ${entries.length} ${entries.length === 1 ? 'player' : 'players'}`}
+      >
+        {entries.map((entry, index) => (
+          <li
+            className={cn(
+              'grid size-5.5 shrink-0 place-items-center rounded-full border text-[8px] leading-none font-[900] tabular-nums shadow-[0_1px_0_rgb(0_0_0/24%)]',
+              STATUS_PRESENTATION[entry.status].dotTone
+            )}
+            key={entry.entryId}
+            aria-label={`${index + 1}. ${entry.displayName}: ${STATUS_PRESENTATION[entry.status].label}`}
+            title={`${entry.displayName}: ${STATUS_PRESENTATION[entry.status].label}`}
+          >
+            {index + 1}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function FactoryPlayersSidebar({
   game,
   copied,
@@ -285,30 +326,7 @@ function FactoryPlayersSidebar({
           <UsersRound className="size-3.5" aria-hidden="true" /> {game.participantCount}
         </span>
       </div>
-      <div
-        className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[#26324a] bg-[#37435b] px-3"
-        role="progressbar"
-        aria-label={`${readyCount} of ${game.summary.total} player-made games are ready`}
-        aria-valuemin={0}
-        aria-valuemax={game.summary.total}
-        aria-valuenow={readyCount}
-      >
-        {game.entries.map((entry) => (
-          <span
-            className={cn(
-              'h-2.5 min-w-1 flex-1 rounded-full border border-[#657189] bg-[#778298]',
-              entry.status === 'queued' && 'border-[#dec653] bg-[#f3d95f]',
-              entry.status === 'generating' && 'border-[#8d85ec] bg-[#9d96ee] motion-safe:animate-pulse',
-              (entry.status === 'validating' || entry.status === 'repairing') && 'border-[#64c9bc] bg-[#79d7ca]',
-              (entry.status === 'ready' || entry.status === 'played') && 'border-[#51c5a8] bg-[#65d6b8]',
-              entry.status === 'needsRevision' && 'border-[#eb927c] bg-[#f39a83]'
-            )}
-            key={entry.entryId}
-            title={`${entry.displayName}: ${STATUS_PRESENTATION[entry.status].label}`}
-            aria-hidden="true"
-          />
-        ))}
-      </div>
+      <PlayerBuildRoster entries={game.entries} />
       <div className="flex items-center justify-between gap-2 border-b border-[#c4c3df] px-4 py-2.5 text-[10px] font-[760] text-[#6f7086]">
         <span>
           {readyCount} of {game.requiredReadyCount} ready
@@ -681,47 +699,158 @@ function LobbySurface({
   );
 }
 
-function RoundStandings({
-  standings,
-  copied,
-  onInvite,
-}: {
-  standings: GameView['standings'];
-  copied: boolean;
-  onInvite: () => void;
-}) {
+type Standing = GameView['standings'][number];
+type StandingMemberId = Standing['memberId'];
+
+function reconcileStandingOrder(previousIds: StandingMemberId[], standingIds: StandingMemberId[]) {
+  const currentIds = new Set(standingIds);
+  const knownIds = new Set(previousIds);
+  return [
+    ...previousIds.filter((memberId) => currentIds.has(memberId)),
+    ...standingIds.filter((id) => !knownIds.has(id)),
+  ];
+}
+
+function useRoundStandingOrder(standings: GameView['standings'], roundNumber: number, phase: GameView['phase']) {
+  const [frozenOrder, setFrozenOrder] = useState<{ roundNumber: number; memberIds: StandingMemberId[] }>(() => ({
+    roundNumber,
+    memberIds: standings.map((standing) => standing.memberId),
+  }));
+  const roundIsLive = phase === 'countdown' || phase === 'playing';
+  const standingIdsKey = standings.map((standing) => standing.memberId).join('|');
+  const standingIds = useMemo(
+    () => (standingIdsKey === '' ? [] : (standingIdsKey.split('|') as StandingMemberId[])),
+    [standingIdsKey]
+  );
+  const baseIds = frozenOrder.roundNumber === roundNumber ? frozenOrder.memberIds : standingIds;
+  const nextIds = useMemo(() => reconcileStandingOrder(baseIds, standingIds), [baseIds, standingIds]);
+
+  useEffect(() => {
+    if (!roundIsLive) return;
+    setFrozenOrder((previous) => {
+      if (previous.roundNumber === roundNumber && previous.memberIds.join('|') === nextIds.join('|')) return previous;
+      return { roundNumber, memberIds: nextIds };
+    });
+  }, [nextIds, roundIsLive, roundNumber]);
+
+  if (!roundIsLive) return standings;
+  const standingsById = new Map(standings.map((standing) => [standing.memberId, standing]));
+  return nextIds.flatMap((memberId) => {
+    const standing = standingsById.get(memberId);
+    return standing === undefined ? [] : [standing];
+  });
+}
+
+function RoundStandings({ game, copied, onInvite }: { game: GameView; copied: boolean; onInvite: () => void }) {
+  const roundNumber = game.round?.roundNumber ?? game.currentRoundNumber;
+  const roundIsLive = game.phase === 'countdown' || game.phase === 'playing';
+  const resultByMemberId = useMemo(
+    () => new Map(game.roundResults.map((result) => [result.memberId, result])),
+    [game.roundResults]
+  );
+  const roundStartStandings = useMemo(() => {
+    if (!roundIsLive) return game.standings;
+    return [...game.standings].sort((first, second) => {
+      const firstRoundScore = resultByMemberId.get(first.memberId)?.score ?? 0;
+      const secondRoundScore = resultByMemberId.get(second.memberId)?.score ?? 0;
+      return (
+        second.totalScore - secondRoundScore - (first.totalScore - firstRoundScore) ||
+        first.displayName.localeCompare(second.displayName)
+      );
+    });
+  }, [game.standings, resultByMemberId, roundIsLive]);
+  const orderedStandings = useRoundStandingOrder(roundStartStandings, roundNumber, game.phase);
+  const currentPlayer = game.standings.find((standing) => standing.isCurrentPlayer) ?? null;
+  const standingsOrderKey = orderedStandings.map((standing) => standing.memberId).join('|');
+  const setStandingItemRef = useListReorderAnimation(standingsOrderKey, {
+    animate: game.phase === 'roundResults',
+    resetKey: roundNumber,
+  });
+
   return (
     <aside
       className={cn(
-        'flex flex-col overflow-hidden rounded-[16px_10px_18px_12px] border border-[#bbc6d6] bg-white shadow-[5px_6px_0_#d3dae6]',
+        'flex flex-col overflow-hidden rounded-[16px_10px_18px_12px] border border-[#aaa8cf] bg-[#f8f7ff] shadow-[5px_6px_0_#d3dae6]',
         GAME_STANDINGS_SIDEBAR_HEIGHT_CLASS,
-        'max-[860px]:h-auto max-[860px]:max-h-80'
+        'max-[860px]:h-auto max-[860px]:max-h-96'
       )}
       aria-label="Prompt Arcade standings"
     >
-      <div className="border-b border-[#d2d9e4] px-4 py-4">
-        <p className="mb-0.5 text-[9px] font-[850] tracking-[0.13em] text-[#564dd8] uppercase">All cartridges</p>
-        <h2 className="m-0 font-display text-xl font-[850] tracking-[-0.04em]">Standings</h2>
+      <div className="flex items-start justify-between gap-3 border-b border-[#d2d0e8] bg-white/65 px-4 py-4">
+        <div>
+          <p className="mb-0.5 text-[9px] font-[850] tracking-[0.13em] text-[#564dd8] uppercase">Live table</p>
+          <h2 className="m-0 font-display text-xl font-[850] tracking-[-0.04em]">Standings</h2>
+        </div>
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#e4e1ff] px-2 py-1.5 text-[10px] font-[800] text-[#5148c5]">
+          <UsersRound className="size-3" aria-hidden="true" /> {orderedStandings.length}
+        </span>
       </div>
-      <ol className="m-0 grid min-h-0 flex-1 list-none content-start gap-1 overflow-y-auto p-3">
-        {standings.map((entry) => (
-          <li
-            className={cn(
-              'grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded-[10px_7px_11px_8px] px-2.5 py-2.5',
-              entry.isCurrentPlayer && 'bg-[#efedff]',
-              !entry.isActive && 'opacity-50'
-            )}
-            key={entry.memberId}
-          >
-            <span className="grid size-7 place-items-center rounded-full bg-[#e8ecf3] text-[10px] font-[850] text-[#536079]">
-              {entry.rank}
-            </span>
-            <span className="min-w-0 overflow-hidden text-xs font-[730] text-ellipsis whitespace-nowrap">
-              {entry.displayName} {entry.isCurrentPlayer ? '(you)' : ''}
-            </span>
-            <strong className="text-xs tabular-nums text-[#564dd8]">{formatPoints(entry.totalScore)}</strong>
-          </li>
-        ))}
+      {currentPlayer !== null ? (
+        <div className="mx-3 mt-3 rounded-[11px_7px_12px_8px] bg-[#17203a] px-3 py-2.5 text-white">
+          <span className="text-[10px] font-[760] text-[#bfc8d8]">Your score</span>
+          <strong className="float-right font-display text-lg text-[#ffd75a] tabular-nums">
+            {formatPoints(currentPlayer.totalScore)}
+          </strong>
+        </div>
+      ) : null}
+      <ol
+        className="m-0 grid min-h-0 flex-1 list-none content-start gap-1 overflow-y-auto p-3"
+        aria-label="Player standings"
+      >
+        {orderedStandings.map((entry, index) => {
+          const displayRank = roundIsLive ? index + 1 : entry.rank;
+          const roundResult = resultByMemberId.get(entry.memberId);
+          const hasRoundScore = roundResult !== undefined && roundResult.status !== 'waiting';
+          return (
+            <li
+              ref={(element) => setStandingItemRef(entry.memberId, element)}
+              className={cn(
+                'grid min-h-13 grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded-[10px_7px_11px_8px] px-2.5 py-2 text-[#536079] transition-[background-color,opacity] data-[current=true]:bg-[#e9e6ff] data-[reordering=true]:z-2 data-[reordering=true]:pointer-events-none motion-reduce:transition-none',
+                !entry.isActive && 'opacity-45 grayscale'
+              )}
+              key={entry.memberId}
+              data-current={entry.isCurrentPlayer}
+              data-display-rank={displayRank}
+              data-authoritative-rank={entry.rank}
+            >
+              <span className="grid size-7 place-items-center rounded-full bg-[#e5e8ef] text-[10px] font-[850] text-[#536079]">
+                {displayRank <= 3 && !roundIsLive ? (
+                  <Medal className="size-3.5 text-[#c49113]" aria-label={`Position ${displayRank}`} />
+                ) : (
+                  displayRank
+                )}
+              </span>
+              <span className="grid min-w-0">
+                <strong className="overflow-hidden text-xs text-ellipsis whitespace-nowrap text-[#26334d]">
+                  {entry.displayName} {entry.isCurrentPlayer ? '(you)' : ''}
+                </strong>
+                <small className="overflow-hidden text-[9px] text-ellipsis whitespace-nowrap text-[#8993a3]">
+                  {!entry.isActive
+                    ? 'Left the room'
+                    : roundResult?.status === 'finished'
+                      ? 'Finished this game'
+                      : roundResult?.status === 'timedOut'
+                        ? 'Time expired'
+                        : `${entry.roundsFinished} ${entry.roundsFinished === 1 ? 'game' : 'games'} scored`}
+                </small>
+              </span>
+              <span className="grid justify-items-end">
+                <strong className="text-xs tabular-nums text-[#564dd8]">{formatPoints(entry.totalScore)}</strong>
+                {hasRoundScore ? (
+                  <small
+                    className={cn(
+                      'animate-in text-[9px] font-[850] tabular-nums fade-in slide-in-from-bottom-1 duration-300',
+                      roundResult.score > 0 ? 'text-[#16856b]' : 'text-[#8993a3]'
+                    )}
+                  >
+                    +{formatPoints(roundResult.score)}
+                    <span className="sr-only"> points gained this round</span>
+                  </small>
+                ) : null}
+              </span>
+            </li>
+          );
+        })}
       </ol>
       <Button
         className="m-3 mt-0 inline-flex h-10 w-[calc(100%-24px)] shrink-0 items-center justify-center gap-2 rounded-lg border border-[#bbc6d6] bg-[#f8f9fc] px-3 text-xs font-[760] text-[#5148c5] enabled:hover:border-[#aaa8cf] enabled:hover:bg-[#f1efff] enabled:hover:text-[#5148c5] [&_svg]:size-4"
@@ -764,21 +893,97 @@ function RoundHeader({ game, now }: { game: GameView; now: number }) {
 
 function CountdownSurface({ game, now }: { game: GameView; now: number }) {
   if (game.round === null) return null;
+  const elapsedMs = Math.max(0, now - game.round.countdownStartedAt);
+  const showGameDetails = elapsedMs >= AUTHOR_SPOTLIGHT_MS;
+  const showStartCountdown = elapsedMs >= GAME_DETAILS_SPOTLIGHT_MS;
+  const startSeconds = Math.max(1, Math.ceil((game.round.playStartsAt - now) / 1_000));
   return (
-    <div className="grid min-h-[clamp(440px,calc(100dvh-220px),640px)] place-content-center bg-[#f8f7ff] px-6 text-center">
-      <span className="mx-auto mb-5 grid size-18 -rotate-3 place-items-center rounded-[23px_14px_25px_16px] border-2 border-[#17203a] bg-[#cabfff] shadow-[5px_5px_0_#17203a]">
-        <Gamepad2 className="size-8 text-[#5148c5]" aria-hidden="true" />
-      </span>
-      <p className="mb-2 text-[10px] font-[850] tracking-[0.15em] text-[#564dd8] uppercase">Load the cartridge</p>
-      <h2 className="m-0 font-display text-[clamp(38px,7vw,68px)] leading-[0.9] font-[910] tracking-[-0.065em]">
-        {game.round.artifact.title}
-      </h2>
-      <p className="mx-auto mt-4 mb-0 max-w-145 text-base leading-[1.5] text-[#687389]">
-        {game.round.artifact.instructions}
-      </p>
-      <p className="mt-6 mb-0 font-display text-4xl font-[920] text-[#ef7543] tabular-nums" aria-live="polite">
-        {Math.max(1, Math.ceil((game.round.playStartsAt - now) / 1_000))}
-      </p>
+    <div
+      className="relative min-h-[clamp(440px,calc(100dvh-150px),640px)] overflow-hidden bg-[#f8f7ff] px-6 text-center max-[520px]:px-4"
+      data-reveal-stage={showStartCountdown ? 'countdown' : showGameDetails ? 'game' : 'author'}
+    >
+      <span
+        className="pointer-events-none absolute -top-14 -right-10 size-52 rotate-12 rounded-[38%_62%_55%_45%] bg-[#e0dcff] opacity-80"
+        aria-hidden="true"
+      />
+      <div
+        className="relative z-1 mx-auto flex min-h-[clamp(440px,calc(100dvh-150px),640px)] w-full max-w-205 flex-col items-center justify-center py-8 max-[520px]:py-6"
+        data-countdown-content
+      >
+        <div
+          className="max-w-full shrink-0 transition-[font-size,line-height,margin,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          data-countdown-section="author"
+        >
+          <span
+            className={cn(
+              'mx-auto grid -rotate-3 place-items-center border-2 border-[#17203a] bg-[#cabfff] shadow-[5px_5px_0_#17203a] transition-[width,height,margin,border-radius] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
+              showGameDetails
+                ? 'mb-3 size-12 rounded-[16px_10px_18px_12px]'
+                : 'mb-5 size-18 rounded-[23px_14px_25px_16px]'
+            )}
+          >
+            <Gamepad2
+              className={cn(
+                'text-[#5148c5] transition-[width,height] duration-700 motion-reduce:transition-none',
+                showGameDetails ? 'size-5' : 'size-8'
+              )}
+              aria-hidden="true"
+            />
+          </span>
+          <p className="mb-2 text-[10px] font-[850] tracking-[0.15em] text-[#564dd8] uppercase">This game is by</p>
+          <h2
+            className={cn(
+              'm-0 max-w-full break-words font-display font-[920] tracking-[-0.07em] transition-[font-size,line-height] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
+              showGameDetails
+                ? 'text-[clamp(32px,5vw,50px)] leading-[0.9]'
+                : 'text-[clamp(46px,8vw,82px)] leading-[0.86]'
+            )}
+          >
+            {game.round.entry.displayName}
+          </h2>
+        </div>
+
+        <div
+          className={cn(
+            'grid w-full transition-[grid-template-rows,opacity,margin,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
+            showGameDetails
+              ? 'mt-6 grid-rows-[1fr] translate-y-0 opacity-100'
+              : 'mt-0 grid-rows-[0fr] translate-y-5 opacity-0'
+          )}
+          data-countdown-section="game"
+          aria-hidden={!showGameDetails}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <p className="mb-2 text-[9px] font-[850] tracking-[0.15em] text-[#ef7543] uppercase">
+              Cartridge {game.round.roundNumber}
+            </p>
+            <h3 className="m-0 max-w-full break-words font-display text-[clamp(32px,6vw,58px)] leading-[0.92] font-[910] tracking-[-0.065em]">
+              {game.round.artifact.title}
+            </h3>
+            <p className="mx-auto mt-4 mb-0 max-w-165 text-[clamp(13px,2vw,16px)] leading-[1.5] text-[#687389]">
+              {game.round.artifact.instructions}
+            </p>
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            'grid w-full transition-[grid-template-rows,opacity,margin,transform] duration-500 motion-reduce:transition-none',
+            showStartCountdown
+              ? 'mt-7 grid-rows-[1fr] translate-y-0 opacity-100'
+              : 'mt-0 grid-rows-[0fr] translate-y-4 opacity-0'
+          )}
+          data-countdown-section="timer"
+          aria-hidden={!showStartCountdown}
+        >
+          <p
+            className="m-0 min-h-0 overflow-hidden font-display text-3xl font-[920] text-[#ef7543] tabular-nums"
+            aria-live="polite"
+          >
+            Starts in {startSeconds}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -858,49 +1063,163 @@ function WaitingForCartridge({
   );
 }
 
-function RoundResults({ game }: { game: GameView }) {
+type RoundResult = GameView['roundResults'][number];
+
+type RoundRecapEntry = {
+  result: RoundResult;
+  standing: Standing;
+  previousRank: number;
+  rankChange: number;
+};
+
+function buildRoundRecap(game: GameView): RoundRecapEntry[] {
+  const scoreByMemberId = new Map(game.roundResults.map((result) => [result.memberId, result.score]));
+  const previousRankByMemberId = new Map(
+    game.standings
+      .map((standing) => ({
+        memberId: standing.memberId,
+        displayName: standing.displayName,
+        totalScore: standing.totalScore - (scoreByMemberId.get(standing.memberId) ?? 0),
+      }))
+      .sort(
+        (first, second) => second.totalScore - first.totalScore || first.displayName.localeCompare(second.displayName)
+      )
+      .map((standing, index) => [standing.memberId, index + 1] as const)
+  );
+  const standingByMemberId = new Map(game.standings.map((standing) => [standing.memberId, standing]));
+
+  return game.roundResults
+    .filter((result) => result.status !== 'waiting')
+    .flatMap((result) => {
+      const standing = standingByMemberId.get(result.memberId);
+      if (standing === undefined) return [];
+      const previousRank = previousRankByMemberId.get(result.memberId) ?? standing.rank;
+      return [{ result, standing, previousRank, rankChange: previousRank - standing.rank }];
+    });
+}
+
+function RankMovement({ entry }: { entry: RoundRecapEntry }) {
+  if (entry.rankChange > 0) {
+    return (
+      <>
+        <span className="inline-flex items-center gap-1 font-[820] text-[#16856b]" aria-hidden="true">
+          <span>#{entry.previousRank}</span>
+          <ArrowUp className="size-3" />
+          <span>#{entry.standing.rank}</span>
+        </span>
+        <span className="sr-only">
+          Moved from position {entry.previousRank} to {entry.standing.rank}
+        </span>
+      </>
+    );
+  }
+  if (entry.rankChange < 0) {
+    return (
+      <>
+        <span className="inline-flex items-center gap-1 font-[820] text-[#c25b3e]" aria-hidden="true">
+          <span>#{entry.previousRank}</span>
+          <ArrowDown className="size-3" />
+          <span>#{entry.standing.rank}</span>
+        </span>
+        <span className="sr-only">
+          Moved from position {entry.previousRank} to {entry.standing.rank}
+        </span>
+      </>
+    );
+  }
+  return (
+    <>
+      <span className="font-[760] text-[#7a8597]" aria-hidden="true">
+        Held #{entry.standing.rank}
+      </span>
+      <span className="sr-only">Held position {entry.standing.rank}</span>
+    </>
+  );
+}
+
+function RoundResults({ game, playIntro }: { game: GameView; playIntro: boolean }) {
   if (game.round === null) return null;
-  const finishedResults = game.roundResults.filter((result) => result.status !== 'waiting');
+  const recap = buildRoundRecap(game);
+  const podium = recap.slice(0, 3);
+  const toughestRound = recap.length > 3 ? recap.at(-1) : undefined;
   return (
     <div className="min-h-[clamp(440px,calc(100dvh-220px),640px)] bg-[#f8f9ff] p-5 max-[520px]:p-3">
-      <div className="mx-auto max-w-190">
-        <div className="mb-5 rounded-[14px_9px_15px_10px] border border-[#bfc9d8] bg-white px-4 py-3 text-sm leading-[1.45] text-[#58657b] shadow-[0_3px_0_#d4dbe6]">
+      <div className="mx-auto max-w-205">
+        <div
+          className={cn(
+            'mb-5 rounded-[14px_9px_15px_10px] border border-[#bfc9d8] bg-white px-4 py-3 text-sm leading-[1.45] text-[#58657b] shadow-[0_3px_0_#d4dbe6]',
+            playIntro &&
+              'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-both motion-safe:duration-500'
+          )}
+        >
           <strong className="text-[#17203a]">What the builder made:</strong> {game.round.artifact.interpretation}
         </div>
-        <ol className="m-0 grid list-none gap-2 p-0" aria-label="Round results">
-          {finishedResults.map((result, index) => (
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <p className="mb-1 text-[9px] font-[850] tracking-[0.14em] text-[#564dd8] uppercase">Round podium</p>
+            <h2 className="m-0 font-display text-[clamp(26px,4vw,38px)] leading-none font-[890] tracking-[-0.05em]">
+              Top scorers this game
+            </h2>
+          </div>
+          <Trophy className="size-7 shrink-0 text-[#d0a018]" aria-hidden="true" />
+        </div>
+        <ol
+          className="m-0 grid list-none grid-cols-3 gap-2 p-0 max-[620px]:grid-cols-1"
+          aria-label="Top scorers this round"
+        >
+          {podium.map((entry, index) => (
             <li
               className={cn(
-                'grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-[13px_8px_14px_9px] border border-[#c3ccda] bg-white px-3 py-3 shadow-[0_3px_0_#d7deea]',
-                result.isCurrentPlayer && 'border-[#665edb] bg-[#f1efff]'
+                'relative grid min-h-31 content-between overflow-hidden rounded-[15px_9px_16px_10px] border border-[#c3ccda] bg-white p-3 shadow-[0_3px_0_#d7deea]',
+                index === 0 && 'border-[#d0a018] bg-[#fff8d7]',
+                entry.result.isCurrentPlayer && 'ring-2 ring-[#665edb]/35',
+                playIntro &&
+                  'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:fill-mode-both motion-safe:duration-500'
               )}
-              key={result.memberId}
+              key={entry.result.memberId}
+              style={playIntro ? { animationDelay: `${140 + index * 110}ms` } : undefined}
             >
-              <span className="grid size-8 place-items-center rounded-full bg-[#17203a] text-[10px] font-[850] text-white">
-                {index + 1}
-              </span>
-              <span className="min-w-0">
-                <strong className="block overflow-hidden text-sm text-ellipsis whitespace-nowrap">
-                  {result.displayName}
+              <div className="flex items-start justify-between gap-2">
+                <span className="grid size-8 place-items-center rounded-full bg-[#17203a] text-[10px] font-[850] text-white">
+                  {index + 1}
+                </span>
+                <strong className="font-display text-xl font-[900] text-[#564dd8] tabular-nums">
+                  +{formatPoints(entry.result.score)}
                 </strong>
-                <small className="block overflow-hidden text-[10px] text-ellipsis whitespace-nowrap text-[#748095]">
-                  {result.status === 'timedOut'
-                    ? 'Time expired'
-                    : result.metricLabel !== null && result.metricValue !== null
-                      ? `${result.metricLabel}: ${result.metricValue.toLocaleString()}`
-                      : result.elapsedMs === null
-                        ? 'Finished'
-                        : `${(result.elapsedMs / 1_000).toFixed(1)} seconds`}
+              </div>
+              <div className="mt-3 min-w-0">
+                <strong className="block overflow-hidden text-sm text-ellipsis whitespace-nowrap text-[#17203a]">
+                  {entry.result.displayName}
+                </strong>
+                <small className="mt-1 block text-[10px] text-[#748095]">
+                  <RankMovement entry={entry} /> overall
                 </small>
-              </span>
-              <strong className="font-display text-lg font-[890] text-[#564dd8] tabular-nums">
-                +{formatPoints(result.score)}
-              </strong>
+              </div>
             </li>
           ))}
         </ol>
-        <p className="mt-5 mb-0 text-center text-xs font-[720] text-[#748095]">
-          The next ready cartridge loads automatically.
+        {toughestRound !== undefined ? (
+          <div
+            className={cn(
+              'mt-4 flex items-center justify-between gap-4 rounded-[13px_8px_14px_9px] border border-[#e0b09f] bg-[#fff1eb] px-4 py-3 text-sm shadow-[0_3px_0_#ead1c7]',
+              playIntro &&
+                'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-both motion-safe:duration-500 motion-safe:delay-500'
+            )}
+          >
+            <div className="min-w-0">
+              <p className="mb-0.5 text-[9px] font-[850] tracking-[0.12em] text-[#b44f34] uppercase">Tough break</p>
+              <strong className="block truncate text-[#4f352e]">{toughestRound.result.displayName}</strong>
+            </div>
+            <div className="shrink-0 text-right">
+              <strong className="block text-[#b44f34] tabular-nums">+{formatPoints(toughestRound.result.score)}</strong>
+              <small className="text-[10px]">
+                <RankMovement entry={toughestRound} /> overall
+              </small>
+            </div>
+          </div>
+        ) : null}
+        <p className="mt-4 mb-0 text-center text-xs font-[720] text-[#748095]">
+          Standings lock in, then the next creator gets the spotlight.
         </p>
       </div>
     </div>
@@ -944,10 +1263,10 @@ function ActiveRoundSurface({
     );
   }
   let content: ReactNode;
+  let surfaceKey: string;
   if (game.phase === 'countdown') {
     content = <CountdownSurface game={game} now={now} />;
-  } else if (game.phase === 'roundResults') {
-    content = <RoundResults game={game} />;
+    surfaceKey = `${game.round.roundId}:countdown`;
   } else if (game.currentResult === null) {
     content = (
       <div
@@ -961,6 +1280,7 @@ function ActiveRoundSurface({
         </p>
       </div>
     );
+    surfaceKey = `${game.round.roundId}:spectating`;
   } else if (game.currentResult?.status === 'finished') {
     content = (
       <div
@@ -976,6 +1296,7 @@ function ActiveRoundSurface({
         </p>
       </div>
     );
+    surfaceKey = `${game.round.roundId}:finished`;
   } else if (game.currentResult?.status === 'timedOut') {
     content = (
       <div
@@ -987,6 +1308,7 @@ function ActiveRoundSurface({
         <p className="mt-3 mb-0 text-sm text-[#746d5b]">Waiting for the round results.</p>
       </div>
     );
+    surfaceKey = `${game.round.roundId}:timed-out`;
   } else if (failedFinish !== null && failedFinish.roundId === game.round.roundId) {
     content = (
       <div
@@ -1010,6 +1332,7 @@ function ActiveRoundSurface({
         </Button>
       </div>
     );
+    surfaceKey = `${game.round.roundId}:finish-failed`;
   } else if (resultPending) {
     content = (
       <div
@@ -1023,6 +1346,7 @@ function ActiveRoundSurface({
         <h2 className="m-0 font-display text-3xl font-[880] tracking-[-0.05em]">Recording your finish…</h2>
       </div>
     );
+    surfaceKey = `${game.round.roundId}:finish-pending`;
   } else if (game.round.artifact.codeUrl === null) {
     content = (
       <div className="grid min-h-100 place-content-center bg-[#fff2ed] px-6 text-center" role="alert">
@@ -1031,6 +1355,7 @@ function ActiveRoundSurface({
         <p className="mt-2 mb-0 text-sm text-[#7d5d53]">The server will close this round and move on.</p>
       </div>
     );
+    surfaceKey = `${game.round.roundId}:unavailable`;
   } else {
     content = (
       <GeneratedGameFrame
@@ -1042,20 +1367,32 @@ function ActiveRoundSurface({
         onRuntimeError={onRuntimeError}
       />
     );
+    surfaceKey = `${game.round.roundId}:playing`;
   }
 
   return (
     <main
       className={cn(
         GAME_LOBBY_FRAME_CLASS,
-        'grid grid-cols-[minmax(0,1fr)_260px] items-start gap-4 max-[860px]:grid-cols-1'
+        'grid grid-cols-[minmax(0,1fr)_300px] items-start gap-4.5 max-[860px]:grid-cols-1'
       )}
     >
       <section className="overflow-hidden rounded-[20px_13px_22px_15px] border-2 border-[#17203a] bg-white shadow-[7px_7px_0_#17203a]">
-        <RoundHeader game={game} now={now} />
-        {content}
+        <GameSurfaceTransition
+          showResults={game.phase === 'roundResults'}
+          surfaceKey={surfaceKey}
+          results={({ playIntro }) => (
+            <>
+              <RoundHeader game={game} now={now} />
+              <RoundResults game={game} playIntro={playIntro} />
+            </>
+          )}
+        >
+          {game.phase === 'countdown' ? null : <RoundHeader game={game} now={now} />}
+          {content}
+        </GameSurfaceTransition>
       </section>
-      <RoundStandings standings={game.standings} copied={copied} onInvite={onInvite} />
+      <RoundStandings game={game} copied={copied} onInvite={onInvite} />
     </main>
   );
 }
@@ -1085,7 +1422,7 @@ function CompleteSurface({
     <main
       className={cn(
         GAME_LOBBY_FRAME_CLASS,
-        'grid grid-cols-[minmax(0,1fr)_260px] items-start gap-4 max-[860px]:grid-cols-1'
+        'grid grid-cols-[minmax(0,1fr)_300px] items-start gap-4.5 max-[860px]:grid-cols-1'
       )}
     >
       <section className="min-w-0">
@@ -1108,7 +1445,7 @@ function CompleteSurface({
           summary={<PostGamePodium entries={podiumEntries} label="Prompt Arcade podium" />}
         />
       </section>
-      <RoundStandings standings={game.standings} copied={copied} onInvite={onInvite} />
+      <RoundStandings game={game} copied={copied} onInvite={onInvite} />
     </main>
   );
 }

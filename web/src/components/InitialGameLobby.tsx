@@ -123,17 +123,19 @@ export default function InitialGameLobby({ guest, session }: { guest: GuestIdent
 
       <main className="mx-auto grid min-h-[calc(100dvh-76px)] w-[min(1120px,calc(100%-36px))] grid-cols-[minmax(0,1fr)_300px] items-start gap-4.5 py-8 max-[820px]:w-[min(720px,calc(100%-24px))] max-[820px]:grid-cols-1 max-[760px]:min-h-[calc(100dvh-68px)] max-[760px]:py-4">
         <section className="min-w-0">
-          <div className="mb-5 rounded-[22px_15px_24px_17px] border border-[#c1ccdc] bg-[rgb(255_255_255/86%)] p-6 shadow-[7px_8px_0_rgb(23_32_58/8%)] max-[620px]:p-4.5">
-            <p className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-[820] tracking-[0.13em] text-[#3155d9] uppercase">
-              <Vote className="size-3.5" aria-hidden="true" /> The room is open
-            </p>
-            <h1 className="m-0 font-display text-[clamp(34px,5vw,58px)] leading-[0.94] font-[850] tracking-[-0.06em]">
-              Invite everyone. Then pick together.
-            </h1>
-            <p className="mt-3.5 mb-0 max-w-165 text-sm leading-[1.6] text-[#657087]">
-              Anyone who joins can vote for the first game. The room owner closes the round and starts the final pick.
-            </p>
-          </div>
+          {session.isOwner ? (
+            <div className="mb-5 rounded-[22px_15px_24px_17px] border border-[#c1ccdc] bg-[rgb(255_255_255/86%)] p-6 shadow-[7px_8px_0_rgb(23_32_58/8%)] max-[620px]:p-4.5">
+              <p className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-[820] tracking-[0.13em] text-[#3155d9] uppercase">
+                <Vote className="size-3.5" aria-hidden="true" /> The room is open
+              </p>
+              <h1 className="m-0 font-display text-[clamp(34px,5vw,58px)] leading-[0.94] font-[850] tracking-[-0.06em]">
+                Invite everyone. Then pick together.
+              </h1>
+              <p className="mt-3.5 mb-0 max-w-165 text-sm leading-[1.6] text-[#657087]">
+                Anyone who joins can vote for the first game. The room owner closes the round and starts the final pick.
+              </p>
+            </div>
+          ) : null}
 
           {isClosed ? (
             <div className="rounded-[20px_13px_22px_15px] border border-[#c7d1e0] bg-white p-8 text-center shadow-[6px_7px_0_rgb(23_32_58/10%)] max-[620px]:p-5">

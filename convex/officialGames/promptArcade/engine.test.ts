@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   type GeneratedPromptArcadeArtifact,
   normalizePromptArcadePrompt,
+  PROMPT_ARCADE_COUNTDOWN_MS,
   PROMPT_ARCADE_MAX_PLAYERS,
   PROMPT_ARCADE_MAX_PROMPT_CHARACTERS,
+  PROMPT_ARCADE_RESULTS_MS,
   parseGeneratedArtifact,
   scorePromptArcadeResult,
   validateGeneratedArtifact,
@@ -32,6 +34,11 @@ const VALID_CODE = `window.registerPromptArcadeGame({
 });`;
 
 describe('Prompt Arcade engine', () => {
+  it('leaves eight seconds to introduce a game and read its round recap', () => {
+    expect(PROMPT_ARCADE_COUNTDOWN_MS).toBe(8_000);
+    expect(PROMPT_ARCADE_RESULTS_MS).toBe(8_000);
+  });
+
   it('scores every standardized mode and clamps client-controlled values', () => {
     expect(scorePromptArcadeResult('speed', 0.2, 0, 20_000).score).toBe(1_000);
     expect(scorePromptArcadeResult('speed', 1, 10_000, 20_000).score).toBe(500);
