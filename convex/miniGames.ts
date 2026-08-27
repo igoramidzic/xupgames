@@ -3,6 +3,7 @@ import { internalMutation, mutation, query } from './_generated/server';
 import { configureGameHandler, startGameHandler } from './officialGames/miniGames/game';
 import { submitCircleCenterHandler } from './officialGames/miniGames/games/circleCenter/submission';
 import { submitOrangeEmojisHandler } from './officialGames/miniGames/games/orangeEmojis/submission';
+// Legacy scoring path for a map round that was already in progress when the challenge was retired.
 import { submitMapPointHandler } from './officialGames/miniGames/games/pointOnMap/submission';
 import { submitStraightLineHandler } from './officialGames/miniGames/games/straightLine/submission';
 import { advanceRoundHandler, beginRoundHandler, finalizeRoundHandler } from './officialGames/miniGames/rounds';

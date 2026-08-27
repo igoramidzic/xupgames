@@ -1,135 +1,17 @@
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useMutation, useQuery } from 'convex/react';
-import { Check, Gamepad2, LoaderCircle, Sparkles, Timer, Vote } from 'lucide-react';
-import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { Gamepad2, LoaderCircle, Sparkles, Timer, Vote } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import GameChoiceCard from '@/components/GameChoiceCard';
 import { Button } from '@/components/ui/button';
-import {
-  GameAuthor,
-  type GameCatalogEntry,
-  GameSourceBadge,
-  type GameType,
-  gamePresentation,
-  hasGamePresentation,
-} from '@/games/registry';
+import { type GameCatalogEntry, type GameType, hasGamePresentation } from '@/games/registry';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
 
 type SelectableGame = GameCatalogEntry & { gameType: GameType };
-type GameTally = { votes: number; percentage: number };
 const NEXT_GAME_AUTO_ADVANCE_DELAY_MS = 5_000;
 const AUTO_ADVANCE_COUNTDOWN_TICK_MS = 100;
-
-function GameOptionCard({
-  game,
-  layout,
-  selected,
-  tally,
-  complete = false,
-  recommended = false,
-  advancing = false,
-  pending = false,
-  disabled,
-  onClick,
-}: {
-  game: SelectableGame;
-  layout: 'page' | 'dialog';
-  selected: boolean;
-  tally?: GameTally;
-  complete?: boolean;
-  recommended?: boolean;
-  advancing?: boolean;
-  pending?: boolean;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  const presentation = gamePresentation(game.gameType);
-  const Icon = presentation.icon;
-  const isDialogLayout = layout === 'dialog';
-
-  return (
-    <Button
-      variant="game-choice"
-      className={cn(
-        'relative h-auto! min-h-0 min-w-0 gap-0! overflow-hidden disabled:cursor-default disabled:opacity-100',
-        isDialogLayout ? 'p-3.5' : 'aspect-[4/3] p-4 pb-4.5 max-[520px]:aspect-auto max-[520px]:min-h-40',
-        complete &&
-          'bg-white data-[selected=true]:border-[#35a675] data-[selected=true]:bg-[#ecf9f2] data-[selected=true]:shadow-[0_4px_0_#35a675]'
-      )}
-      type="button"
-      style={{ '--game-color': presentation.color, '--game-tint': presentation.tint } as CSSProperties}
-      data-selected={complete ? recommended : selected}
-      data-advancing={advancing}
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={complete ? undefined : selected}
-    >
-      {tally && !complete ? (
-        <span
-          className="absolute inset-y-0 left-0 bg-[var(--game-color)] opacity-10 transition-[width] duration-300"
-          style={{ width: `${tally.percentage}%` }}
-          aria-hidden="true"
-        />
-      ) : null}
-      {advancing ? (
-        <span
-          className="pointer-events-none absolute inset-0 bg-white/20 motion-safe:animate-pulse"
-          aria-hidden="true"
-        />
-      ) : null}
-      <span className="relative z-1 flex min-w-0 items-center justify-between gap-2">
-        <span
-          className={cn(
-            'grid place-items-center rounded-[11px_8px_12px_9px] bg-[var(--game-color)] text-white shadow-[2px_2px_0_rgb(23_32_58/18%)]',
-            isDialogLayout ? 'size-10' : 'size-11'
-          )}
-        >
-          <Icon className={isDialogLayout ? 'size-5.5' : 'size-6'} aria-hidden="true" />
-        </span>
-        <span className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-          <GameSourceBadge source={game.source} label="Community" className="shrink-0" />
-          {pending ? (
-            <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-          ) : recommended ? (
-            <span className="text-[9px] font-[820] tracking-[0.08em] text-[#16885c] uppercase">
-              {complete ? 'Winner' : 'Top vote'}
-            </span>
-          ) : selected ? (
-            <Check className="size-4 text-[#16885c]" aria-label="Your vote" />
-          ) : null}
-        </span>
-      </span>
-      <span
-        className={cn(
-          'relative z-1 flex min-w-0 flex-1 content-start items-start pt-3',
-          isDialogLayout ? 'flex-col gap-1.5' : 'gap-2 max-[760px]:flex-col max-[760px]:gap-1.5'
-        )}
-      >
-        <strong
-          className={cn(
-            'min-w-0 font-display leading-[1.05] font-[830]',
-            isDialogLayout ? 'text-[17px]' : 'text-[clamp(17px,1.7vw,22px)]'
-          )}
-        >
-          {game.name}
-        </strong>
-      </span>
-      <span
-        className={cn(
-          'relative z-1 flex min-w-0 items-end justify-between gap-2 pt-2.5',
-          isDialogLayout ? 'mt-3' : 'min-h-7'
-        )}
-      >
-        <GameAuthor game={game} className="pb-1" />
-        {tally ? (
-          <b className="ml-auto min-w-7 rounded-full bg-white/70 px-2 py-1 text-center text-xs text-[#34415b] tabular-nums">
-            {tally.votes}
-          </b>
-        ) : null}
-      </span>
-    </Button>
-  );
-}
 
 function gameDefinition(games: SelectableGame[], gameType: GameType) {
   const game = games.find((candidate) => candidate.gameType === gameType);
@@ -344,10 +226,9 @@ export default function NextGameVoting({
               const selected = poll.selectedGameType === gameType;
               const tally = poll.tallies?.find((candidate) => candidate.gameType === gameType);
               return (
-                <GameOptionCard
+                <GameChoiceCard
                   key={gameType}
                   game={game}
-                  layout={layout}
                   selected={selected}
                   tally={tally}
                   pending={pendingAction === `vote:${gameType}`}
@@ -397,10 +278,9 @@ export default function NextGameVoting({
               const recommended = poll.recommendedGameType === gameType;
               const ownerCanBreakTie = tieNeedsOwner && isOwner;
               return (
-                <GameOptionCard
+                <GameChoiceCard
                   key={gameType}
                   game={game}
-                  layout={layout}
                   selected={poll.selectedGameType === gameType}
                   tally={tally}
                   complete

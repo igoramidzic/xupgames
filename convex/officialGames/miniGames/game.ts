@@ -38,7 +38,7 @@ export async function startGameHandler(ctx: MutationCtx, args: GameRequest) {
   const gameNumber = existingState.gameNumber + 1;
   const totalRounds = normalizeMiniGamesRoundCount(existingState.configuredRoundCount);
   const state = { ...existingState, gameNumber, totalRounds };
-  const { round, participantCount } = await createRound(ctx, state, 1, null, now);
+  const { round, miniGameId, participantCount } = await createRound(ctx, state, 1, null, now);
   await ctx.db.patch('miniGamesGameStates', existingState._id, {
     gameNumber,
     phase: 'selecting',
@@ -50,5 +50,5 @@ export async function startGameHandler(ctx: MutationCtx, args: GameRequest) {
     participantCount,
     finishedCount: 0,
   });
-  return { gameNumber, roundNumber: 1, miniGameId: round.miniGameId };
+  return { gameNumber, roundNumber: 1, miniGameId };
 }

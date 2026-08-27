@@ -10,7 +10,7 @@ import {
   normalizeRoomPassword,
   validateSessionToken,
 } from './domain';
-import { syncGameMembership } from './gameRouter';
+import { closeGameState, syncGameMembership } from './gameRouter';
 import { gameTypeValidator } from './games';
 import { createPasswordCredential, verifyPasswordCredential } from './passwords';
 import { stopActivePlaytestForRoom } from './playtestLifecycle';
@@ -439,7 +439,10 @@ export const close = mutation({
       fail('NOT_ROOM_OWNER', 'Only the room owner can close this room.');
     }
     if (room.status === 'open') {
-      await ctx.db.patch('rooms', room._id, { status: 'closed', closedAt: Date.now() });
+      const now = Date.now();
+      await closeGameState(ctx, room, now);
+      await stopActivePlaytestForRoom(ctx, room._id, 'The room was closed.');
+      await ctx.db.patch('rooms', room._id, { status: 'closed', closedAt: now });
     }
     return null;
   },

@@ -5,8 +5,6 @@ export const miniGameIdValidator = v.union(
   v.literal('orangeEmojis'),
   v.literal('guessPercentage'),
   v.literal('circleCenter'),
-  v.literal('guessDistance'),
-  v.literal('pointOnMap'),
   v.literal('batteryPercentage')
 );
 

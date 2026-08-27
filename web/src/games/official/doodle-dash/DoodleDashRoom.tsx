@@ -4,10 +4,8 @@ import type { FunctionReturnType } from 'convex/server';
 import {
   Check,
   Copy,
-  DoorOpen,
   Eye,
   LoaderCircle,
-  LockKeyhole,
   Medal,
   MessageCircle,
   Paintbrush,
@@ -22,6 +20,7 @@ import GameModeControl, { GameModeContent } from '@/components/GameModeControl';
 import GameSurfaceTransition from '@/components/GameSurfaceTransition';
 import LobbyPlayersSidebar from '@/components/LobbyPlayersSidebar';
 import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
+import RoomHeaderActions from '@/components/RoomHeaderActions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -266,29 +265,13 @@ export default function DoodleDashRoom({ guest, session }: { guest: GuestIdentit
             isClosed={isClosed}
             onOpen={() => setGameModeOpen(true)}
           />
-          {session.isOwner && !isClosed ? (
-            <Button
-              variant="paper"
-              size="sm"
-              className="max-[760px]:w-8.5 max-[760px]:px-0"
-              type="button"
-              onClick={() => setConfirmation('close')}
-            >
-              <LockKeyhole />
-              <span className="max-[760px]:hidden">Close room</span>
-            </Button>
-          ) : null}
-          <Button
-            variant="paper"
-            size="sm"
-            className="max-[760px]:w-8.5 max-[760px]:px-0"
-            type="button"
-            onClick={() => setConfirmation('leave')}
-            disabled={actionPending !== null}
-          >
-            {actionPending === 'leave' ? <LoaderCircle className="animate-spin" /> : <DoorOpen />}
-            <span className="max-[760px]:hidden">Leave</span>
-          </Button>
+          <RoomHeaderActions
+            isOwner={session.isOwner}
+            isClosed={isClosed}
+            pendingAction={actionPending}
+            onRequestLeave={() => setConfirmation('leave')}
+            onRequestClose={() => setConfirmation('close')}
+          />
         </div>
       </header>
 

@@ -2,6 +2,7 @@ import type { Id } from '../../_generated/dataModel';
 import type { MutationCtx } from '../../_generated/server';
 import { fail } from '../../domain';
 import { scoreBatteryEstimate } from './games/batteryPercentage';
+// Legacy scoring path for distance rounds created before the challenge was retired.
 import { scoreDistanceEstimate } from './games/guessDistance';
 import { scorePercentageEstimate } from './games/guessPercentage';
 import { assertSubmissionOpen, recordResult } from './results';

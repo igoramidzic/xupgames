@@ -18,6 +18,13 @@ import {
   prepareMiniGamesGame,
   syncMiniGamesMembership,
 } from './officialGames/miniGames/lifecycle';
+import {
+  closePromptArcadeGame,
+  initializePromptArcadeGame,
+  preparePromptArcadeGame,
+  promptArcadeGameIsComplete,
+  syncPromptArcadeMembership,
+} from './officialGames/promptArcade/lifecycle';
 import { initializeTriviaGame, prepareTriviaGame, triviaGameIsComplete } from './officialGames/trivia/lifecycle';
 import {
   initializeTypeRacerGame,
@@ -42,6 +49,9 @@ export async function initializeGameState(ctx: MutationCtx, roomId: Id<'rooms'>,
       return;
     case 'miniGames':
       await initializeMiniGamesGame(ctx, roomId);
+      return;
+    case 'promptArcade':
+      await initializePromptArcadeGame(ctx, roomId);
       return;
     case 'trivia':
       await initializeTriviaGame(ctx, roomId);
@@ -74,6 +84,9 @@ export async function syncGameMembership(
     case 'miniGames':
       await syncMiniGamesMembership(ctx, room._id, membership, now);
       return;
+    case 'promptArcade':
+      await syncPromptArcadeMembership(ctx, room._id, membership, now);
+      return;
     case 'trivia':
       return;
     case 'typeRacer':
@@ -97,6 +110,9 @@ export async function prepareGameState(ctx: MutationCtx, room: Doc<'rooms'>, gam
     case 'miniGames':
       await prepareMiniGamesGame(ctx, room._id);
       return;
+    case 'promptArcade':
+      await preparePromptArcadeGame(ctx, room._id);
+      return;
     case 'trivia':
       await prepareTriviaGame(ctx, room._id);
       return;
@@ -113,6 +129,26 @@ export async function prepareGameState(ctx: MutationCtx, room: Doc<'rooms'>, gam
   }
 }
 
+/** Applies game-owned terminal behavior before the shared room closes. */
+export async function closeGameState(ctx: MutationCtx, room: Doc<'rooms'>, now: number): Promise<void> {
+  if (room.gameType === undefined) return;
+  switch (room.gameType) {
+    case 'promptArcade':
+      await closePromptArcadeGame(ctx, room._id, now);
+      return;
+    case 'doodleDash':
+    case 'miniGames':
+    case 'trivia':
+    case 'typeRacer':
+    case 'trendline':
+      return;
+    default: {
+      const unsupportedGameType: never = room.gameType;
+      throw new Error(`No close adapter exists for game type: ${unsupportedGameType}`);
+    }
+  }
+}
+
 export async function gameStateIsComplete(ctx: DatabaseReaderContext, room: Doc<'rooms'>): Promise<boolean> {
   if (room.gameType === undefined) {
     return false;
@@ -122,6 +158,8 @@ export async function gameStateIsComplete(ctx: DatabaseReaderContext, room: Doc<
       return await doodleDashGameIsComplete(ctx, room._id);
     case 'miniGames':
       return await miniGamesGameIsComplete(ctx, room._id);
+    case 'promptArcade':
+      return await promptArcadeGameIsComplete(ctx, room._id);
     case 'trivia':
       return await triviaGameIsComplete(ctx, room._id);
     case 'typeRacer':

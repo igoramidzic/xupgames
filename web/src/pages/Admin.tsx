@@ -17,6 +17,7 @@ type ReadyPlaytestRoom = PlaytestRoom & {
 
 const ROOM_CODE_PATTERN = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/;
 const TARGETS = [10, 25, 50] as const;
+const PROMPT_ARCADE_TARGETS = [10, 25, 30] as const;
 export default function Admin() {
   const params = useParams();
   const code = (params.code ?? '').trim().toUpperCase();
@@ -209,12 +210,14 @@ function AdminLoading() {
 function PlaytestPanel({ panel, sessionToken }: { panel: ReadyPlaytestRoom; sessionToken: string }) {
   const startPlaytest = useMutation(api.playtests.start);
   const stopPlaytest = useMutation(api.playtests.stop);
-  const [target, setTarget] = useState<(typeof TARGETS)[number]>(10);
+  const [target, setTarget] = useState(10);
   const [pending, setPending] = useState<'start' | 'stop' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const run = panel.latestRun;
   const isRunActive = run?.isActive ?? false;
   const adapterCopy = gameAdapterCopy(panel.room.gameType);
+  const targetLimit = Math.min(panel.room.maxPlayers, adapterCopy.maxActiveMembers);
+  const targets = panel.room.gameType === 'promptArcade' ? PROMPT_ARCADE_TARGETS : TARGETS;
 
   async function handleStart() {
     setPending('start');
@@ -247,8 +250,9 @@ function PlaytestPanel({ panel, sessionToken }: { panel: ReadyPlaytestRoom; sess
     }
   }
 
-  const targetUnavailable = target <= panel.room.activeMemberCount;
-  const canStart = panel.room.status === 'open' && !isRunActive && !targetUnavailable;
+  const targetTooLarge = target > targetLimit;
+  const targetUnavailable = target <= panel.room.activeMemberCount || targetTooLarge;
+  const canStart = panel.room.status === 'open' && !isRunActive && !targetUnavailable && adapterCopy.supportsBots;
   const statusLabel = run ? run.status[0].toUpperCase() + run.status.slice(1) : 'Ready';
 
   return (
@@ -319,7 +323,7 @@ function PlaytestPanel({ panel, sessionToken }: { panel: ReadyPlaytestRoom; sess
               </span>
             </div>
 
-            <SeatMap panel={panel} target={target} />
+            <SeatMap panel={panel} target={Math.min(target, targetLimit)} />
 
             <div className="mb-7 flex flex-wrap items-center gap-4.5 text-[11px] font-[650] text-[#68748a]">
               <span className="inline-flex items-center gap-1.75">
@@ -370,10 +374,13 @@ function PlaytestPanel({ panel, sessionToken }: { panel: ReadyPlaytestRoom; sess
               />
             </div>
 
-            <fieldset className="mt-6.25 min-w-0 border-0 p-0" disabled={isRunActive || pending !== null}>
+            <fieldset
+              className="mt-6.25 min-w-0 border-0 p-0"
+              disabled={isRunActive || pending !== null || !adapterCopy.supportsBots}
+            >
               <legend className="mb-2.25 text-[11px] font-[730] text-[#4f5b72]">Target room size</legend>
               <div className="grid grid-cols-3 gap-1.5 rounded-[10px] border border-[#c8d2e0] bg-[#eef2f7] p-1.25">
-                {TARGETS.map((option) => (
+                {targets.map((option) => (
                   <Button
                     key={option}
                     variant="tab"
@@ -381,7 +388,7 @@ function PlaytestPanel({ panel, sessionToken }: { panel: ReadyPlaytestRoom; sess
                     aria-label={`${option} seats`}
                     className="h-11.25 min-w-0 flex-col text-xs disabled:opacity-[.38] [&_strong]:font-display [&_strong]:text-[17px] [&_strong]:leading-none [&_span]:mt-0.5 [&_span]:text-[9px] [&_span]:font-[650]"
                     data-selected={target === option}
-                    disabled={option <= panel.room.activeMemberCount}
+                    disabled={option <= panel.room.activeMemberCount || option > targetLimit}
                     onClick={() => setTarget(option)}
                   >
                     <strong>{option}</strong>
@@ -429,7 +436,13 @@ function PlaytestPanel({ panel, sessionToken }: { panel: ReadyPlaytestRoom; sess
                 ) : (
                   <Play aria-hidden="true" />
                 )}
-                {targetUnavailable ? 'Choose a larger target' : `Fill to ${target} players`}
+                {!adapterCopy.supportsBots
+                  ? 'Use real browser players'
+                  : targetTooLarge
+                    ? `Choose at most ${targetLimit}`
+                    : targetUnavailable
+                      ? 'Choose a larger target'
+                      : `Fill to ${target} players`}
               </Button>
             )}
 
@@ -507,29 +520,47 @@ function gameAdapterCopy(gameType: ReadyPlaytestRoom['room']['gameType']) {
   switch (gameType) {
     case 'doodleDash':
       return {
+        supportsBots: true,
+        maxActiveMembers: 50,
         label: 'Doodle Dash drawing adapter',
         description:
           'Bots choose words, make random doodles, and submit staggered correct guesses. They stay at the table until you remove them.',
       };
     case 'miniGames':
       return {
+        supportsBots: false,
+        maxActiveMembers: 50,
         label: 'Mini Game Mix browser playtest',
         description: 'Automated mini-game players are not available yet. Use real browser tabs to test this game.',
       };
+    case 'promptArcade':
+      return {
+        supportsBots: true,
+        maxActiveMembers: 30,
+        label: 'Prompt Arcade bot builder',
+        description:
+          'Each bot invents a random game with explicit winning criteria, sends it through the configured generator, and posts a staggered simulated result in every round.',
+      };
     case 'trivia':
       return {
+        supportsBots: true,
+        maxActiveMembers: 50,
         label: 'Trivia answer adapter',
         description:
           'Bots answer every game with varied speed and accuracy. They stay at the table until you remove them.',
       };
     case 'typeRacer':
       return {
+        supportsBots: true,
+        maxActiveMembers: 50,
         label: 'Type racer adapter',
         description:
           'Bots type in every race at varied speeds and accuracy. They stay at the table until you remove them.',
       };
     case 'trendline':
       return {
+        supportsBots: true,
+        maxActiveMembers: 50,
         label: 'Trendline drawing adapter',
         description: 'Bots draw varied predictions in every data round. They stay at the table until you remove them.',
       };

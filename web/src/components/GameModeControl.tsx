@@ -3,9 +3,10 @@ import type { Id } from '@convex/_generated/dataModel';
 import { useMutation, useQuery } from 'convex/react';
 import { ArrowLeft, Gamepad2, LoaderCircle, Shuffle, UsersRound, Vote } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
+import GameChoiceCard from '@/components/GameChoiceCard';
 import NextGameVoting from '@/components/NextGameVoting';
 import { Button } from '@/components/ui/button';
-import { GameSourceBadge, type GameType, gamePresentation, hasGamePresentation } from '@/games/registry';
+import { type GameType, hasGamePresentation } from '@/games/registry';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
 
@@ -242,37 +243,17 @@ export function GameModeContent({
             ) : (
               <div className="mt-8 grid grid-cols-3 gap-3 max-[620px]:grid-cols-1">
                 {games.map((game) => {
-                  const presentation = gamePresentation(game.gameType);
-                  const Icon = presentation.icon;
                   const isCurrent = game.gameType === activeGameType;
                   const isPending = pending === `pick:${game.gameType}`;
                   return (
-                    <Button
-                      variant="choice"
-                      className="h-auto! min-w-0 flex-col items-stretch justify-start gap-0 p-4 text-left"
-                      type="button"
+                    <GameChoiceCard
                       key={game.gameType}
+                      game={game}
+                      statusLabel={isCurrent ? 'Play again' : undefined}
+                      pending={isPending}
                       onClick={() => handleDirectChange(game.gameType)}
                       disabled={pending !== null}
-                    >
-                      <span className="flex items-center justify-between gap-2">
-                        <span
-                          className="grid size-11 place-items-center rounded-[10px_7px_11px_8px] text-white shadow-[2px_2px_0_rgb(23_32_58/18%)]"
-                          style={{ backgroundColor: presentation.color }}
-                        >
-                          {isPending ? <LoaderCircle className="animate-spin" /> : <Icon aria-hidden="true" />}
-                        </span>
-                        {isCurrent ? (
-                          <span className="rounded-full bg-[#edf1f7] px-2 py-1 text-[9px] font-[800] tracking-[0.08em] text-[#5c687e] uppercase">
-                            Play again
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="mt-3 flex min-w-0 flex-wrap items-center gap-1.5 whitespace-normal">
-                        <strong className="text-sm text-[#17203a]">{game.name}</strong>
-                        <GameSourceBadge source={game.source} />
-                      </span>
-                    </Button>
+                    />
                   );
                 })}
               </div>

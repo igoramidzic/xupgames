@@ -1,9 +1,15 @@
 import migrations from '@convex-dev/migrations/convex.config';
 import presence from '@convex-dev/presence/convex.config';
 import { defineApp } from 'convex/server';
+import { v } from 'convex/values';
 import trendline from './communityGames/trendline/convex.config.js';
 
-const app = defineApp();
+const app = defineApp({
+  env: {
+    OPENAI_API_KEY: v.optional(v.string()),
+    OPENAI_PROMPT_ARCADE_MODEL: v.optional(v.string()),
+  },
+});
 app.use(migrations);
 app.use(presence);
 app.use(trendline, { name: 'trendline' });

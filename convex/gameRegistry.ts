@@ -1,11 +1,12 @@
 import { v } from 'convex/values';
 
-export const GAME_TYPES = ['doodleDash', 'miniGames', 'trivia', 'typeRacer', 'trendline'] as const;
+export const GAME_TYPES = ['doodleDash', 'miniGames', 'promptArcade', 'trivia', 'typeRacer', 'trendline'] as const;
 export type GameType = (typeof GAME_TYPES)[number];
 
 export const gameTypeValidator = v.union(
   v.literal('doodleDash'),
   v.literal('miniGames'),
+  v.literal('promptArcade'),
   v.literal('trivia'),
   v.literal('typeRacer'),
   v.literal('trendline')
@@ -72,6 +73,16 @@ export const GAME_DEFINITIONS = [
     source: 'official',
     isEnabled: true,
     sortOrder: 20,
+  },
+  {
+    gameType: 'promptArcade',
+    name: 'Prompt Arcade',
+    description: 'Invent a tiny game, watch it materialize, then race through every player-made challenge.',
+    authorName: 'Xup Games',
+    authorUrl: null,
+    source: 'official',
+    isEnabled: true,
+    sortOrder: 25,
   },
   {
     gameType: 'trendline',

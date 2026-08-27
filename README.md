@@ -50,6 +50,17 @@ If you need to point only the web client at an existing deployment, copy
 `web/.env.example` to `web/.env.local` and set `VITE_CONVEX_URL`. Backend secrets
 belong in Convex deployment environment variables, never in a Vite variable.
 
+Prompt Arcade also needs two Convex deployment environment variables before it
+can generate player-authored games:
+
+```bash
+pnpm exec convex env set OPENAI_API_KEY '<your-api-key>'
+pnpm exec convex env set OPENAI_PROMPT_ARCADE_MODEL '<responses-api-model-id>'
+```
+
+The model must support strict Structured Outputs in the OpenAI Responses API.
+Neither value is sent to the browser or embedded in generated game code.
+
 ## How games are organized
 
 Shared infrastructure owns rooms, guest identity, memberships, passwords,

@@ -152,20 +152,21 @@ describe('NextGameVoting', () => {
     expect(screen.getByText('The winning game is locked in.')).toBeInTheDocument();
     expect(screen.getByText('Starting Trivia in 5s')).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Time until Trivia starts' })).toBeInTheDocument();
-    const winner = screen.getByRole('button', { name: /WinnerTrivia/ });
+    const winner = screen.getByRole('button', { name: /Winner: Trivia/ });
     const loser = screen.getByRole('button', { name: /Type Racer/ });
     expect(winner).toHaveAttribute('data-variant', 'game-choice');
     expect(loser).toHaveAttribute('data-variant', 'game-choice');
     expect(winner).toHaveClass(
-      'aspect-[4/3]',
-      'data-[selected=true]:bg-[#ecf9f2]',
+      'aspect-square',
+      'data-[selected=true]:bg-white',
       'data-[selected=true]:border-[#35a675]'
     );
     expect(loser).toHaveClass('bg-white');
     expect(loser).not.toHaveClass('opacity-40');
-    expect(within(winner).getByText('2')).toBeInTheDocument();
-    expect(within(loser).getByText('1')).toBeInTheDocument();
-    expect(winner.querySelector('svg')?.parentElement).toHaveClass('bg-[var(--game-color)]', 'size-11');
+    expect(within(winner).getByText('2', { selector: 'b' })).toBeInTheDocument();
+    expect(within(loser).getByText('1', { selector: 'b' })).toBeInTheDocument();
+    expect(winner.querySelector('[data-game-artwork="trivia"]')).toBeInTheDocument();
+    expect(within(winner).getByText('Quick-fire trivia')).toBeInTheDocument();
     expect(winner).toHaveAttribute('data-advancing', 'true');
     expect(winner).toBeDisabled();
     expect(loser).toBeDisabled();
@@ -188,15 +189,15 @@ describe('NextGameVoting', () => {
     };
     renderVoting(false);
 
-    const winner = screen.getByRole('button', { name: /WinnerTrivia/ });
+    const winner = screen.getByRole('button', { name: /Winner: Trivia/ });
     const loser = screen.getByRole('button', { name: /Type Racer/ });
     expect(winner).toBeDisabled();
     expect(loser).toBeDisabled();
-    expect(winner).toHaveClass('data-[selected=true]:bg-[#ecf9f2]');
+    expect(winner).toHaveClass('data-[selected=true]:bg-white');
     expect(loser).toHaveClass('bg-white');
     expect(loser).not.toHaveClass('opacity-40');
-    expect(within(winner).getByText('2')).toBeInTheDocument();
-    expect(within(loser).getByText('1')).toBeInTheDocument();
+    expect(within(winner).getByText('2', { selector: 'b' })).toBeInTheDocument();
+    expect(within(loser).getByText('1', { selector: 'b' })).toBeInTheDocument();
     expect(screen.getByText('The winning game is locked in.')).toBeInTheDocument();
     expect(screen.queryByText(/Waiting for the room owner/)).not.toBeInTheDocument();
   });
@@ -235,7 +236,10 @@ describe('NextGameVoting', () => {
       'justify-start',
       'gap-0!'
     );
-    expect(screen.getByRole('button', { name: /Trivia/ }).querySelector('svg')).toHaveClass('size-6');
+    expect(
+      screen.getByRole('button', { name: /Trivia/ }).querySelector('[data-game-artwork="trivia"]')
+    ).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /Trivia/ })).getByText('Quick-fire trivia')).toBeInTheDocument();
     expect(screen.queryByText('Official')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Type Racer/ })).not.toHaveTextContent('by Xup Games');
     expect(screen.getByRole('button', { name: /Type Racer/ }).parentElement).toHaveClass('grid-cols-3');
@@ -261,12 +265,12 @@ describe('NextGameVoting', () => {
     renderVoting(true, null);
 
     expect(screen.getByRole('heading', { name: 'Trivia is up next.' })).toBeInTheDocument();
-    const recommendedChoice = screen.getByRole('button', { name: /WinnerTrivia/ });
+    const recommendedChoice = screen.getByRole('button', { name: /Winner: Trivia/ });
     expect(recommendedChoice).toHaveClass('h-auto!', 'min-h-0', 'gap-0!');
     expect(recommendedChoice).toHaveAttribute('data-variant', 'game-choice');
-    expect(recommendedChoice).toHaveClass('data-[selected=true]:bg-[#ecf9f2]');
-    expect(within(recommendedChoice).getByText('1')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Trendline/ })).toHaveTextContent('by Igor Amidzic');
+    expect(recommendedChoice).toHaveClass('aspect-square', 'data-[selected=true]:bg-white');
+    expect(within(recommendedChoice).getByText('1', { selector: 'b' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Trendline/ })).not.toHaveTextContent('by Igor Amidzic');
     expect(screen.getByRole('button', { name: /Trendline/ })).toHaveClass('bg-white');
     expect(screen.getByRole('button', { name: /Trendline/ })).not.toHaveClass('opacity-40');
     expect(recommendedChoice).toBeDisabled();
@@ -329,22 +333,22 @@ describe('NextGameVoting', () => {
     renderVoting();
 
     const trendline = screen.getByRole('button', { name: /Trendline/ });
-    expect(trendline).toHaveClass('aspect-[4/3]', 'min-w-0');
+    expect(trendline).toHaveClass('aspect-square', 'min-w-0');
+    expect(trendline).not.toHaveClass('enabled:hover:-translate-y-1');
     expect(trendline).toHaveTextContent('Community');
     expect(trendline).not.toHaveTextContent('Community game');
     expect(trendline).not.toHaveTextContent('Draw the shape of real-world data, then compare your line with history.');
-    expect(trendline).toHaveTextContent('by Igor Amidzic');
+    expect(trendline).not.toHaveTextContent('by Igor Amidzic');
     expect(screen.queryByText('Official')).not.toBeInTheDocument();
     expect(screen.queryByText(/two-thirds majority/)).not.toBeInTheDocument();
   });
 
-  it('uses content-sized cards in the game-change dialog', () => {
+  it('keeps the polished square cards in the compact ballot layout', () => {
     mocks.poll = { ...basePoll, options: ['trivia', 'typeRacer', 'trendline'] };
     renderDialogVoting();
 
     const trendline = screen.getByRole('button', { name: /Trendline/ });
-    expect(trendline).toHaveClass('h-auto!', 'min-h-0', 'p-3.5');
-    expect(trendline).not.toHaveClass('aspect-[4/3]');
+    expect(trendline).toHaveClass('h-auto!', 'min-h-0', 'aspect-square', 'p-0');
     expect(trendline.parentElement).toHaveClass('grid-cols-3', 'max-[700px]:grid-cols-1');
   });
 
@@ -360,7 +364,16 @@ describe('NextGameVoting', () => {
     };
     renderVoting(false, 'typeRacer');
 
-    expect(within(screen.getByRole('button', { name: /Type Racer/ })).getByText('1')).toHaveClass('ml-auto');
-    expect(within(screen.getByRole('button', { name: /Trivia/ })).getByText('0')).toHaveClass('ml-auto');
+    expect(within(screen.getByRole('button', { name: /Type Racer/ })).getByText('1')).toHaveClass(
+      'absolute',
+      'right-3.5',
+      'bottom-3.5'
+    );
+    expect(within(screen.getByRole('button', { name: /Trivia/ })).getByText('0')).toHaveClass(
+      'absolute',
+      'right-3.5',
+      'bottom-3.5'
+    );
+    expect(screen.getByRole('button', { name: /Type Racer/ }).lastElementChild).toHaveClass('bottom-3.5');
   });
 });

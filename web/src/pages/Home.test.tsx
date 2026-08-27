@@ -38,6 +38,21 @@ describe('Home', () => {
     expect(screen.queryByText('Choose a game')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Trivia/ })).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'A preview of a Doodle Dash drawing turn' })).toBeInTheDocument();
+    expect(screen.queryByText('ROOM F7K2P')).not.toBeInTheDocument();
+  });
+
+  it('keeps the Mini Game Mix preview inside the same aspect-ratio frame as the other games', () => {
+    vi.mocked(Math.random).mockReturnValue(0.2);
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>
+    );
+
+    const preview = screen.getByRole('region', { name: 'A preview of the Mini Game Mix challenge spinner' });
+    expect(preview.firstElementChild).toHaveClass('aspect-[1.24]', 'overflow-hidden');
+    expect(preview.querySelector('[data-mini-game-challenge-grid]')).toBeInTheDocument();
+    expect(screen.getByText('Next up')).toBeInTheDocument();
   });
 
   it('starts randomly, then fades through every game preview', () => {

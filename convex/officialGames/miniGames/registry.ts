@@ -8,8 +8,6 @@ export const MINI_GAME_IDS = [
   'orangeEmojis',
   'guessPercentage',
   'circleCenter',
-  'guessDistance',
-  'pointOnMap',
   'batteryPercentage',
 ] as const;
 
@@ -41,18 +39,6 @@ export const MINI_GAME_DEFINITIONS = [
     instructions: 'Find the true center of the broken circle and place your marker.',
   },
   {
-    id: 'guessDistance',
-    title: 'Guess the distance',
-    eyebrow: 'Route reader',
-    instructions: 'Estimate the distance between the two marked cities.',
-  },
-  {
-    id: 'pointOnMap',
-    title: 'Point on the map',
-    eyebrow: 'Pin drop',
-    instructions: 'Place a pin as close as you can to the named city.',
-  },
-  {
     id: 'batteryPercentage',
     title: 'Guess the battery',
     eyebrow: 'Charge check',
@@ -77,13 +63,11 @@ export function normalizeMiniGamesRoundCount(roundCount: number | undefined) {
   return roundCount !== undefined && isMiniGamesRoundCount(roundCount) ? roundCount : MINI_GAMES_DEFAULT_ROUND_COUNT;
 }
 
-export function chooseMiniGame(previous: MiniGameId | null, random: () => number = Math.random): MiniGameId {
+export function chooseMiniGame(previous: string | null, random: () => number = Math.random): MiniGameId {
   const available = previous === null ? MINI_GAME_IDS : MINI_GAME_IDS.filter((id) => id !== previous);
   return available[Math.min(available.length - 1, Math.floor(random() * available.length))] ?? MINI_GAME_IDS[0];
 }
 
-export function miniGameDefinition(id: MiniGameId) {
-  const definition = MINI_GAME_DEFINITIONS.find((entry) => entry.id === id);
-  if (definition === undefined) throw new Error(`Missing mini-game definition: ${id}`);
-  return definition;
+export function miniGameDefinition(id: string) {
+  return MINI_GAME_DEFINITIONS.find((entry) => entry.id === id) ?? null;
 }

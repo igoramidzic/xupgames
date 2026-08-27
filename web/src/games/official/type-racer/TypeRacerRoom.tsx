@@ -23,6 +23,7 @@ import GameModeControl, { GameModeContent } from '@/components/GameModeControl';
 import GameSurfaceTransition from '@/components/GameSurfaceTransition';
 import LobbyPlayersSidebar, { type LobbyPlayersSidebarTheme } from '@/components/LobbyPlayersSidebar';
 import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
+import RoomHeaderActions from '@/components/RoomHeaderActions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -519,28 +520,13 @@ export default function TypeRacerRoom({ guest, session }: { guest: GuestIdentity
               </Link>
             </Button>
           ) : null}
-          {session.isOwner && !isClosed ? (
-            <Button
-              variant="type-paper"
-              size="sm"
-              className="max-[760px]:w-9 max-[760px]:px-0 [&_svg]:size-3.75"
-              type="button"
-              onClick={() => setConfirmation('close')}
-            >
-              <LockKeyhole aria-hidden="true" /> <span className="max-[760px]:hidden">Close</span>
-            </Button>
-          ) : null}
-          <Button
-            variant="type-paper"
-            size="sm"
-            className="disabled:opacity-55 max-[760px]:w-9 max-[760px]:px-0 [&_svg]:size-3.75"
-            type="button"
-            onClick={() => setConfirmation('leave')}
-            disabled={actionPending !== null}
-          >
-            {actionPending === 'leave' ? <LoaderCircle className="animate-spin" /> : <DoorOpen aria-hidden="true" />}
-            <span className="max-[760px]:hidden">Leave</span>
-          </Button>
+          <RoomHeaderActions
+            isOwner={session.isOwner}
+            isClosed={isClosed}
+            pendingAction={actionPending}
+            onRequestLeave={() => setConfirmation('leave')}
+            onRequestClose={() => setConfirmation('close')}
+          />
         </div>
       </header>
 

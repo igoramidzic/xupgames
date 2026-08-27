@@ -1,12 +1,19 @@
 import type { api } from '@convex/_generated/api';
 import type { GameType as BackendGameType } from '@convex/gameRegistry';
 import type { FunctionReturnType } from 'convex/server';
-import { BrainCircuit, Dices, Keyboard, type LucideIcon, Paintbrush, TrendingUp } from 'lucide-react';
+import { BrainCircuit, Dices, Keyboard, type LucideIcon, Paintbrush, TrendingUp, WandSparkles } from 'lucide-react';
 import type { ComponentType } from 'react';
+import TrendlineCardPreview from '@/games/community/trendline/TrendlineCardPreview';
 import TrendlinePreview from '@/games/community/trendline/TrendlinePreview';
+import DoodleDashCardPreview from '@/games/official/doodle-dash/DoodleDashCardPreview';
 import DoodleDashPreview from '@/games/official/doodle-dash/DoodleDashPreview';
+import MiniGamesCardPreview from '@/games/official/mini-games/MiniGamesCardPreview';
 import MiniGamesPreview from '@/games/official/mini-games/MiniGamesPreview';
+import PromptArcadeCardPreview from '@/games/official/prompt-arcade/PromptArcadeCardPreview';
+import PromptArcadePreview from '@/games/official/prompt-arcade/PromptArcadePreview';
+import TriviaCardPreview from '@/games/official/trivia/TriviaCardPreview';
 import TriviaPreview from '@/games/official/trivia/TriviaPreview';
+import TypeRacerCardPreview from '@/games/official/type-racer/TypeRacerCardPreview';
 import TypeRacerPreview from '@/games/official/type-racer/TypeRacerPreview';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +21,7 @@ export type GameType = BackendGameType;
 export const GAME_TYPES = [
   'doodleDash',
   'miniGames',
+  'promptArcade',
   'trivia',
   'typeRacer',
   'trendline',
@@ -25,6 +33,9 @@ type GamePresentation = {
   icon: LucideIcon;
   color: string;
   tint: string;
+  modeLabel: string;
+  cardPreviewClassName: string;
+  cardPreview?: ComponentType;
   previewLabel: string;
   preview: ComponentType;
 };
@@ -34,6 +45,9 @@ const GAME_PRESENTATIONS: Record<GameType, GamePresentation> = {
     icon: Paintbrush,
     color: '#3155d9',
     tint: '#e3e9ff',
+    modeLabel: 'Draw & guess',
+    cardPreviewClassName: 'top-[54%] w-[80%]',
+    cardPreview: DoodleDashCardPreview,
     previewLabel: 'A preview of a Doodle Dash drawing turn',
     preview: DoodleDashPreview,
   },
@@ -41,13 +55,29 @@ const GAME_PRESENTATIONS: Record<GameType, GamePresentation> = {
     icon: Dices,
     color: '#e85d2a',
     tint: '#fff0b8',
+    modeLabel: 'Party mix',
+    cardPreviewClassName: 'top-[54%] w-[80%]',
+    cardPreview: MiniGamesCardPreview,
     previewLabel: 'A preview of the Mini Game Mix challenge spinner',
     preview: MiniGamesPreview,
+  },
+  promptArcade: {
+    icon: WandSparkles,
+    color: '#b52b68',
+    tint: '#ffe2ee',
+    modeLabel: 'Prompt & play',
+    cardPreviewClassName: 'top-[54%] w-[80%]',
+    cardPreview: PromptArcadeCardPreview,
+    previewLabel: 'A preview of player-made Prompt Arcade games moving through the live game factory',
+    preview: PromptArcadePreview,
   },
   trivia: {
     icon: BrainCircuit,
     color: '#6347e8',
     tint: '#e8e1ff',
+    modeLabel: 'Quick-fire trivia',
+    cardPreviewClassName: 'top-[54%] w-[80%]',
+    cardPreview: TriviaCardPreview,
     previewLabel: 'A preview of a trivia round',
     preview: TriviaPreview,
   },
@@ -55,6 +85,9 @@ const GAME_PRESENTATIONS: Record<GameType, GamePresentation> = {
     icon: Keyboard,
     color: '#ef493f',
     tint: '#ffdcd7',
+    modeLabel: 'Typing race',
+    cardPreviewClassName: 'top-[54%] w-[80%]',
+    cardPreview: TypeRacerCardPreview,
     previewLabel: 'A preview of a multiplayer type race',
     preview: TypeRacerPreview,
   },
@@ -62,6 +95,9 @@ const GAME_PRESENTATIONS: Record<GameType, GamePresentation> = {
     icon: TrendingUp,
     color: '#078b68',
     tint: '#d5f6e8',
+    modeLabel: 'Draw the data',
+    cardPreviewClassName: 'top-[54%] w-[80%]',
+    cardPreview: TrendlineCardPreview,
     previewLabel: 'A preview of drawing a real-world historical trend',
     preview: TrendlinePreview,
   },
@@ -88,9 +124,6 @@ export function GamePreview({ gameType }: { gameType: GameType }) {
       className="relative mx-auto w-[min(100%,760px)] [perspective:1200px] max-[1040px]:mb-16 max-[1040px]:w-[min(92%,700px)] max-[620px]:w-[94%]"
       aria-label={presentation.previewLabel}
     >
-      <div className="absolute -top-5.5 left-10.5 z-3 -rotate-4 bg-[rgb(49_85_217/92%)] px-7.5 pt-3.25 pb-2.75 font-display text-[13px] font-extrabold tracking-[0.12em] text-white [clip-path:polygon(7px_0,calc(100%-7px)_0,100%_7px,calc(100%-2px)_calc(100%-6px),calc(100%-7px)_100%,6px_100%,0_calc(100%-7px),2px_6px)] [filter:drop-shadow(0_8px_9px_rgb(49_85_217/22%))] max-[620px]:left-5">
-        ROOM F7K2P
-      </div>
       <Preview />
     </section>
   );

@@ -35,6 +35,12 @@ export const initializeRoomGameLifecycle = migrations.define({
           status = 'lobby';
           break;
         }
+        case 'promptArcade': {
+          // Prompt Arcade was introduced after this migration, so there is no
+          // legacy active state to recover.
+          status = 'lobby';
+          break;
+        }
         case 'trivia': {
           const state = await ctx.db
             .query('triviaGameStates')

@@ -3,6 +3,7 @@ import type { FunctionReturnType } from 'convex/server';
 import TrendlineRoom from '@/games/community/trendline/TrendlineRoom';
 import DoodleDashRoom from '@/games/official/doodle-dash/DoodleDashRoom';
 import MiniGamesRoom from '@/games/official/mini-games/MiniGamesRoom';
+import PromptArcadeRoom from '@/games/official/prompt-arcade/PromptArcadeRoom';
 import TriviaRoom from '@/games/official/trivia/TriviaRoom';
 import TypeRacerRoom from '@/games/official/type-racer/TypeRacerRoom';
 import type { GuestIdentity } from '@/lib/guest';
@@ -17,6 +18,8 @@ export default function GameRoom({ guest, session }: { guest: GuestIdentity; ses
       return <DoodleDashRoom guest={guest} session={session} />;
     case 'miniGames':
       return <MiniGamesRoom guest={guest} session={session} />;
+    case 'promptArcade':
+      return <PromptArcadeRoom guest={guest} session={session} />;
     case 'trivia':
       return <TriviaRoom guest={guest} session={session} />;
     case 'typeRacer':

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createBatteryChallenge, scoreBatteryEstimate } from './games/batteryPercentage';
 import { createCircleChallenge, scoreCircleCenter } from './games/circleCenter';
-import { createDistanceChallenge, scoreDistanceEstimate } from './games/guessDistance';
+import { scoreDistanceEstimate } from './games/guessDistance';
 import { createPercentageChallenge, scorePercentageEstimate } from './games/guessPercentage';
 import { createEmojiChallenge, scoreFindEmoji } from './games/orangeEmojis';
-import { createMapPointChallenge, scoreMapPoint } from './games/pointOnMap';
+import { scoreMapPoint } from './games/pointOnMap';
 import { createStraightLineTarget, scoreStraightLine } from './games/straightLine';
 import {
   chooseMiniGame,
@@ -19,6 +19,7 @@ describe('Mini Game Mix engine', () => {
   it('does not repeat the previous mini-game when another is available', () => {
     expect(chooseMiniGame('straightLine', () => 0)).toBe('orangeEmojis');
     expect(chooseMiniGame('orangeEmojis', () => 0)).toBe('straightLine');
+    expect(chooseMiniGame('pointOnMap', () => 0)).toBe('straightLine');
   });
 
   it('scatters five to ten copies of one target among repeatable decoys', () => {
@@ -67,8 +68,6 @@ describe('Mini Game Mix engine', () => {
       'orangeEmojis',
       'guessPercentage',
       'circleCenter',
-      'guessDistance',
-      'pointOnMap',
       'batteryPercentage',
     ]);
     const percentage = createPercentageChallenge(() => 0.42);
@@ -81,19 +80,22 @@ describe('Mini Game Mix engine', () => {
     expect(createBatteryChallenge(() => 0)).toBe(12);
   });
 
-  it('scores estimates, center clicks, and map points on the shared scale', () => {
+  it('scores estimates and center clicks on the shared scale', () => {
     expect(scorePercentageEstimate(42, 42, 2_000).score).toBeGreaterThan(scorePercentageEstimate(42, 85, 2_000).score);
     expect(scoreBatteryEstimate(42, 42, 2_000)).toEqual(scorePercentageEstimate(42, 42, 2_000));
-    expect(scoreDistanceEstimate(5_000, 5_100, 2_000).score).toBeGreaterThan(
-      scoreDistanceEstimate(5_000, 10_000, 2_000).score
-    );
     expect(scoreCircleCenter({ x: 0.4, y: 0.6 }, 0.2, { x: 0.4, y: 0.6 }, 2_000).score).toBeGreaterThan(
       scoreCircleCenter({ x: 0.4, y: 0.6 }, 0.2, { x: 0.8, y: 0.2 }, 2_000).score
     );
-    const target = createMapPointChallenge(() => 0.42);
-    expect(scoreMapPoint(target, target).score).toBe(1_000);
-    const distance = createDistanceChallenge(() => 0.42);
-    expect(distance.first.name).not.toBe(distance.second.name);
-    expect(distance.answer).toBeGreaterThan(0);
+  });
+
+  it('keeps legacy map scoring available without registering either map challenge', () => {
+    expect(MINI_GAME_IDS).not.toContain('guessDistance');
+    expect(MINI_GAME_IDS).not.toContain('pointOnMap');
+    expect(scoreDistanceEstimate(5_000, 5_100, 2_000).score).toBeGreaterThan(
+      scoreDistanceEstimate(5_000, 10_000, 2_000).score
+    );
+    expect(
+      scoreMapPoint({ latitude: 35.6762, longitude: 139.6503, x: 0.8879, y: 0.3018 }, { x: 0.8879, y: 0.3018 }).score
+    ).toBeGreaterThan(990);
   });
 });

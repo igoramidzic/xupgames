@@ -1,20 +1,9 @@
 import type { api } from '@convex/_generated/api';
 import type { FunctionReturnType } from 'convex/server';
-import { BatteryCharging, Crosshair, Route } from 'lucide-react';
-import {
-  type ComponentProps,
-  lazy,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-  Suspense,
-  useMemo,
-  useState,
-} from 'react';
+import { BatteryCharging, Crosshair } from 'lucide-react';
+import { type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const miniGameWorldMapModule = import('./MiniGameWorldMap');
-const MiniGameWorldMap = lazy(() => miniGameWorldMapModule);
 
 type GameView = FunctionReturnType<typeof api.miniGames.getGame>;
 type MiniGameRound = NonNullable<GameView['round']>;
@@ -26,26 +15,6 @@ const CHART_COLORS = {
   mint: { fill: '#63c99a', label: 'mint' },
   blue: { fill: '#5b82e8', label: 'blue' },
 } as const;
-
-function WorldMapSurface(props: ComponentProps<typeof MiniGameWorldMap>) {
-  return (
-    <Suspense
-      fallback={
-        <div
-          className={cn('grid place-items-end bg-[#dff3f5] p-3', props.className)}
-          role="status"
-          aria-label="Loading world map"
-        >
-          <span className="rounded-full border border-[#17203a]/20 bg-white/90 px-2.5 py-1 text-[9px] font-[760] text-[#53627a]">
-            Loading map…
-          </span>
-        </div>
-      }
-    >
-      <MiniGameWorldMap {...props} />
-    </Suspense>
-  );
-}
 
 function pointFromPointer(event: ReactPointerEvent<HTMLElement>): Point {
   const bounds = event.currentTarget.getBoundingClientRect();
@@ -77,18 +46,15 @@ function movePoint(point: Point, event: ReactKeyboardEvent<HTMLElement>) {
 
 function EstimateControl({
   kind,
-  unit,
   disabled,
   onSubmit,
 }: {
-  kind: 'percentage' | 'distance';
-  unit: string;
+  kind: 'percentage';
   disabled: boolean;
   onSubmit: (guess: number) => void;
 }) {
   const [guess, setGuess] = useState('');
-  const isPercentage = kind === 'percentage';
-  const maximum = isPercentage ? 100 : 25_000;
+  const maximum = 100;
   const numericGuess = guess === '' ? null : Number(guess);
   const hasValidGuess =
     numericGuess !== null && Number.isFinite(numericGuess) && numericGuess >= 0 && numericGuess <= maximum;
@@ -106,7 +72,7 @@ function EstimateControl({
           <input
             className={cn(
               'h-16 w-full rounded-lg border-2 border-[#17203a] bg-[#fffdf5] px-4 font-display font-[850] text-[#17203a] tabular-nums outline-none [appearance:textfield] focus:border-[#3155d9] focus:ring-3 focus:ring-[#3155d9]/20 [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none',
-              isPercentage ? 'min-w-33 pr-12 text-3xl' : 'min-w-0 pr-28 text-2xl'
+              'min-w-33 pr-12 text-3xl'
             )}
             type="number"
             id={`mini-game-estimate-${kind}`}
@@ -121,7 +87,7 @@ function EstimateControl({
             onChange={(event) => setGuess(event.currentTarget.value)}
           />
           <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs font-[760] tracking-normal text-[#68758b] normal-case">
-            {isPercentage ? '%' : unit}
+            %
           </span>
         </span>
       </div>
@@ -167,7 +133,7 @@ function PercentageChallenge({
             <span className="size-5 rounded-full border-2 border-[#17203a]" style={{ backgroundColor: target.fill }} />
             {target.label}
           </strong>
-          <EstimateControl kind="percentage" unit="percent" disabled={disabled} onSubmit={onSubmit} />
+          <EstimateControl kind="percentage" disabled={disabled} onSubmit={onSubmit} />
         </div>
       </div>
     </div>
@@ -197,7 +163,7 @@ function BatteryChallenge({
           </div>
         </div>
         <p className="mt-6 mb-0 font-display text-2xl font-[850] tracking-[-0.04em]">How much charge is left?</p>
-        <EstimateControl kind="percentage" unit="percent" disabled={disabled} onSubmit={onSubmit} />
+        <EstimateControl kind="percentage" disabled={disabled} onSubmit={onSubmit} />
       </div>
     </div>
   );
@@ -268,71 +234,16 @@ function CircleChallenge({
   );
 }
 
-function DistanceChallenge({
-  round,
-  disabled,
-  onSubmit,
-}: {
-  round: MiniGameRound;
-  disabled: boolean;
-  onSubmit: (guess: number) => void;
-}) {
-  const places = round.distancePlaces;
-  const mapPoints = useMemo(() => (places === null ? [] : [places.first, places.second]), [places]);
-  if (places === null) return null;
-  return (
-    <div>
-      <div className="relative aspect-[2/1] min-h-72 overflow-hidden rounded-[20px_13px_22px_15px] border-2 border-[#17203a] shadow-[5px_5px_0_#7eb6c0]">
-        <WorldMapSurface className="absolute inset-0" labeledPoints={mapPoints} showRoute />
-        <span className="absolute top-3 left-3 flex items-center gap-2 rounded-full border border-[#17203a] bg-white px-3 py-1.5 text-[10px] font-[820] tracking-[0.1em] uppercase">
-          <Route className="size-3.5 text-[#e85d2a]" /> Great-circle distance
-        </span>
-      </div>
-      <EstimateControl kind="distance" unit={places.unit} disabled={disabled} onSubmit={onSubmit} />
-    </div>
-  );
-}
-
-function MapPointChallenge({
-  round,
-  disabled,
-  onSubmit,
-}: {
-  round: MiniGameRound;
-  disabled: boolean;
-  onSubmit: (point: Point) => void;
-}) {
-  return (
-    <div>
-      <div className="mb-3 flex items-center justify-center gap-3 text-center">
-        <span className="text-[10px] font-[850] tracking-[0.14em] text-[#53627a] uppercase">Drop your pin on</span>
-        <strong className="font-display text-[clamp(28px,6vw,46px)] font-[900] tracking-[-0.055em] text-[#17203a]">
-          {round.mapTargetName}
-        </strong>
-      </div>
-      <WorldMapSurface
-        className="relative aspect-[2/1] min-h-72 touch-none overflow-hidden rounded-[20px_13px_22px_15px] border-2 border-[#17203a] shadow-[5px_5px_0_#7eb6c0] outline-none focus-visible:ring-4 focus-visible:ring-[#3155d9]/30"
-        ariaLabel={`Place a pin near ${round.mapTargetName ?? 'the named city'}`}
-        disabled={disabled}
-        onPick={onSubmit}
-      />
-      <p className="mt-3 mb-0 text-center text-xs font-[720] text-[#53627a]">Tap or click once to drop your pin.</p>
-    </div>
-  );
-}
-
 export default function MiniGameChallenge({
   round,
   disabled,
   onEstimate,
   onCirclePoint,
-  onMapPoint,
 }: {
   round: MiniGameRound;
   disabled: boolean;
   onEstimate: (guess: number) => void;
   onCirclePoint: (point: Point) => void;
-  onMapPoint: (point: Point) => void;
 }) {
   switch (round.miniGame.id) {
     case 'guessPercentage':
@@ -341,10 +252,6 @@ export default function MiniGameChallenge({
       return <BatteryChallenge round={round} disabled={disabled} onSubmit={onEstimate} />;
     case 'circleCenter':
       return <CircleChallenge round={round} disabled={disabled} onSubmit={onCirclePoint} />;
-    case 'guessDistance':
-      return <DistanceChallenge round={round} disabled={disabled} onSubmit={onEstimate} />;
-    case 'pointOnMap':
-      return <MapPointChallenge round={round} disabled={disabled} onSubmit={onMapPoint} />;
     case 'straightLine':
     case 'orangeEmojis':
       return null;

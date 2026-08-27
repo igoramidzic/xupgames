@@ -29,6 +29,7 @@
   "dependencies": {
     "@convex-dev/migrations": "^0.3.6",
     "@convex-dev/presence": "^0.4.0",
+    "acorn": "8.16.0",
     "convex": "^1.44.0",
     "convex-helpers": "^0.1.123"
   },

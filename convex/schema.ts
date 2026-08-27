@@ -38,12 +38,36 @@ const miniGameId = v.union(
   v.literal('orangeEmojis'),
   v.literal('guessPercentage'),
   v.literal('circleCenter'),
+  // Retained only so rounds and results created before the map games were retired remain valid.
   v.literal('guessDistance'),
   v.literal('pointOnMap'),
   v.literal('batteryPercentage')
 );
 const miniGameRoundStatus = v.union(v.literal('selecting'), v.literal('playing'), v.literal('results'));
 const miniGameResultStatus = v.union(v.literal('waiting'), v.literal('finished'), v.literal('timedOut'));
+const promptArcadePhase = v.union(
+  v.literal('lobby'),
+  v.literal('prompting'),
+  v.literal('generating'),
+  v.literal('countdown'),
+  v.literal('playing'),
+  v.literal('roundResults'),
+  v.literal('complete')
+);
+const promptArcadeEntryStatus = v.union(
+  v.literal('writing'),
+  v.literal('queued'),
+  v.literal('generating'),
+  v.literal('validating'),
+  v.literal('repairing'),
+  v.literal('ready'),
+  v.literal('needsRevision'),
+  v.literal('withdrawn'),
+  v.literal('played')
+);
+const promptArcadeScoringMode = v.union(v.literal('speed'), v.literal('quality'), v.literal('qualityAndSpeed'));
+const promptArcadeRoundStatus = v.union(v.literal('countdown'), v.literal('playing'), v.literal('results'));
+const promptArcadeResultStatus = v.union(v.literal('waiting'), v.literal('finished'), v.literal('timedOut'));
 const miniGameEmojiColor = v.union(
   v.literal('orange'),
   v.literal('blue'),
@@ -418,6 +442,102 @@ export default defineSchema({
     .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber'])
     .index('by_roomId_and_gameNumber_and_memberId', ['roomId', 'gameNumber', 'memberId']),
 
+  promptArcadeGameStates: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    phase: promptArcadePhase,
+    currentRoundId: v.union(v.id('promptArcadeRounds'), v.null()),
+    currentRoundNumber: v.number(),
+    playlistStarted: v.boolean(),
+    participantCount: v.number(),
+    phaseStartedAt: v.union(v.number(), v.null()),
+    phaseEndsAt: v.union(v.number(), v.null()),
+  }).index('by_roomId', ['roomId']),
+
+  promptArcadeEntries: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    memberId: v.id('roomMembers'),
+    displayName: v.string(),
+    prompt: v.union(v.string(), v.null()),
+    status: promptArcadeEntryStatus,
+    order: v.number(),
+    attempt: v.number(),
+    artifactId: v.union(v.id('promptArcadeArtifacts'), v.null()),
+    errorMessage: v.union(v.string(), v.null()),
+    submittedAt: v.union(v.number(), v.null()),
+    readyAt: v.union(v.number(), v.null()),
+    statusUpdatedAt: v.number(),
+  })
+    .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber'])
+    .index('by_roomId_and_gameNumber_and_memberId', ['roomId', 'gameNumber', 'memberId']),
+
+  promptArcadeArtifacts: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    entryId: v.id('promptArcadeEntries'),
+    memberId: v.id('roomMembers'),
+    title: v.string(),
+    interpretation: v.string(),
+    instructions: v.string(),
+    durationMs: v.number(),
+    scoringMode: promptArcadeScoringMode,
+    codeStorageId: v.id('_storage'),
+    codeSha256: v.string(),
+    model: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_entryId', ['entryId'])
+    .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber']),
+
+  promptArcadeRounds: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    roundNumber: v.number(),
+    entryId: v.id('promptArcadeEntries'),
+    artifactId: v.id('promptArcadeArtifacts'),
+    status: promptArcadeRoundStatus,
+    countdownStartedAt: v.number(),
+    playStartsAt: v.number(),
+    playEndsAt: v.number(),
+    resultsStartedAt: v.union(v.number(), v.null()),
+  })
+    .index('by_roomId_and_gameNumber_and_roundNumber', ['roomId', 'gameNumber', 'roundNumber'])
+    .index('by_artifactId', ['artifactId']),
+
+  promptArcadeResults: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    roundNumber: v.number(),
+    roundId: v.id('promptArcadeRounds'),
+    memberId: v.id('roomMembers'),
+    displayName: v.string(),
+    status: promptArcadeResultStatus,
+    startedAt: v.number(),
+    finishedAt: v.union(v.number(), v.null()),
+    elapsedMs: v.union(v.number(), v.null()),
+    quality: v.union(v.number(), v.null()),
+    score: v.number(),
+    metricLabel: v.union(v.string(), v.null()),
+    metricValue: v.union(v.number(), v.null()),
+  })
+    .index('by_roundId', ['roundId'])
+    .index('by_roundId_and_memberId', ['roundId', 'memberId'])
+    .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber'])
+    .index('by_roomId_and_gameNumber_and_memberId', ['roomId', 'gameNumber', 'memberId']),
+
+  promptArcadeScores: defineTable({
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    memberId: v.id('roomMembers'),
+    displayName: v.string(),
+    totalScore: v.number(),
+    roundsFinished: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber'])
+    .index('by_roomId_and_gameNumber_and_memberId', ['roomId', 'gameNumber', 'memberId']),
+
   typeRacerGameStates: defineTable({
     roomId: v.id('rooms'),
     raceNumber: v.number(),
@@ -487,6 +607,15 @@ export default defineSchema({
     targetWpm: v.number(),
     targetAccuracy: v.number(),
     nextReportAt: v.number(),
+  }).index('by_botId', ['botId']),
+
+  promptArcadePlaytestBotStates: defineTable({
+    botId: v.id('playtestBots'),
+    roomId: v.id('rooms'),
+    gameNumber: v.number(),
+    plannedRoundId: v.union(v.id('promptArcadeRounds'), v.null()),
+    finishAt: v.number(),
+    quality: v.number(),
   }).index('by_botId', ['botId']),
 
   playtestRuns: defineTable({

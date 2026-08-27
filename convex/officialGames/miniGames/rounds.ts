@@ -5,12 +5,10 @@ import { completeCurrentRoomGame } from '../../roomGames';
 import { listActiveRoomMembers } from '../../roomMembers';
 import { createBatteryChallenge } from './games/batteryPercentage';
 import { createCircleChallenge } from './games/circleCenter';
-import { createDistanceChallenge } from './games/guessDistance';
 import { createPercentageChallenge } from './games/guessPercentage';
 import { createEmojiChallenge } from './games/orangeEmojis';
-import { createMapPointChallenge } from './games/pointOnMap';
 import { createStraightLineTarget } from './games/straightLine';
-import { chooseMiniGame, type MiniGameId } from './registry';
+import { chooseMiniGame } from './registry';
 import { showRoundResults } from './results';
 import { MINI_GAMES_ROUND_MS, MINI_GAMES_SELECTION_MS } from './shared';
 import { insertRoundParticipant } from './state';
@@ -19,7 +17,7 @@ export async function createRound(
   ctx: MutationCtx,
   state: Doc<'miniGamesGameStates'>,
   roundNumber: number,
-  previousMiniGameId: MiniGameId | null,
+  previousMiniGameId: string | null,
   now: number
 ) {
   const miniGameId = chooseMiniGame(previousMiniGameId);
@@ -27,13 +25,11 @@ export async function createRound(
   const emojiChallenge = miniGameId === 'orangeEmojis' ? createEmojiChallenge() : null;
   const percentageChallenge = miniGameId === 'guessPercentage' ? createPercentageChallenge() : null;
   const circleChallenge = miniGameId === 'circleCenter' ? createCircleChallenge() : null;
-  const distanceChallenge = miniGameId === 'guessDistance' ? createDistanceChallenge() : null;
-  const mapTarget = miniGameId === 'pointOnMap' ? createMapPointChallenge() : null;
   const batteryPercentage = miniGameId === 'batteryPercentage' ? createBatteryChallenge() : null;
   const percentageAnswer =
     percentageChallenge?.segments.find((segment) => segment.color === percentageChallenge.targetColor)?.percentage ??
     null;
-  const numericAnswer = percentageAnswer ?? distanceChallenge?.answer ?? batteryPercentage;
+  const numericAnswer = percentageAnswer ?? batteryPercentage;
   const playStartsAt = now + MINI_GAMES_SELECTION_MS;
   const playEndsAt = playStartsAt + MINI_GAMES_ROUND_MS;
   const roundId = await ctx.db.insert('miniGamesRounds', {
@@ -67,26 +63,6 @@ export async function createRound(
           circleRadius: circleChallenge.radius,
           circleGapRotation: circleChallenge.gapRotation,
         }),
-    ...(distanceChallenge === null
-      ? {}
-      : {
-          mapFirstName: distanceChallenge.first.name,
-          mapFirstX: distanceChallenge.first.x,
-          mapFirstY: distanceChallenge.first.y,
-          mapSecondName: distanceChallenge.second.name,
-          mapSecondX: distanceChallenge.second.x,
-          mapSecondY: distanceChallenge.second.y,
-          distanceUnit: distanceChallenge.unit,
-        }),
-    ...(mapTarget === null
-      ? {}
-      : {
-          mapTargetName: mapTarget.name,
-          mapTargetLatitude: mapTarget.latitude,
-          mapTargetLongitude: mapTarget.longitude,
-          mapTargetX: mapTarget.x,
-          mapTargetY: mapTarget.y,
-        }),
     ...(numericAnswer === null ? {} : { numericAnswer }),
   });
   const round = await ctx.db.get('miniGamesRounds', roundId);
@@ -105,7 +81,7 @@ export async function createRound(
     gameNumber: state.gameNumber,
     roundNumber,
   });
-  return { round, participantCount: participants.length };
+  return { round, miniGameId, participantCount: participants.length };
 }
 
 type RoundScheduleArgs = {

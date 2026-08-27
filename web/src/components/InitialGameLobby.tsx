@@ -1,7 +1,7 @@
 import { api } from '@convex/_generated/api';
 import { useMutation } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
-import { Check, Copy, DoorOpen, LoaderCircle, LockKeyhole, Vote } from 'lucide-react';
+import { Check, Copy, DoorOpen, LockKeyhole, Vote } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -20,6 +20,7 @@ import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
 import LobbyPlayersSidebar from './LobbyPlayersSidebar';
 import NextGameVoting from './NextGameVoting';
+import RoomHeaderActions from './RoomHeaderActions';
 
 type SessionResult = FunctionReturnType<typeof api.rooms.getSession>;
 type ActiveSession = Extract<SessionResult, { kind: 'session' }>;
@@ -110,30 +111,13 @@ export default function InitialGameLobby({ guest, session }: { guest: GuestIdent
             />
             {isClosed ? 'Closed' : 'Live'}
           </span>
-          {session.isOwner && !isClosed ? (
-            <Button
-              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#bdc8d8] bg-white px-3 text-[11px] font-[760] text-[#34415b] shadow-[2px_2px_0_rgb(23_32_58/8%)] transition-transform hover:-translate-y-0.5 disabled:opacity-55 max-[760px]:w-8.5 max-[760px]:px-0 [&_svg]:size-3.75"
-              type="button"
-              onClick={() => setConfirmation('close')}
-              disabled={pendingAction !== null}
-              variant="paper"
-              size="sm"
-            >
-              {pendingAction === 'close' ? <LoaderCircle className="animate-spin" /> : <LockKeyhole />}
-              <span className="max-[760px]:hidden">Close room</span>
-            </Button>
-          ) : null}
-          <Button
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#bdc8d8] bg-white px-3 text-[11px] font-[760] text-[#34415b] shadow-[2px_2px_0_rgb(23_32_58/8%)] transition-transform hover:-translate-y-0.5 disabled:opacity-55 max-[760px]:w-8.5 max-[760px]:px-0 [&_svg]:size-3.75"
-            type="button"
-            onClick={() => setConfirmation('leave')}
-            disabled={pendingAction !== null}
-            variant="paper"
-            size="sm"
-          >
-            {pendingAction === 'leave' ? <LoaderCircle className="animate-spin" /> : <DoorOpen />}
-            <span className="max-[760px]:hidden">Leave</span>
-          </Button>
+          <RoomHeaderActions
+            isOwner={session.isOwner}
+            isClosed={isClosed}
+            pendingAction={pendingAction}
+            onRequestLeave={() => setConfirmation('leave')}
+            onRequestClose={() => setConfirmation('close')}
+          />
         </div>
       </header>
 

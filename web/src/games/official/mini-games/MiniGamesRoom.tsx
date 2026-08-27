@@ -1,7 +1,7 @@
 import { api } from '@convex/_generated/api';
 import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
-import { Check, Copy, Dices, DoorOpen, LoaderCircle, LockKeyhole, Play, Trophy } from 'lucide-react';
+import { Check, Copy, Dices, LoaderCircle, Play, Trophy } from 'lucide-react';
 import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -16,6 +16,7 @@ import GameModeControl, { GameModeContent } from '@/components/GameModeControl';
 import GameSurfaceTransition from '@/components/GameSurfaceTransition';
 import LobbyPlayersSidebar from '@/components/LobbyPlayersSidebar';
 import PostGameBoard, { PostGamePodium } from '@/components/PostGameBoard';
+import RoomHeaderActions from '@/components/RoomHeaderActions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,8 +70,6 @@ const MINI_GAME_GLYPHS: Record<MiniGameRound['miniGame']['id'], string> = {
   orangeEmojis: '🍊',
   guessPercentage: '◔',
   circleCenter: '◎',
-  guessDistance: '↔️',
-  pointOnMap: '📍',
   batteryPercentage: '🔋',
 };
 const MINI_GAME_CARD_COLORS = ['bg-[#bde8ff]', 'bg-[#fff0b8]', 'bg-[#eadfff]', 'bg-[#d9f7ca]', 'bg-[#ffdcd7]'] as const;
@@ -101,9 +100,7 @@ function resultDetail(result: GameView['roundResults'][number], round: MiniGameR
   if (miniGameId === 'guessPercentage' || miniGameId === 'batteryPercentage')
     return `${result.numericGuess ?? 0}% guess · ${result.metric ?? 0} points off`;
   if (miniGameId === 'circleCenter') return `${result.metric ?? 0}% of a radius from center`;
-  if (miniGameId === 'guessDistance')
-    return `${Math.round(result.numericGuess ?? 0).toLocaleString()} ${round.distancePlaces?.unit ?? ''} · ${result.metric ?? 0}% off`;
-  return `${Math.round(result.metric ?? 0).toLocaleString()} km away`;
+  return formatTime(result.timeMs);
 }
 
 function CountdownCircle({ remainingMs, totalMs, label }: { remainingMs: number; totalMs: number; label: string }) {
@@ -567,7 +564,6 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
   const submitOrangeEmojis = useMutation(api.miniGames.submitOrangeEmojis);
   const submitEstimate = useMutation(api.miniGames.submitEstimate);
   const submitCircleCenter = useMutation(api.miniGames.submitCircleCenter);
-  const submitMapPoint = useMutation(api.miniGames.submitMapPoint);
   const leaveRoom = useMutation(api.rooms.leave);
   const closeRoom = useMutation(api.rooms.close);
   const { onlineByMemberId } = useRoomPresence({ roomId: session.roomId, sessionToken: guest.sessionToken });
@@ -576,7 +572,7 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
   const [copied, setCopied] = useState(false);
   const [gameModeOpen, setGameModeOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<'leave' | 'close' | null>(null);
-  const [actionPending, setActionPending] = useState(false);
+  const [actionPending, setActionPending] = useState<'leave' | 'close' | null>(null);
   const isClosed = session.status === 'closed';
   const now = useClock(game?.phase === 'selecting' || game?.phase === 'playing' || game?.phase === 'roundResults');
   const members = getRoomMembers(session);
@@ -646,20 +642,11 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
     }
   }
 
-  async function submitMapPin(point: MiniGamePoint) {
-    setNotice(null);
-    try {
-      await submitMapPoint({ roomId: session.roomId, sessionToken: guest.sessionToken, point });
-    } catch (error) {
-      setNotice(userFacingError(error, 'Your map pin could not be scored.'));
-    }
-  }
-
   async function confirmAction() {
     const action = confirmation;
     setConfirmation(null);
     if (action === null) return;
-    setActionPending(true);
+    setActionPending(action);
     try {
       if (action === 'close') {
         await closeRoom({ code: session.code, sessionToken: guest.sessionToken });
@@ -673,7 +660,7 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
         userFacingError(error, action === 'close' ? 'The room could not be closed.' : 'The room could not be left.')
       );
     } finally {
-      setActionPending(false);
+      setActionPending(null);
     }
   }
 
@@ -728,27 +715,13 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
             onOpen={() => setGameModeOpen(true)}
             buttonVariant="type-paper"
           />
-          {session.isOwner && !isClosed ? (
-            <Button
-              variant="type-paper"
-              size="sm"
-              className="max-[760px]:w-9 max-[760px]:px-0"
-              onClick={() => setConfirmation('close')}
-            >
-              <LockKeyhole />
-              <span className="max-[760px]:hidden">Close</span>
-            </Button>
-          ) : null}
-          <Button
-            variant="type-paper"
-            size="sm"
-            className="max-[760px]:w-9 max-[760px]:px-0"
-            onClick={() => setConfirmation('leave')}
-            disabled={actionPending}
-          >
-            <DoorOpen />
-            <span className="max-[760px]:hidden">Leave</span>
-          </Button>
+          <RoomHeaderActions
+            isOwner={session.isOwner}
+            isClosed={isClosed}
+            pendingAction={actionPending}
+            onRequestLeave={() => setConfirmation('leave')}
+            onRequestClose={() => setConfirmation('close')}
+          />
         </div>
       </header>
 
@@ -951,7 +924,6 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
                           disabled={currentFinished || isClosed}
                           onEstimate={(guess) => void submitNumericEstimate(guess)}
                           onCirclePoint={(point) => void submitCirclePoint(point)}
-                          onMapPoint={(point) => void submitMapPin(point)}
                         />
                       )}
                       {currentFinished ? (

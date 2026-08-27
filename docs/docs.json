@@ -23,7 +23,7 @@
           },
           {
             "group": "Building Games",
-            "pages": ["games/architecture", "games/create-a-game"]
+            "pages": ["games/architecture", "games/create-a-game", "games/prompt-arcade"]
           }
         ]
       }

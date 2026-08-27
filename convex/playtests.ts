@@ -5,7 +5,13 @@ import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, type MutationCtx, mutation, query } from './_generated/server';
 import { fail, MAX_PLAYERS, normalizeRoomCode, validateSessionToken } from './domain';
 import { gameTypeValidator } from './games';
-import { initializeGameBot, runGameBotTick, stopGameBot } from './playtestAdapters';
+import {
+  getGamePlaytestBotTargetLimit,
+  getGamePlaytestStartBlocker,
+  initializeGameBot,
+  runGameBotTick,
+  stopGameBot,
+} from './playtestAdapters';
 import {
   beginStoppingPlaytest,
   DISCONNECTED_HUMAN_GRACE_MS,
@@ -180,15 +186,20 @@ export const start = mutation({
     if (room.gameType === undefined) {
       fail('GAME_NOT_SELECTED', 'Finish the first game vote before starting a playtest.');
     }
+    const targetLimit = getGamePlaytestBotTargetLimit(room.gameType, room.maxPlayers);
+    if (targetLimit === null)
+      fail('PLAYTEST_UNSUPPORTED', 'This game does not have an automated playtest adapter yet.');
+    const startBlocker = await getGamePlaytestStartBlocker(ctx, room);
+    if (startBlocker !== null) fail('PLAYTEST_UNSUPPORTED', startBlocker);
     if (await currentRoomGameIsComplete(ctx, room)) {
       fail('ROOM_GAME_NOT_COMPLETE', 'Choose the next game before starting a playtest.');
     }
     if (
       !Number.isInteger(args.targetActiveMemberCount) ||
       args.targetActiveMemberCount < 2 ||
-      args.targetActiveMemberCount > room.maxPlayers
+      args.targetActiveMemberCount > targetLimit
     ) {
-      fail('INVALID_PLAYTEST_TARGET', `Choose a room size between 2 and ${room.maxPlayers}.`);
+      fail('INVALID_PLAYTEST_TARGET', `Choose a room size between 2 and ${targetLimit}.`);
     }
     const existingRun = await ctx.db
       .query('playtestRuns')

@@ -88,8 +88,6 @@ const baseGame = {
     },
     { id: 'guessPercentage', title: 'Guess the percentage', eyebrow: 'Slice sense', instructions: 'Estimate it.' },
     { id: 'circleCenter', title: 'Click the circle center', eyebrow: 'Bullseye', instructions: 'Find it.' },
-    { id: 'guessDistance', title: 'Guess the distance', eyebrow: 'Route reader', instructions: 'Estimate it.' },
-    { id: 'pointOnMap', title: 'Point on the map', eyebrow: 'Pin drop', instructions: 'Place it.' },
     { id: 'batteryPercentage', title: 'Guess the battery', eyebrow: 'Charge check', instructions: 'Estimate it.' },
   ],
   round: null,
@@ -128,7 +126,7 @@ describe('MiniGamesRoom', () => {
       screen.getByRole('button', { name: 'Configure' })
     );
     expect(screen.getByRole('region', { name: 'Mini Game Mix game configuration' })).toHaveTextContent(
-      '7 challenges in rotation'
+      '5 challenges in rotation'
     );
   });
 
@@ -419,143 +417,6 @@ describe('MiniGamesRoom', () => {
       roomId: 'room-1',
       sessionToken: guest.sessionToken,
       guess: 42,
-    });
-  });
-
-  it('starts the distance estimate empty and submits the entered distance', async () => {
-    const user = userEvent.setup();
-    mocks.game = {
-      ...baseGame,
-      gameNumber: 1,
-      phase: 'playing',
-      phaseStartedAt: Date.now(),
-      phaseEndsAt: Date.now() + 10_000,
-      currentRoundNumber: 1,
-      participantCount: 1,
-      round: {
-        roundId: 'round-distance',
-        roundNumber: 1,
-        miniGame: baseGame.miniGames[4],
-        selectionStartedAt: Date.now() - 3_200,
-        playStartsAt: Date.now(),
-        playEndsAt: Date.now() + 10_000,
-        lineTarget: null,
-        emojiItems: [],
-        targetEmoji: null,
-        targetCount: 0,
-        percentageTargetColor: null,
-        percentageSegments: [],
-        batteryPercentage: null,
-        circleTarget: null,
-        distancePlaces: {
-          first: { name: 'London', x: 0.5, y: 0.21 },
-          second: { name: 'New York City', x: 0.29, y: 0.27 },
-          unit: 'kilometers',
-        },
-        mapTargetName: null,
-        mapAnswerPoint: null,
-        numericAnswer: null,
-      },
-      currentResult: {
-        memberId: 'member-1',
-        displayName: 'Igor',
-        status: 'waiting',
-        score: 0,
-        timeMs: null,
-        straightness: null,
-        correctClicks: 0,
-        wrongClicks: 0,
-        metric: null,
-        numericGuess: null,
-        isCurrentPlayer: true,
-        isActive: true,
-      },
-    };
-    const view = render(
-      <MemoryRouter>
-        <MiniGamesRoom guest={guest} session={session as never} />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => expect(view.container.querySelectorAll('[data-map-route-segment] polyline')).toHaveLength(2));
-    const estimate = screen.getByLabelText('Your estimate');
-    expect(estimate).toHaveValue(null);
-    expect(screen.getByRole('button', { name: 'Lock it in' })).toBeDisabled();
-    fireEvent.change(estimate, { target: { value: '5570' } });
-    await user.click(screen.getByRole('button', { name: 'Lock it in' }));
-    expect(mocks.mutation).toHaveBeenCalledWith({
-      roomId: 'room-1',
-      sessionToken: guest.sessionToken,
-      guess: 5_570,
-    });
-  });
-
-  it('submits direct pointer placement for the point-on-map challenge', async () => {
-    mocks.game = {
-      ...baseGame,
-      gameNumber: 1,
-      phase: 'playing',
-      phaseStartedAt: Date.now(),
-      phaseEndsAt: Date.now() + 10_000,
-      currentRoundNumber: 1,
-      participantCount: 1,
-      round: {
-        roundId: 'round-map',
-        roundNumber: 1,
-        miniGame: baseGame.miniGames[5],
-        selectionStartedAt: Date.now() - 3_200,
-        playStartsAt: Date.now(),
-        playEndsAt: Date.now() + 10_000,
-        lineTarget: null,
-        emojiItems: [],
-        targetEmoji: null,
-        targetCount: 0,
-        percentageTargetColor: null,
-        percentageSegments: [],
-        batteryPercentage: null,
-        circleTarget: null,
-        distancePlaces: null,
-        mapTargetName: 'Tokyo',
-        mapAnswerPoint: null,
-        numericAnswer: null,
-      },
-      currentResult: {
-        memberId: 'member-1',
-        displayName: 'Igor',
-        status: 'waiting',
-        score: 0,
-        timeMs: null,
-        straightness: null,
-        correctClicks: 0,
-        wrongClicks: 0,
-        metric: null,
-        numericGuess: null,
-        isCurrentPlayer: true,
-        isActive: true,
-      },
-    };
-    render(
-      <MemoryRouter>
-        <MiniGamesRoom guest={guest} session={session as never} />
-      </MemoryRouter>
-    );
-    const map = await screen.findByRole('button', { name: 'Place a pin near Tokyo' });
-    vi.spyOn(map, 'getBoundingClientRect').mockReturnValue({
-      x: 0,
-      y: 0,
-      top: 0,
-      left: 0,
-      right: 1_000,
-      bottom: 500,
-      width: 1_000,
-      height: 500,
-      toJSON: () => ({}),
-    });
-    fireEvent.pointerDown(map, { clientX: 600, clientY: 250 });
-    expect(mocks.mutation).toHaveBeenCalledWith({
-      roomId: 'room-1',
-      sessionToken: guest.sessionToken,
-      point: { x: 0.6, y: 0.5 },
     });
   });
 });
