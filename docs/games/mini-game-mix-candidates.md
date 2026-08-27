@@ -1,4 +1,4 @@
-# Mini Game Mix: replacement game ideas
+# Mini Game Mix: map replacements
 
 ## Current change
 
@@ -7,7 +7,7 @@ The two map-based challenges have been removed from the playable rotation:
 - **Guess the distance**
 - **Point on the map**
 
-That leaves five live challenges: Draw a straight line, Find this emoji, Guess the percentage, Click the circle center, and Guess the battery.
+All eight replacements described below are now implemented. Together with Draw a straight line, Find this emoji, Guess the percentage, Click the circle center, and Guess the battery, the live rotation now contains 13 challenges.
 
 The old map identifiers, fields, and submission scoring paths remain only so previously stored or already-running rounds stay valid during rollout. They are not eligible for new rounds, and the map renderer, city catalog, and browser dependency are gone.
 
@@ -22,7 +22,7 @@ Mini Game Mix has a 3.2-second reveal, 10 seconds of play, and a 4-second result
 
 The ideas below borrow those broad interaction patterns, not their names, characters, art, or exact rules.
 
-## Strongest next five
+## Implemented additions
 
 ### 1. Flashback Tiles
 
@@ -84,8 +84,6 @@ A colorful object appears in the center with four silhouettes around it. The obj
 
 **Design note:** Generate a curated set of unmistakable silhouettes; fully random geometry will create ambiguous answers.
 
-## More good candidates
-
 ### 6. Flag Frenzy
 
 **Command:** “Match the signal.”
@@ -120,12 +118,17 @@ The stage waits for a randomly timed visual change. Players tap as soon as it ap
 
 **Scoring:** Use broad timing bands rather than exact millisecond rankings, discard a player's worst valid attempt, and heavily penalize early taps.
 
-**Design note:** This should come after the other ideas. Display latency, input hardware, network delivery, and browser scheduling all affect measured reaction time, so an exact cross-device leaderboard would feel more authoritative than it really is.
+**Design note:** Display latency, input hardware, network delivery, and browser scheduling all affect measured reaction time, so scoring uses broad response bands and the median rather than presenting an exact cross-device leaderboard as authoritative.
 
-## Suggested implementation order
+## Implementation notes
 
-Implement **Flashback Tiles**, **Copycat Sequence**, **Crowd Count**, **Drop Zone**, and **Shadow Match** first. Together they add memory, counting, timing, and shape recognition without duplicating the five games already live.
+Each challenge ships as a complete Mini Game Mix slice:
 
-Flag Frenzy is a strong sixth game. Brake Check needs careful authoritative animation, and Signal Snap should remain last until its latency behavior is playtested on mixed phones and computers.
+- The server generates a bounded, discriminated challenge payload for the shared round.
+- One validated, discriminated submission mutation routes the answer to the matching scorer and rejects wrong-game, malformed, duplicate, or late submissions.
+- Scores and bounded result details are computed on the server; clients never submit a score.
+- The web room renders one large, tactile interaction surface with touch, mouse, and keyboard-operable controls.
+- Motion-driven games use the shared round start, and Crowd Count supplies a reduced-motion presentation.
+- Focused engine tests cover generation bounds and correct-versus-wrong scoring for every addition. UI tests smoke-test all eight apparatuses and exercise representative submissions.
 
-For every addition, keep the existing contract: server-generated challenge data, server-authoritative scoring, one shared round start, normalized inputs, keyboard support, reduced-motion behavior, and focused wrong-game and duplicate-submission tests.
+The existing rollout-compatibility boundary remains intact: retired map IDs and old stored fields still validate, but neither map challenge can be selected for a new round and no map UI or browser mapping dependency is present.

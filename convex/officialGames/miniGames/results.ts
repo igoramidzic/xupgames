@@ -47,6 +47,8 @@ export async function recordResult(
   fields: Pick<Doc<'miniGamesResults'>, 'score' | 'straightness' | 'correctClicks' | 'wrongClicks'> & {
     metric?: number;
     numericGuess?: number;
+    challengeResult?: Doc<'miniGamesResults'>['challengeResult'];
+    submission?: Doc<'miniGamesResults'>['submission'];
   },
   now: number
 ) {

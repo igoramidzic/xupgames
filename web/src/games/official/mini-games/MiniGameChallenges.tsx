@@ -1,7 +1,13 @@
 import type { api } from '@convex/_generated/api';
 import type { FunctionReturnType } from 'convex/server';
 import { BatteryCharging, Crosshair } from 'lucide-react';
-import { type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useState } from 'react';
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -47,17 +53,23 @@ function movePoint(point: Point, event: ReactKeyboardEvent<HTMLElement>) {
 function EstimateControl({
   kind,
   disabled,
+  focusOnMount = false,
   onSubmit,
 }: {
   kind: 'percentage';
   disabled: boolean;
+  focusOnMount?: boolean;
   onSubmit: (guess: number) => void;
 }) {
   const [guess, setGuess] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
   const maximum = 100;
   const numericGuess = guess === '' ? null : Number(guess);
   const hasValidGuess =
     numericGuess !== null && Number.isFinite(numericGuess) && numericGuess >= 0 && numericGuess <= maximum;
+  useEffect(() => {
+    if (focusOnMount && !disabled) inputRef.current?.focus();
+  }, [disabled, focusOnMount]);
   return (
     <form
       className="mx-auto mt-5 grid w-full max-w-xl grid-cols-[minmax(132px,1fr)_auto] items-end gap-3 rounded-[18px_12px_20px_14px] border-2 border-[#17203a] bg-white p-4 shadow-[5px_5px_0_#b8c8e5] max-[520px]:grid-cols-1"
@@ -70,6 +82,7 @@ function EstimateControl({
         <label htmlFor={`mini-game-estimate-${kind}`}>Your estimate</label>
         <span className="relative block">
           <input
+            ref={inputRef}
             className={cn(
               'h-16 w-full rounded-lg border-2 border-[#17203a] bg-[#fffdf5] px-4 font-display font-[850] text-[#17203a] tabular-nums outline-none [appearance:textfield] focus:border-[#3155d9] focus:ring-3 focus:ring-[#3155d9]/20 [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none',
               'min-w-33 pr-12 text-3xl'
@@ -133,7 +146,7 @@ function PercentageChallenge({
             <span className="size-5 rounded-full border-2 border-[#17203a]" style={{ backgroundColor: target.fill }} />
             {target.label}
           </strong>
-          <EstimateControl kind="percentage" disabled={disabled} onSubmit={onSubmit} />
+          <EstimateControl kind="percentage" disabled={disabled} focusOnMount onSubmit={onSubmit} />
         </div>
       </div>
     </div>

@@ -58,6 +58,7 @@ export async function submitEstimateHandler(
       wrongClicks: 0,
       metric: scored.error,
       numericGuess: args.guess,
+      submission: { kind: 'numericEstimate', guess: args.guess },
     },
     now
   );

@@ -14,7 +14,7 @@ import {
   Trophy,
   UsersRound,
 } from 'lucide-react';
-import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GameModeControl, { GameModeContent } from '@/components/GameModeControl';
 import GameSurfaceTransition from '@/components/GameSurfaceTransition';
@@ -697,21 +697,6 @@ function ActiveBoard({
             </div>
           ) : null}
         </div>
-        {game.phase === 'reveal' ? (
-          <section
-            className="rounded-[16px_9px_18px_11px] border-2 border-[#142747] bg-[#f4cd54] px-6 py-5 text-center shadow-[6px_6px_0_#142747] motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:fade-in"
-            aria-label="Revealed word"
-            data-slot="doodle-dash-reveal-card"
-          >
-            <p className="mb-1 text-[9px] font-[900] tracking-[0.15em] text-[#8d493d] uppercase">The word was</p>
-            <strong className="font-display text-[clamp(34px,6vw,68px)] leading-none tracking-[-0.05em]">
-              {round.word}
-            </strong>
-            <p className="mt-2 mb-0 text-xs font-[760] text-[#625126]">
-              {round.correctGuessCount} of {round.eligibleGuesserCount} guessed it
-            </p>
-          </section>
-        ) : null}
       </div>
       <GuessPanel
         game={game}
@@ -815,13 +800,14 @@ function GuessPanel({
   onGuessChange: (guess: string) => void;
   onGuess: (event: FormEvent) => void;
 }) {
-  const endRef = useRef<HTMLDivElement>(null);
+  const messageLogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const round = game.round;
   const messageCount = round?.messages.length ?? 0;
-  useEffect(() => {
+  useLayoutEffect(() => {
     void messageCount;
-    endRef.current?.scrollIntoView?.({ block: 'nearest' });
+    const messageLog = messageLogRef.current;
+    if (messageLog !== null) messageLog.scrollTop = messageLog.scrollHeight;
   }, [messageCount]);
   useEffect(() => {
     function handleWindowKeyDown(event: KeyboardEvent) {
@@ -885,6 +871,7 @@ function GuessPanel({
         <MessageCircle className="size-5 text-[#3155d9]" />
       </div>
       <div
+        ref={messageLogRef}
         className="min-h-30 flex-1 overflow-y-auto px-3 py-3 [overscroll-behavior:contain]"
         role="log"
         aria-label="Room guesses"
@@ -921,7 +908,6 @@ function GuessPanel({
             </div>
           ))}
         </div>
-        <div ref={endRef} />
       </div>
       <form className="border-t border-[#e4d9ca] bg-[#f8f3eb] p-3" onSubmit={onGuess}>
         {feedback ? (

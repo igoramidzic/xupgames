@@ -1,5 +1,6 @@
 import { v } from 'convex/values';
 import { internalMutation, mutation, query } from './_generated/server';
+import { submitChallengeHandler } from './officialGames/miniGames/challengeSubmissions';
 import { configureGameHandler, startGameHandler } from './officialGames/miniGames/game';
 import { submitCircleCenterHandler } from './officialGames/miniGames/games/circleCenter/submission';
 import { submitOrangeEmojisHandler } from './officialGames/miniGames/games/orangeEmojis/submission';
@@ -8,7 +9,12 @@ import { submitMapPointHandler } from './officialGames/miniGames/games/pointOnMa
 import { submitStraightLineHandler } from './officialGames/miniGames/games/straightLine/submission';
 import { advanceRoundHandler, beginRoundHandler, finalizeRoundHandler } from './officialGames/miniGames/rounds';
 import { submitEstimateHandler } from './officialGames/miniGames/submissions';
-import { gameViewValidator, miniGameIdValidator, pointValidator } from './officialGames/miniGames/validators';
+import {
+  challengeSubmissionValidator,
+  gameViewValidator,
+  miniGameIdValidator,
+  pointValidator,
+} from './officialGames/miniGames/validators';
 import { getGameHandler } from './officialGames/miniGames/view';
 
 export const getGame = query({
@@ -55,6 +61,12 @@ export const submitCircleCenter = mutation({
   args: { roomId: v.id('rooms'), sessionToken: v.string(), point: pointValidator },
   returns: v.object({ score: v.number(), error: v.number(), timeMs: v.number() }),
   handler: submitCircleCenterHandler,
+});
+
+export const submitChallenge = mutation({
+  args: { roomId: v.id('rooms'), sessionToken: v.string(), submission: challengeSubmissionValidator },
+  returns: v.object({ score: v.number(), timeMs: v.number() }),
+  handler: submitChallengeHandler,
 });
 
 export const submitMapPoint = mutation({

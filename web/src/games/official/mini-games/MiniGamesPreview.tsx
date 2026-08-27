@@ -1,4 +1,4 @@
-import { BatteryCharging, PencilLine, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 export default function MiniGamesPreview() {
   return (
@@ -15,7 +15,7 @@ export default function MiniGamesPreview() {
       <div className="relative z-1 flex items-start justify-between gap-4">
         <div>
           <p className="mb-1 text-[clamp(8px,1.2vw,11px)] font-[850] tracking-[0.15em] text-[#e85d2a] uppercase">
-            Round 3 of 5
+            Round 3 of 10
           </p>
           <h3 className="m-0 font-display text-[clamp(25px,5vw,48px)] leading-none font-[880] tracking-[-0.055em]">
             What’s next?
@@ -32,8 +32,8 @@ export default function MiniGamesPreview() {
         aria-hidden="true"
       >
         <span className="grid aspect-[0.82] min-w-0 -rotate-2 place-content-center rounded-[18px_11px_20px_13px] border-2 border-[#17203a] bg-[#bde8ff] p-2 text-center shadow-[clamp(3px,0.8vw,6px)_clamp(3px,0.8vw,6px)_0_#17203a]">
-          <PencilLine className="mx-auto mb-[clamp(5px,1.2vw,10px)] size-[clamp(20px,4vw,38px)] text-[#3155d9]" />
-          <strong className="text-[clamp(8px,1.7vw,15px)] leading-tight">Straight line</strong>
+          <span className="mb-[clamp(5px,1.2vw,10px)] text-[clamp(20px,4vw,38px)] text-[#3155d9]">▦</span>
+          <strong className="text-[clamp(8px,1.7vw,15px)] leading-tight">Flashback tiles</strong>
         </span>
 
         <span className="relative grid aspect-[0.82] min-w-0 rotate-1 place-content-center rounded-[14px_21px_16px_23px] border-2 border-[#17203a] bg-[#fff0b8] p-2 text-center shadow-[clamp(4px,1vw,8px)_clamp(4px,1vw,8px)_0_#17203a]">
@@ -41,14 +41,14 @@ export default function MiniGamesPreview() {
             Next up
           </span>
           <span className="mb-[clamp(4px,1vw,9px)] text-[clamp(18px,4.5vw,39px)] leading-none whitespace-nowrap">
-            🍊🫐🍊
+            📦
           </span>
-          <strong className="text-[clamp(9px,1.9vw,17px)] leading-tight">Find this emoji</strong>
+          <strong className="text-[clamp(9px,1.9vw,17px)] leading-tight">Drop Zone</strong>
         </span>
 
         <span className="grid aspect-[0.82] min-w-0 -rotate-1 place-content-center rounded-[20px_12px_22px_14px] border-2 border-[#17203a] bg-[#d9f7ca] p-2 text-center shadow-[clamp(3px,0.8vw,6px)_clamp(3px,0.8vw,6px)_0_#17203a]">
-          <BatteryCharging className="mx-auto mb-[clamp(5px,1.2vw,10px)] size-[clamp(20px,4vw,38px)] text-[#16815f]" />
-          <strong className="text-[clamp(8px,1.7vw,15px)] leading-tight">Guess the battery</strong>
+          <span className="mb-[clamp(5px,1.2vw,10px)] text-[clamp(20px,4vw,38px)] text-[#16815f]">⚡</span>
+          <strong className="text-[clamp(8px,1.7vw,15px)] leading-tight">Signal Snap</strong>
         </span>
       </div>
     </div>

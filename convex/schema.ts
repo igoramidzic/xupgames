@@ -41,7 +41,15 @@ const miniGameId = v.union(
   // Retained only so rounds and results created before the map games were retired remain valid.
   v.literal('guessDistance'),
   v.literal('pointOnMap'),
-  v.literal('batteryPercentage')
+  v.literal('batteryPercentage'),
+  v.literal('flashbackTiles'),
+  v.literal('copycatSequence'),
+  v.literal('crowdCount'),
+  v.literal('dropZone'),
+  v.literal('shadowMatch'),
+  v.literal('flagFrenzy'),
+  v.literal('brakeCheck'),
+  v.literal('signalSnap')
 );
 const miniGameRoundStatus = v.union(v.literal('selecting'), v.literal('playing'), v.literal('results'));
 const miniGameResultStatus = v.union(v.literal('waiting'), v.literal('finished'), v.literal('timedOut'));
@@ -77,6 +85,67 @@ const miniGameEmojiColor = v.union(
 );
 const miniGamePercentageColor = v.union(v.literal('coral'), v.literal('gold'), v.literal('mint'), v.literal('blue'));
 const miniGameDistanceUnit = v.union(v.literal('kilometers'), v.literal('miles'));
+const miniGameChallengePayload = v.union(
+  v.object({
+    kind: v.literal('flashbackTiles'),
+    gridSize: v.number(),
+    targetTileIds: v.array(v.number()),
+    revealDurationMs: v.number(),
+  }),
+  v.object({ kind: v.literal('copycatSequence'), sequence: v.array(v.number()), playbackStepMs: v.number() }),
+  v.object({
+    kind: v.literal('crowdCount'),
+    characters: v.array(
+      v.object({
+        id: v.string(),
+        lane: v.number(),
+        delayMs: v.number(),
+        durationMs: v.number(),
+        direction: v.number(),
+        symbol: v.string(),
+      })
+    ),
+    answerOptions: v.array(v.number()),
+  }),
+  v.object({
+    kind: v.literal('dropZone'),
+    targetCenter: v.number(),
+    targetWidth: v.number(),
+    cycleDurationsMs: v.array(v.number()),
+  }),
+  v.object({
+    kind: v.literal('shadowMatch'),
+    cards: v.array(v.object({ targetShape: v.string(), options: v.array(v.string()) })),
+  }),
+  v.object({ kind: v.literal('flagFrenzy'), signals: v.array(v.number()), signalDurationMs: v.number() }),
+  v.object({ kind: v.literal('brakeCheck'), targets: v.array(v.number()), fillDurationMs: v.number() }),
+  v.object({ kind: v.literal('signalSnap'), cueOffsetsMs: v.array(v.number()) })
+);
+const miniGameChallengeResult = v.union(
+  v.object({ kind: v.literal('flashbackTiles'), correct: v.number(), wrong: v.number(), missed: v.number() }),
+  v.object({ kind: v.literal('copycatSequence'), correctPrefix: v.number(), sequenceLength: v.number() }),
+  v.object({ kind: v.literal('crowdCount'), guess: v.number(), error: v.number() }),
+  v.object({ kind: v.literal('dropZone'), averageError: v.number(), perfectDrops: v.number() }),
+  v.object({ kind: v.literal('shadowMatch'), correct: v.number(), wrong: v.number() }),
+  v.object({ kind: v.literal('flagFrenzy'), correct: v.number(), wrong: v.number(), bestStreak: v.number() }),
+  v.object({ kind: v.literal('brakeCheck'), bestError: v.number(), overshoots: v.number() }),
+  v.object({ kind: v.literal('signalSnap'), medianMs: v.union(v.number(), v.null()), falseStarts: v.number() })
+);
+const miniGameResultSubmission = v.union(
+  v.object({ kind: v.literal('straightLine'), points: v.array(v.object({ x: v.number(), y: v.number() })) }),
+  v.object({ kind: v.literal('orangeEmojis'), clickedIds: v.array(v.string()) }),
+  v.object({ kind: v.literal('numericEstimate'), guess: v.number() }),
+  v.object({ kind: v.literal('circleCenter'), point: v.object({ x: v.number(), y: v.number() }) }),
+  v.object({ kind: v.literal('mapPoint'), point: v.object({ x: v.number(), y: v.number() }) }),
+  v.object({ kind: v.literal('flashbackTiles'), selectedTileIds: v.array(v.number()) }),
+  v.object({ kind: v.literal('copycatSequence'), padIds: v.array(v.number()) }),
+  v.object({ kind: v.literal('crowdCount'), guess: v.number() }),
+  v.object({ kind: v.literal('dropZone'), releasePositions: v.array(v.number()) }),
+  v.object({ kind: v.literal('shadowMatch'), selectedOptionIndices: v.array(v.number()) }),
+  v.object({ kind: v.literal('flagFrenzy'), pressedPads: v.array(v.number()) }),
+  v.object({ kind: v.literal('brakeCheck'), releaseValues: v.array(v.number()) }),
+  v.object({ kind: v.literal('signalSnap'), responseOffsetsMs: v.array(v.number()) })
+);
 const playtestStatus = v.union(
   v.literal('provisioning'),
   v.literal('running'),
@@ -414,6 +483,7 @@ export default defineSchema({
     mapTargetY: v.optional(v.number()),
     distanceUnit: v.optional(miniGameDistanceUnit),
     numericAnswer: v.optional(v.number()),
+    challengePayload: v.optional(miniGameChallengePayload),
   })
     .index('by_roomId_and_gameNumber_and_roundNumber', ['roomId', 'gameNumber', 'roundNumber'])
     .index('by_roomId_and_gameNumber', ['roomId', 'gameNumber']),
@@ -436,6 +506,8 @@ export default defineSchema({
     wrongClicks: v.number(),
     metric: v.optional(v.number()),
     numericGuess: v.optional(v.number()),
+    challengeResult: v.optional(miniGameChallengeResult),
+    submission: v.optional(miniGameResultSubmission),
   })
     .index('by_roundId', ['roundId'])
     .index('by_roundId_and_memberId', ['roundId', 'memberId'])

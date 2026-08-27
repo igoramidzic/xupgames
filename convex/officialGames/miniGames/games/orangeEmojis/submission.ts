@@ -47,7 +47,13 @@ export async function submitOrangeEmojisHandler(
     state,
     round,
     result,
-    { score: scored.score, straightness: null, correctClicks: targetIds.length, wrongClicks },
+    {
+      score: scored.score,
+      straightness: null,
+      correctClicks: targetIds.length,
+      wrongClicks,
+      submission: { kind: 'orangeEmojis', clickedIds: args.clickedIds },
+    },
     now
   );
   return { ...recorded, accuracy: scored.accuracy };

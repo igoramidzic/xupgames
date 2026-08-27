@@ -60,7 +60,14 @@ export async function submitMapPointHandler(
     state,
     round,
     result,
-    { score: scored.score, straightness: null, correctClicks: 0, wrongClicks: 0, metric: scored.error },
+    {
+      score: scored.score,
+      straightness: null,
+      correctClicks: 0,
+      wrongClicks: 0,
+      metric: scored.error,
+      submission: { kind: 'mapPoint', point: args.point },
+    },
     now
   );
   return { ...recorded, errorKm: scored.error };

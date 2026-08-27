@@ -366,7 +366,7 @@ describe('DoodleDashRoom', () => {
     expect(mocks.queryCalls[1]?.[1]).toBe('skip');
   });
 
-  it('uses content-sized cards for the active board and keeps the reveal below the canvas', () => {
+  it('uses content-sized cards and fills the revealed word into the status header', () => {
     mocks.game = activeRound({
       phase: 'reveal',
       canGuess: false,
@@ -386,7 +386,6 @@ describe('DoodleDashRoom', () => {
     const centerStack = container.querySelector('[data-slot="doodle-dash-center-stack"]');
     const statusCard = screen.getByRole('region', { name: 'Round status' });
     const canvas = screen.getByRole('img', { name: 'Current drawing' });
-    const revealCard = screen.getByRole('region', { name: 'Revealed word' });
     const standingsCard = screen.getByText('Standings').closest('aside');
     const guessesCard = screen.getByText('Guesses').closest('aside');
     const activeBoard = standingsCard?.parentElement;
@@ -395,8 +394,9 @@ describe('DoodleDashRoom', () => {
     expect(centerStack).toHaveClass('grid', 'gap-3');
     expect(centerStack).not.toHaveClass('overflow-hidden', 'bg-[#fffdf7]');
     expect(statusCard.parentElement).toBe(centerStack);
-    expect(revealCard.parentElement).toBe(centerStack);
-    expect(canvas.compareDocumentPosition(revealCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(statusCard).toHaveTextContent('GIRAFFE');
+    expect(screen.queryByRole('region', { name: 'Revealed word' })).not.toBeInTheDocument();
+    expect(canvas.parentElement?.parentElement).toBe(centerStack);
     expect(standingsCard).toHaveClass('self-start', 'h-[calc(100dvh-104px)]', 'max-[1120px]:h-auto');
     expect(guessesCard).toHaveClass('self-start', 'h-[calc(100dvh-104px)]');
   });
@@ -458,6 +458,44 @@ describe('DoodleDashRoom', () => {
       sessionToken: guest.sessionToken,
       guess: 'girafe',
     });
+  });
+
+  it('scrolls the room feed to the exact bottom when a message arrives', () => {
+    mocks.game = activeRound();
+    const room = (
+      <MemoryRouter>
+        <DoodleDashRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+    const { rerender } = render(room);
+    const messageLog = screen.getByRole('log', { name: 'Room guesses' });
+    Object.defineProperty(messageLog, 'scrollHeight', { configurable: true, value: 640 });
+    messageLog.scrollTop = 100;
+
+    mocks.game = activeRound({
+      round: {
+        ...activeRound().round,
+        messages: [
+          {
+            messageId: 'message-1',
+            memberId: 'member-1',
+            displayName: 'Ada',
+            kind: 'guess',
+            text: 'horse',
+            isClose: false,
+            isCurrentPlayer: true,
+            createdAt: 1,
+          },
+        ],
+      },
+    });
+    rerender(
+      <MemoryRouter>
+        <DoodleDashRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    expect(messageLog.scrollTop).toBe(640);
   });
 
   it('keeps the guess field enabled while a guess is being submitted', async () => {

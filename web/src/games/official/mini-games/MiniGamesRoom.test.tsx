@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -68,14 +68,14 @@ const baseGame = {
   totalRounds: 10,
   participantCount: 0,
   finishedCount: 0,
-  estimatedDurationMs: 172_000,
+  estimatedDurationMs: 212_000,
   configuration: {
     roundCount: 10,
     roundOptions: [
-      { roundCount: 10, estimatedDurationMs: 172_000 },
-      { roundCount: 15, estimatedDurationMs: 258_000 },
-      { roundCount: 20, estimatedDurationMs: 344_000 },
-      { roundCount: 25, estimatedDurationMs: 430_000 },
+      { roundCount: 10, estimatedDurationMs: 212_000 },
+      { roundCount: 15, estimatedDurationMs: 318_000 },
+      { roundCount: 20, estimatedDurationMs: 424_000 },
+      { roundCount: 25, estimatedDurationMs: 530_000 },
     ],
   },
   miniGames: [
@@ -89,6 +89,14 @@ const baseGame = {
     { id: 'guessPercentage', title: 'Guess the percentage', eyebrow: 'Slice sense', instructions: 'Estimate it.' },
     { id: 'circleCenter', title: 'Click the circle center', eyebrow: 'Bullseye', instructions: 'Find it.' },
     { id: 'batteryPercentage', title: 'Guess the battery', eyebrow: 'Charge check', instructions: 'Estimate it.' },
+    { id: 'flashbackTiles', title: 'Flashback Tiles', eyebrow: 'Visual memory', instructions: 'Remember it.' },
+    { id: 'copycatSequence', title: 'Copycat Sequence', eyebrow: 'Pattern recall', instructions: 'Repeat it.' },
+    { id: 'crowdCount', title: 'Crowd Count', eyebrow: 'Keep count', instructions: 'Count them.' },
+    { id: 'dropZone', title: 'Drop Zone', eyebrow: 'Perfect timing', instructions: 'Drop it.' },
+    { id: 'shadowMatch', title: 'Shadow Match', eyebrow: 'Shape finder', instructions: 'Match it.' },
+    { id: 'flagFrenzy', title: 'Flag Frenzy', eyebrow: 'Quick match', instructions: 'Match it.' },
+    { id: 'brakeCheck', title: 'Brake Check', eyebrow: 'Hold and release', instructions: 'Stop it.' },
+    { id: 'signalSnap', title: 'Signal Snap', eyebrow: 'Reaction test', instructions: 'Tap it.' },
   ],
   round: null,
   currentResult: null,
@@ -120,13 +128,13 @@ describe('MiniGamesRoom', () => {
     );
     expect(screen.getByRole('heading', { name: /Tiny games.*One big score/ })).toBeInTheDocument();
     expect(screen.getAllByText('10 mini-games').length).toBeGreaterThan(0);
-    expect(screen.getByRole('region', { name: 'Mini Game Mix game configuration' })).toHaveTextContent('About 3 min');
+    expect(screen.getByRole('region', { name: 'Mini Game Mix game configuration' })).toHaveTextContent('About 3½ min');
     expect(screen.getByRole('button', { name: 'Start the mix' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Mini Game Mix game configuration' })).toContainElement(
       screen.getByRole('button', { name: 'Configure' })
     );
     expect(screen.getByRole('region', { name: 'Mini Game Mix game configuration' })).toHaveTextContent(
-      '5 challenges in rotation'
+      '13 challenges in rotation'
     );
   });
 
@@ -158,7 +166,7 @@ describe('MiniGamesRoom', () => {
     );
     expect(screen.getByRole('heading', { name: 'Spin the mix.' })).toBeInTheDocument();
     expect(screen.getByText('Round 2 · Picking the next challenge')).toBeInTheDocument();
-    expect(screen.getAllByText('Find this emoji').length).toBeGreaterThan(1);
+    expect(screen.getAllByText('Find this emoji').length).toBeGreaterThan(0);
     await waitFor(() =>
       expect(view.container.querySelector('[data-roulette-track="true"]')).toHaveStyle({
         transition: 'transform 2400ms cubic-bezier(.42,0,.18,1) 420ms',
@@ -166,14 +174,14 @@ describe('MiniGamesRoom', () => {
     );
   });
 
-  it('shows each mini-game score before the next spinner', () => {
+  it('shows the visual round replay with a three-second countdown before round winners', () => {
     mocks.game = {
       ...baseGame,
       gameNumber: 1,
       phase: 'roundResults',
       currentRoundNumber: 1,
       phaseStartedAt: Date.now(),
-      phaseEndsAt: Date.now() + 4_000,
+      phaseEndsAt: Date.now() + 8_000,
       round: {
         roundId: 'round-1',
         roundNumber: 1,
@@ -196,6 +204,14 @@ describe('MiniGamesRoom', () => {
           straightness: 98,
           correctClicks: 0,
           wrongClicks: 0,
+          submission: {
+            kind: 'straightLine',
+            points: [
+              { x: 0.1, y: 0.2 },
+              { x: 0.5, y: 0.55 },
+              { x: 0.9, y: 0.8 },
+            ],
+          },
           isCurrentPlayer: true,
           isActive: true,
         },
@@ -206,13 +222,288 @@ describe('MiniGamesRoom', () => {
         <MiniGamesRoom guest={guest} session={session as never} />
       </MemoryRouter>
     );
-    expect(screen.getByText('Steady hand · Round 1 of 10 · Scores')).toBeInTheDocument();
-    expect(screen.getByText('+920')).toBeInTheDocument();
-    expect(screen.getByText('98% straight · 2.1s')).toBeInTheDocument();
-    const timer = screen.getByRole('timer', { name: /Next spin: \d seconds/ });
+    expect(screen.getByText('Steady hand · Round 1 of 10 · Replay')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Round replay' })).toHaveTextContent('Here’s how it lined up');
+    expect(screen.getByRole('img', { name: 'Your line and the direct path' })).toBeInTheDocument();
+    expect(screen.queryByText('100% straight')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Round scores' })).not.toBeInTheDocument();
+    expect(screen.queryByText('+920')).not.toBeInTheDocument();
+    const timer = screen.getByRole('timer', { name: /Round replay: 3 seconds/ });
     expect(timer).toHaveClass('rounded-full');
     expect(timer.getAttribute('style')).toContain('--countdown-progress:');
-    expect(screen.queryByText(/Next spin in/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Top players this game' })).not.toBeInTheDocument();
+  });
+
+  it('replaces the inline full standings with the top three players after the answer reveal', () => {
+    const now = Date.now();
+    mocks.game = {
+      ...baseGame,
+      gameNumber: 1,
+      phase: 'roundResults',
+      currentRoundNumber: 1,
+      phaseStartedAt: now - 3_500,
+      phaseEndsAt: now + 4_500,
+      round: {
+        roundId: 'round-percentage-results',
+        roundNumber: 1,
+        miniGame: baseGame.miniGames[2],
+        selectionStartedAt: now - 13_200,
+        playStartsAt: now - 10_000,
+        playEndsAt: now,
+        lineTarget: null,
+        emojiItems: [],
+        targetEmoji: null,
+        targetCount: 0,
+        percentageTargetColor: 'coral',
+        percentageSegments: [],
+        batteryPercentage: null,
+        circleTarget: null,
+        distancePlaces: null,
+        mapTargetName: null,
+        mapAnswerPoint: null,
+        numericAnswer: 42,
+        challengePayload: null,
+      },
+      roundResults: [
+        {
+          memberId: 'member-2',
+          displayName: 'Maya',
+          status: 'finished',
+          score: 980,
+          timeMs: 2_000,
+          straightness: null,
+          correctClicks: 0,
+          wrongClicks: 0,
+          metric: 0,
+          numericGuess: 42,
+          challengeResult: null,
+          isCurrentPlayer: false,
+          isActive: true,
+        },
+        {
+          memberId: 'member-1',
+          displayName: 'Igor',
+          status: 'finished',
+          score: 870,
+          timeMs: 2_400,
+          straightness: null,
+          correctClicks: 0,
+          wrongClicks: 0,
+          metric: 3,
+          numericGuess: 39,
+          challengeResult: null,
+          isCurrentPlayer: true,
+          isActive: true,
+        },
+        {
+          memberId: 'member-3',
+          displayName: 'Theo',
+          status: 'finished',
+          score: 650,
+          timeMs: 3_000,
+          straightness: null,
+          correctClicks: 0,
+          wrongClicks: 0,
+          metric: 8,
+          numericGuess: 50,
+          challengeResult: null,
+          isCurrentPlayer: false,
+          isActive: true,
+        },
+        {
+          memberId: 'member-4',
+          displayName: 'Lin',
+          status: 'finished',
+          score: 400,
+          timeMs: 4_000,
+          straightness: null,
+          correctClicks: 0,
+          wrongClicks: 0,
+          metric: 15,
+          numericGuess: 57,
+          challengeResult: null,
+          isCurrentPlayer: false,
+          isActive: true,
+        },
+      ],
+      standings: [
+        { ...baseGame.standings[0], rank: 1, totalScore: 870, roundsFinished: 1 },
+        {
+          ...baseGame.standings[0],
+          memberId: 'member-2',
+          displayName: 'Maya',
+          rank: 2,
+          totalScore: 980,
+          roundsFinished: 1,
+          isCurrentPlayer: false,
+        },
+        {
+          ...baseGame.standings[0],
+          memberId: 'member-3',
+          displayName: 'Theo',
+          rank: 3,
+          totalScore: 650,
+          roundsFinished: 1,
+          isCurrentPlayer: false,
+        },
+        {
+          ...baseGame.standings[0],
+          memberId: 'member-4',
+          displayName: 'Lin',
+          rank: 4,
+          totalScore: 400,
+          roundsFinished: 1,
+          isCurrentPlayer: false,
+        },
+      ],
+    };
+
+    render(
+      <MemoryRouter>
+        <MiniGamesRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    const podium = screen.getByRole('list', { name: 'Top players this round' });
+    expect(screen.getByRole('heading', { name: 'Top players this game' })).toBeInTheDocument();
+    expect(within(podium).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(podium).getByText('Maya')).toBeInTheDocument();
+    expect(within(podium).queryByText('Lin')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Round scores' })).not.toBeInTheDocument();
+    expect(screen.getByRole('timer', { name: /Next spin: 5 seconds/ })).toBeInTheDocument();
+  });
+
+  it('reopens Flashback Tiles with correct tiles green and incorrect picks red', () => {
+    const now = Date.now();
+    const currentResult = {
+      memberId: 'member-1',
+      displayName: 'Igor',
+      status: 'finished',
+      score: 700,
+      timeMs: 3_000,
+      straightness: null,
+      correctClicks: 2,
+      wrongClicks: 1,
+      metric: null,
+      numericGuess: null,
+      challengeResult: { kind: 'flashbackTiles', correct: 2, wrong: 1, missed: 1 },
+      submission: { kind: 'flashbackTiles', selectedTileIds: [0, 1, 4] },
+      isCurrentPlayer: true,
+      isActive: true,
+    };
+    mocks.game = {
+      ...baseGame,
+      gameNumber: 1,
+      phase: 'roundResults',
+      currentRoundNumber: 1,
+      phaseStartedAt: now,
+      phaseEndsAt: now + 8_000,
+      round: {
+        roundId: 'round-flashback',
+        roundNumber: 1,
+        miniGame: baseGame.miniGames[5],
+        selectionStartedAt: now - 13_200,
+        playStartsAt: now - 10_000,
+        playEndsAt: now,
+        lineTarget: null,
+        emojiItems: [],
+        targetEmoji: null,
+        targetCount: 0,
+        percentageTargetColor: null,
+        percentageSegments: [],
+        batteryPercentage: null,
+        circleTarget: null,
+        distancePlaces: null,
+        mapTargetName: null,
+        mapAnswerPoint: null,
+        numericAnswer: null,
+        challengePayload: {
+          kind: 'flashbackTiles',
+          gridSize: 5,
+          targetTileIds: [0, 2, 4],
+          revealDurationMs: 1_650,
+        },
+      },
+      currentResult,
+      roundResults: [currentResult],
+    };
+
+    const view = render(
+      <MemoryRouter>
+        <MiniGamesRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    const tile = (tileId: number) => view.container.querySelector(`[data-tile-id="${tileId}"]`);
+    expect(screen.getByRole('img', { name: 'Revealed Flashback Tiles board' })).toBeInTheDocument();
+    expect(tile(0)).toHaveAttribute('data-feedback', 'correct');
+    expect(tile(0)).toHaveAttribute('data-selected', 'true');
+    expect(tile(1)).toHaveAttribute('data-feedback', 'wrong');
+    expect(tile(2)).toHaveAttribute('data-feedback', 'correct');
+    expect(tile(2)).toHaveAttribute('data-selected', 'false');
+    expect(tile(3)).toHaveAttribute('data-feedback', 'neutral');
+    expect(screen.queryByText('1 · 3 · 5')).not.toBeInTheDocument();
+  });
+
+  it('shows Signal Snap as tap timing without calling any tap correct', () => {
+    const now = Date.now();
+    const currentResult = {
+      memberId: 'member-1',
+      displayName: 'Igor',
+      status: 'finished',
+      score: 850,
+      timeMs: 8_000,
+      straightness: null,
+      correctClicks: 0,
+      wrongClicks: 0,
+      metric: null,
+      numericGuess: null,
+      challengeResult: { kind: 'signalSnap', medianMs: 240, falseStarts: 0 },
+      submission: { kind: 'signalSnap', responseOffsetsMs: [1_590, 4_420, 7_260] },
+      isCurrentPlayer: true,
+      isActive: true,
+    };
+    mocks.game = {
+      ...baseGame,
+      gameNumber: 1,
+      phase: 'roundResults',
+      currentRoundNumber: 1,
+      phaseStartedAt: now,
+      phaseEndsAt: now + 8_000,
+      round: {
+        roundId: 'round-signal',
+        roundNumber: 1,
+        miniGame: baseGame.miniGames[12],
+        selectionStartedAt: now - 13_200,
+        playStartsAt: now - 10_000,
+        playEndsAt: now,
+        lineTarget: null,
+        emojiItems: [],
+        targetEmoji: null,
+        targetCount: 0,
+        percentageTargetColor: null,
+        percentageSegments: [],
+        batteryPercentage: null,
+        circleTarget: null,
+        distancePlaces: null,
+        mapTargetName: null,
+        mapAnswerPoint: null,
+        numericAnswer: null,
+        challengePayload: { kind: 'signalSnap', cueOffsetsMs: [1_350, 4_180, 7_020] },
+      },
+      currentResult,
+      roundResults: [currentResult],
+    };
+
+    render(
+      <MemoryRouter>
+        <MiniGamesRoom guest={guest} session={session as never} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('heading', { name: 'Here’s your tap timing' })).toBeInTheDocument();
+    expect(screen.getByText('There is no correct tap—only your reaction time after each cue.')).toBeInTheDocument();
+    expect(screen.queryByText('The correct answer was')).not.toBeInTheDocument();
   });
 
   it('keeps the card shell mounted and uses the same header layout from play to scores', () => {
@@ -267,7 +558,8 @@ describe('MiniGamesRoom', () => {
     mocks.game = {
       ...playingGame,
       phase: 'roundResults',
-      phaseEndsAt: Date.now() + 4_000,
+      phaseStartedAt: Date.now() - 3_500,
+      phaseEndsAt: Date.now() + 4_500,
       roundResults: [],
     };
     view.rerender(
@@ -281,7 +573,177 @@ describe('MiniGamesRoom', () => {
     expect(scoreCard).toBe(card);
     expect(scoreHeader).not.toBeNull();
     expect(scoreHeader?.className).toBe(playHeader?.className);
-    expect(scoreHeader).toHaveTextContent('Slice sense · Round 1 of 10 · Scores');
+    expect(scoreHeader).toHaveTextContent('Slice sense · Round 1 of 10 · Round winners');
+  });
+
+  it('holds pre-round sidebar scores in fixed lanes, then animates into the final order', () => {
+    const animate = vi.fn(() => ({ cancel: vi.fn(), finished: Promise.resolve() }) as unknown as Animation);
+    const originalAnimate = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'animate');
+    Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      const top = Number(this.dataset.displayPosition ?? 0) * 100;
+      return {
+        x: 0,
+        y: top,
+        top,
+        right: 300,
+        bottom: top + 80,
+        left: 0,
+        width: 300,
+        height: 80,
+        toJSON: () => ({}),
+      };
+    });
+    try {
+      const now = Date.now();
+      const round = {
+        roundId: 'round-sidebar',
+        roundNumber: 2,
+        miniGame: baseGame.miniGames[2],
+        selectionStartedAt: now - 5_000,
+        playStartsAt: now - 2_000,
+        playEndsAt: now + 8_000,
+        lineTarget: null,
+        emojiItems: [],
+        targetEmoji: null,
+        targetCount: 0,
+        percentageTargetColor: 'coral',
+        percentageSegments: [],
+        batteryPercentage: null,
+        circleTarget: null,
+        distancePlaces: null,
+        mapTargetName: null,
+        mapAnswerPoint: null,
+        numericAnswer: null,
+        challengePayload: null,
+      };
+      const igorResult = {
+        memberId: 'member-1',
+        displayName: 'Igor',
+        status: 'waiting',
+        score: 0,
+        timeMs: null,
+        straightness: null,
+        correctClicks: 0,
+        wrongClicks: 0,
+        metric: null,
+        numericGuess: null,
+        challengeResult: null,
+        isCurrentPlayer: true,
+        isActive: true,
+      };
+      const mayaResult = {
+        ...igorResult,
+        memberId: 'member-2',
+        displayName: 'Maya',
+        status: 'finished',
+        score: 500,
+        timeMs: 2_000,
+        metric: 0,
+        numericGuess: 42,
+        isCurrentPlayer: false,
+      };
+      const theoResult = {
+        ...igorResult,
+        memberId: 'member-3',
+        displayName: 'Theo',
+        isCurrentPlayer: false,
+      };
+      mocks.game = {
+        ...baseGame,
+        gameNumber: 1,
+        phase: 'playing',
+        phaseStartedAt: now - 2_000,
+        phaseEndsAt: now + 8_000,
+        currentRoundNumber: 2,
+        participantCount: 3,
+        finishedCount: 1,
+        round,
+        currentResult: igorResult,
+        roundResults: [igorResult, mayaResult, theoResult],
+        standings: [
+          {
+            ...baseGame.standings[0],
+            memberId: 'member-2',
+            displayName: 'Maya',
+            rank: 1,
+            totalScore: 1_400,
+            roundsFinished: 2,
+            isCurrentPlayer: false,
+          },
+          { ...baseGame.standings[0], rank: 2, totalScore: 1_000, roundsFinished: 1 },
+          {
+            ...baseGame.standings[0],
+            memberId: 'member-3',
+            displayName: 'Theo',
+            rank: 3,
+            totalScore: 800,
+            roundsFinished: 1,
+            isCurrentPlayer: false,
+          },
+        ],
+      };
+      const view = render(
+        <MemoryRouter>
+          <MiniGamesRoom guest={guest} session={session as never} />
+        </MemoryRouter>
+      );
+      const sidebarRows = () =>
+        within(screen.getByRole('list', { name: 'Player standings' }))
+          .getAllByRole('listitem')
+          .map((item) => item.textContent);
+
+      expect(sidebarRows()).toEqual([
+        expect.stringContaining('Igor'),
+        expect.stringContaining('Maya'),
+        expect.stringContaining('Theo'),
+      ]);
+      const mayaLiveRow = within(screen.getByRole('list', { name: 'Player standings' }))
+        .getByText('Maya')
+        .closest('li');
+      expect(mayaLiveRow).toHaveTextContent('900');
+      expect(mayaLiveRow).toHaveTextContent('1 rounds scored');
+      expect(mayaLiveRow).toHaveAttribute('data-display-rank', '2');
+      expect(mayaLiveRow).toHaveAttribute('data-authoritative-rank', '1');
+
+      mocks.game = {
+        ...(mocks.game as typeof baseGame),
+        phase: 'roundResults',
+        phaseStartedAt: now,
+        phaseEndsAt: now + 8_000,
+        currentResult: { ...igorResult, status: 'timedOut' },
+        roundResults: [mayaResult, { ...igorResult, status: 'timedOut' }, { ...theoResult, status: 'timedOut' }],
+        round: { ...round, numericAnswer: 42 },
+      };
+      view.rerender(
+        <MemoryRouter>
+          <MiniGamesRoom guest={guest} session={session as never} />
+        </MemoryRouter>
+      );
+
+      expect(sidebarRows()).toEqual([
+        expect.stringContaining('Maya'),
+        expect.stringContaining('Igor'),
+        expect.stringContaining('Theo'),
+      ]);
+      expect(animate).toHaveBeenCalledTimes(2);
+      expect(animate).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ transform: expect.stringContaining('translate3d') }),
+          { transform: 'translate3d(0, 0, 0)' },
+        ]),
+        { duration: 520, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+      );
+    } finally {
+      rectSpy.mockRestore();
+      if (originalAnimate) {
+        Object.defineProperty(HTMLElement.prototype, 'animate', originalAnimate);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+      }
+    }
   });
 
   it('shows the random target and submits after every matching copy is clicked', async () => {
@@ -407,6 +869,7 @@ describe('MiniGamesRoom', () => {
     );
     expect(screen.getByRole('img', { name: 'A three-color pie chart' })).toBeInTheDocument();
     const estimate = screen.getByLabelText('Your estimate');
+    expect(estimate).toHaveFocus();
     expect(estimate).toHaveAttribute('type', 'number');
     expect(estimate).toHaveAttribute('max', '100');
     expect(estimate).toHaveValue(null);

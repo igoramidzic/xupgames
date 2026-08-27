@@ -80,6 +80,11 @@ export async function getGameHandler(ctx: QueryCtx, args: { roomId: Id<'rooms'>;
       wrongClicks: result.wrongClicks,
       metric: result.metric ?? null,
       numericGuess: result.numericGuess ?? null,
+      challengeResult: result.challengeResult ?? null,
+      submission:
+        (state.phase === 'roundResults' || state.phase === 'complete') && result.memberId === membership._id
+          ? (result.submission ?? null)
+          : null,
       isCurrentPlayer: result.memberId === membership._id,
       isActive: activeByMemberId.get(result.memberId) ?? true,
     }))
@@ -167,6 +172,7 @@ export async function getGameHandler(ctx: QueryCtx, args: { roomId: Id<'rooms'>;
                   : { x: round.mapTargetX, y: round.mapTargetY },
               numericAnswer:
                 state.phase === 'roundResults' || state.phase === 'complete' ? (round.numericAnswer ?? null) : null,
+              challengePayload: round.challengePayload ?? null,
             };
           })(),
     currentResult: resultViews.find((result) => result.isCurrentPlayer) ?? null,

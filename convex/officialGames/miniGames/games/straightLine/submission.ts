@@ -58,7 +58,13 @@ export async function submitStraightLineHandler(
     state,
     round,
     result,
-    { score: scored.score, straightness: scored.straightness, correctClicks: 0, wrongClicks: 0 },
+    {
+      score: scored.score,
+      straightness: scored.straightness,
+      correctClicks: 0,
+      wrongClicks: 0,
+      submission: { kind: 'straightLine', points: args.points },
+    },
     now
   );
   return { ...recorded, straightness: scored.straightness };

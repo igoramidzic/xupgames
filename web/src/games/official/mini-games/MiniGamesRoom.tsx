@@ -34,11 +34,14 @@ import {
 } from '@/lib/gameLobbyLayout';
 import type { GuestIdentity } from '@/lib/guest';
 import { getRoomMembers } from '@/lib/roomSession';
+import { useListReorderAnimation } from '@/lib/useListReorderAnimation';
 import { useRoomPresence } from '@/lib/useRoomPresence';
 import { userFacingError } from '@/lib/userFacingError';
 import { cn } from '@/lib/utils';
 import MiniGameChallenge, { type MiniGamePoint } from './MiniGameChallenges';
+import { MiniGameAnswerReveal, MiniGameRoundPodium } from './MiniGameRoundRecap';
 import MiniGamesConfigurationDialog, { formatMiniGamesDuration } from './MiniGamesConfigurationDialog';
+import NewMiniGameChallenge, { type NewMiniGameSubmission } from './NewMiniGameChallenges';
 
 type SessionResult = FunctionReturnType<typeof api.rooms.getSession>;
 type ActiveSession = Extract<SessionResult, { kind: 'session' }>;
@@ -64,13 +67,22 @@ const ROULETTE_SLOT_IDS = [
 const ROULETTE_REST_MS = 420;
 const ROULETTE_SPIN_MS = 2_400;
 const MINI_GAME_ROUND_MS = 10_000;
-const MINI_GAME_RESULTS_MS = 4_000;
+const MINI_GAME_ANSWER_REVEAL_MS = 3_000;
+const MINI_GAME_RESULTS_MS = 8_000;
 const MINI_GAME_GLYPHS: Record<MiniGameRound['miniGame']['id'], string> = {
   straightLine: '✏️',
   orangeEmojis: '🍊',
   guessPercentage: '◔',
   circleCenter: '◎',
   batteryPercentage: '🔋',
+  flashbackTiles: '▦',
+  copycatSequence: '◆',
+  crowdCount: '●',
+  dropZone: '📦',
+  shadowMatch: '★',
+  flagFrenzy: '⚑',
+  brakeCheck: '🏁',
+  signalSnap: '⚡',
 };
 const MINI_GAME_CARD_COLORS = ['bg-[#bde8ff]', 'bg-[#fff0b8]', 'bg-[#eadfff]', 'bg-[#d9f7ca]', 'bg-[#ffdcd7]'] as const;
 
@@ -83,24 +95,6 @@ function useClock(enabled: boolean) {
     return () => window.clearInterval(interval);
   }, [enabled]);
   return now;
-}
-
-function formatTime(timeMs: number | null) {
-  if (timeMs === null) return '—';
-  return `${(timeMs / 1_000).toFixed(1)}s`;
-}
-
-function resultDetail(result: GameView['roundResults'][number], round: MiniGameRound) {
-  const miniGameId = round.miniGame.id;
-  if (result.status === 'timedOut') return 'Time expired';
-  if (miniGameId === 'straightLine')
-    return `${Math.round(result.straightness ?? 0)}% straight · ${formatTime(result.timeMs)}`;
-  if (miniGameId === 'orangeEmojis')
-    return `${result.correctClicks} found · ${result.wrongClicks} wrong · ${formatTime(result.timeMs)}`;
-  if (miniGameId === 'guessPercentage' || miniGameId === 'batteryPercentage')
-    return `${result.numericGuess ?? 0}% guess · ${result.metric ?? 0} points off`;
-  if (miniGameId === 'circleCenter') return `${result.metric ?? 0}% of a radius from center`;
-  return formatTime(result.timeMs);
 }
 
 function CountdownCircle({ remainingMs, totalMs, label }: { remainingMs: number; totalMs: number; label: string }) {
@@ -129,14 +123,14 @@ function MiniGameRoundHeader({
   remainingMs,
   totalMs,
   timerLabel,
-  scoreView = false,
+  phaseLabel,
 }: {
   round: MiniGameRound;
   totalRounds: number;
   remainingMs: number;
   totalMs: number;
   timerLabel: string;
-  scoreView?: boolean;
+  phaseLabel?: string;
 }) {
   return (
     <div
@@ -146,7 +140,7 @@ function MiniGameRoundHeader({
       <div>
         <p className="mb-1 text-[9px] font-[850] tracking-[0.14em] text-[#e85d2a] uppercase">
           {round.miniGame.eyebrow} · Round {round.roundNumber} of {totalRounds}
-          {scoreView ? ' · Scores' : ''}
+          {phaseLabel === undefined ? '' : ` · ${phaseLabel}`}
         </p>
         <h1 className="m-0 font-display text-[clamp(25px,4vw,38px)] leading-none font-[880] tracking-[-0.05em]">
           {round.miniGame.title}
@@ -475,42 +469,104 @@ function EmojiChallenge({
 function RoundResults({ game, now }: { game: GameView; now: number }) {
   const round = game.round;
   if (round === null) return null;
-  const remainingMs = Math.max(0, (game.phaseEndsAt ?? now) - now);
+  const resultsStartedAt = game.phaseStartedAt ?? (game.phaseEndsAt ?? now) - MINI_GAME_RESULTS_MS;
+  const answerRevealEndsAt = resultsStartedAt + MINI_GAME_ANSWER_REVEAL_MS;
+  const revealingAnswer = now < answerRevealEndsAt;
+  const remainingMs = Math.max(0, (revealingAnswer ? answerRevealEndsAt : (game.phaseEndsAt ?? now)) - now);
   return (
     <section className="min-h-[clamp(470px,calc(100dvh-210px),680px)]">
       <MiniGameRoundHeader
         round={round}
         totalRounds={game.totalRounds}
         remainingMs={remainingMs}
-        totalMs={MINI_GAME_RESULTS_MS}
-        timerLabel="Next spin"
-        scoreView
+        totalMs={revealingAnswer ? MINI_GAME_ANSWER_REVEAL_MS : MINI_GAME_RESULTS_MS - MINI_GAME_ANSWER_REVEAL_MS}
+        timerLabel={revealingAnswer ? 'Round replay' : 'Next spin'}
+        phaseLabel={revealingAnswer ? 'Replay' : 'Round winners'}
       />
-      <ol className="m-0 grid list-none gap-2 p-[clamp(14px,3vw,30px)]" aria-label="Round scores">
-        {game.roundResults.map((result, index) => (
-          <li
-            key={result.memberId}
-            className="grid min-h-16 grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-[14px_9px_16px_11px] border border-[#c7d2e2] bg-white px-4 py-3 shadow-[0_3px_0_#dce4ef]"
-          >
-            <span className="grid size-8 place-items-center rounded-full bg-[#17203a] text-xs font-[850] text-white">
-              {index + 1}
-            </span>
-            <span className="min-w-0">
-              <strong className="block truncate text-sm text-[#24334c]">
-                {result.displayName}
-                {result.isCurrentPlayer ? ' (you)' : ''}
-              </strong>
-              <small className="text-[10px] text-[#78869a]">{resultDetail(result, round)}</small>
-            </span>
-            <strong className="font-display text-xl font-[880] text-[#e85d2a] tabular-nums">+{result.score}</strong>
-          </li>
-        ))}
-      </ol>
+      {revealingAnswer ? (
+        <MiniGameAnswerReveal
+          round={round}
+          result={game.currentResult ?? game.roundResults.find((result) => result.isCurrentPlayer) ?? null}
+        />
+      ) : (
+        <MiniGameRoundPodium game={game} />
+      )}
     </section>
   );
 }
 
+type Standing = GameView['standings'][number];
+type StandingMemberId = Standing['memberId'];
+
+function reconcileStandingOrder(previousIds: StandingMemberId[], standingIds: StandingMemberId[]) {
+  const currentIds = new Set(standingIds);
+  const knownIds = new Set(previousIds);
+  return [
+    ...previousIds.filter((memberId) => currentIds.has(memberId)),
+    ...standingIds.filter((memberId) => !knownIds.has(memberId)),
+  ];
+}
+
+function useMiniGameStandingOrder(standings: GameView['standings'], roundNumber: number, phase: GameView['phase']) {
+  const [frozenOrder, setFrozenOrder] = useState<{ roundNumber: number; memberIds: StandingMemberId[] }>(() => ({
+    roundNumber,
+    memberIds: standings.map((standing) => standing.memberId),
+  }));
+  const roundIsLive = phase === 'selecting' || phase === 'playing';
+  const standingIdsKey = standings.map((standing) => standing.memberId).join('|');
+  const standingIds = useMemo(
+    () => (standingIdsKey === '' ? [] : (standingIdsKey.split('|') as StandingMemberId[])),
+    [standingIdsKey]
+  );
+  const baseIds = frozenOrder.roundNumber === roundNumber ? frozenOrder.memberIds : standingIds;
+  const nextIds = useMemo(() => reconcileStandingOrder(baseIds, standingIds), [baseIds, standingIds]);
+
+  useEffect(() => {
+    if (!roundIsLive) return;
+    setFrozenOrder((previous) => {
+      if (previous.roundNumber === roundNumber && previous.memberIds.join('|') === nextIds.join('|')) return previous;
+      return { roundNumber, memberIds: nextIds };
+    });
+  }, [nextIds, roundIsLive, roundNumber]);
+
+  if (!roundIsLive) return standings;
+  const standingByMemberId = new Map(standings.map((standing) => [standing.memberId, standing]));
+  return nextIds.flatMap((memberId) => {
+    const standing = standingByMemberId.get(memberId);
+    return standing === undefined ? [] : [standing];
+  });
+}
+
 function Standings({ game }: { game: GameView }) {
+  const roundNumber = game.round?.roundNumber ?? game.currentRoundNumber;
+  const roundIsLive = game.phase === 'selecting' || game.phase === 'playing';
+  const resultByMemberId = useMemo(
+    () => new Map(game.roundResults.map((result) => [result.memberId, result])),
+    [game.roundResults]
+  );
+  const preRoundStandings = useMemo(() => {
+    if (!roundIsLive) return game.standings;
+    return game.standings
+      .map((standing) => {
+        const result = resultByMemberId.get(standing.memberId);
+        const roundHasFinished = result !== undefined && result.status !== 'waiting';
+        return {
+          ...standing,
+          totalScore: standing.totalScore - (roundHasFinished ? result.score : 0),
+          roundsFinished: standing.roundsFinished - (roundHasFinished ? 1 : 0),
+        };
+      })
+      .sort(
+        (first, second) => second.totalScore - first.totalScore || first.displayName.localeCompare(second.displayName)
+      );
+  }, [game.standings, resultByMemberId, roundIsLive]);
+  const orderedStandings = useMiniGameStandingOrder(preRoundStandings, roundNumber, game.phase);
+  const standingsOrderKey = orderedStandings.map((standing) => standing.memberId).join('|');
+  const setStandingItemRef = useListReorderAnimation(standingsOrderKey, {
+    animate: game.phase === 'roundResults',
+    resetKey: `${game.gameNumber}:${roundNumber}`,
+  });
+
   return (
     <aside
       className={cn(
@@ -527,29 +583,36 @@ function Standings({ game }: { game: GameView }) {
         </div>
         <Trophy className="size-5 text-[#ffd85c]" aria-hidden="true" />
       </div>
-      <ol className="m-0 grid min-h-0 flex-1 content-start gap-1.5 overflow-y-auto p-3">
-        {game.standings.map((standing) => (
-          <li
-            key={standing.memberId}
-            className={cn(
-              'grid grid-cols-[26px_minmax(0,1fr)_auto] items-center gap-2 rounded-[11px_7px_12px_8px] px-2.5 py-2.5',
-              standing.isCurrentPlayer && 'bg-white/10',
-              !standing.isActive && 'opacity-45'
-            )}
-          >
-            <span className="grid size-6 place-items-center rounded-full bg-white/10 text-[10px] font-[820]">
-              {standing.rank}
-            </span>
-            <span className="min-w-0">
-              <strong className="block truncate text-xs">
-                {standing.displayName}
-                {standing.isCurrentPlayer ? ' (you)' : ''}
-              </strong>
-              <small className="text-[9px] text-[#aebbd0]">{standing.roundsFinished} rounds scored</small>
-            </span>
-            <strong className="font-display text-sm text-[#ffd85c] tabular-nums">{standing.totalScore}</strong>
-          </li>
-        ))}
+      <ol className="m-0 grid min-h-0 flex-1 content-start gap-1.5 overflow-y-auto p-3" aria-label="Player standings">
+        {orderedStandings.map((standing, index) => {
+          const displayRank = roundIsLive ? index + 1 : standing.rank;
+          return (
+            <li
+              key={standing.memberId}
+              ref={(element) => setStandingItemRef(standing.memberId, element)}
+              className={cn(
+                'grid grid-cols-[26px_minmax(0,1fr)_auto] items-center gap-2 rounded-[11px_7px_12px_8px] px-2.5 py-2.5 transition-[background-color,opacity] data-[reordering=true]:z-2 data-[reordering=true]:pointer-events-none motion-reduce:transition-none',
+                standing.isCurrentPlayer && 'bg-white/10',
+                !standing.isActive && 'opacity-45'
+              )}
+              data-display-position={index}
+              data-display-rank={displayRank}
+              data-authoritative-rank={standing.rank}
+            >
+              <span className="grid size-6 place-items-center rounded-full bg-white/10 text-[10px] font-[820]">
+                {displayRank}
+              </span>
+              <span className="min-w-0">
+                <strong className="block truncate text-xs">
+                  {standing.displayName}
+                  {standing.isCurrentPlayer ? ' (you)' : ''}
+                </strong>
+                <small className="text-[9px] text-[#aebbd0]">{standing.roundsFinished} rounds scored</small>
+              </span>
+              <strong className="font-display text-sm text-[#ffd85c] tabular-nums">{standing.totalScore}</strong>
+            </li>
+          );
+        })}
       </ol>
     </aside>
   );
@@ -564,6 +627,7 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
   const submitOrangeEmojis = useMutation(api.miniGames.submitOrangeEmojis);
   const submitEstimate = useMutation(api.miniGames.submitEstimate);
   const submitCircleCenter = useMutation(api.miniGames.submitCircleCenter);
+  const submitChallenge = useMutation(api.miniGames.submitChallenge);
   const leaveRoom = useMutation(api.rooms.leave);
   const closeRoom = useMutation(api.rooms.close);
   const { onlineByMemberId } = useRoomPresence({ roomId: session.roomId, sessionToken: guest.sessionToken });
@@ -639,6 +703,15 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
       await submitCircleCenter({ roomId: session.roomId, sessionToken: guest.sessionToken, point });
     } catch (error) {
       setNotice(userFacingError(error, 'Your center point could not be scored.'));
+    }
+  }
+
+  async function submitNewChallenge(submission: NewMiniGameSubmission) {
+    setNotice(null);
+    try {
+      await submitChallenge({ roomId: session.roomId, sessionToken: guest.sessionToken, submission });
+    } catch (error) {
+      setNotice(userFacingError(error, 'Your challenge answer could not be scored.'));
     }
   }
 
@@ -916,6 +989,14 @@ export default function MiniGamesRoom({ guest, session }: { guest: GuestIdentity
                           round={game.round}
                           disabled={currentFinished || isClosed}
                           onSubmit={(ids) => void submitEmojis(ids)}
+                        />
+                      ) : game.round.challengePayload ? (
+                        <NewMiniGameChallenge
+                          key={game.round.roundId}
+                          round={game.round}
+                          now={now}
+                          disabled={currentFinished || isClosed}
+                          onSubmit={(submission) => void submitNewChallenge(submission)}
                         />
                       ) : (
                         <MiniGameChallenge

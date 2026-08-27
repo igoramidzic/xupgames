@@ -3,6 +3,24 @@ import { createBatteryChallenge, scoreBatteryEstimate } from './games/batteryPer
 import { createCircleChallenge, scoreCircleCenter } from './games/circleCenter';
 import { scoreDistanceEstimate } from './games/guessDistance';
 import { createPercentageChallenge, scorePercentageEstimate } from './games/guessPercentage';
+import {
+  createBrakeCheckChallenge,
+  createCopycatSequenceChallenge,
+  createCrowdCountChallenge,
+  createDropZoneChallenge,
+  createFlagFrenzyChallenge,
+  createFlashbackTilesChallenge,
+  createShadowMatchChallenge,
+  createSignalSnapChallenge,
+  scoreBrakeCheck,
+  scoreCopycatSequence,
+  scoreCrowdCount,
+  scoreDropZone,
+  scoreFlagFrenzy,
+  scoreFlashbackTiles,
+  scoreShadowMatch,
+  scoreSignalSnap,
+} from './games/newChallenges';
 import { createEmojiChallenge, scoreFindEmoji } from './games/orangeEmojis';
 import { scoreMapPoint } from './games/pointOnMap';
 import { createStraightLineTarget, scoreStraightLine } from './games/straightLine';
@@ -52,7 +70,7 @@ describe('Mini Game Mix engine', () => {
 
   it('penalizes wrong emoji clicks and derives the session duration from the round count', () => {
     expect(scoreFindEmoji(5, 0, 2_000).score).toBeGreaterThan(scoreFindEmoji(5, 3, 2_000).score);
-    expect(estimateMiniGamesDurationMs(10)).toBe(172_000);
+    expect(estimateMiniGamesDurationMs(10)).toBe(212_000);
   });
 
   it('offers longer playlists and upgrades retired configuration values to the default', () => {
@@ -69,6 +87,14 @@ describe('Mini Game Mix engine', () => {
       'guessPercentage',
       'circleCenter',
       'batteryPercentage',
+      'flashbackTiles',
+      'copycatSequence',
+      'crowdCount',
+      'dropZone',
+      'shadowMatch',
+      'flagFrenzy',
+      'brakeCheck',
+      'signalSnap',
     ]);
     const percentage = createPercentageChallenge(() => 0.42);
     expect(percentage.segments).toHaveLength(3);
@@ -78,6 +104,57 @@ describe('Mini Game Mix engine', () => {
     expect(circle.center.x).toBeGreaterThan(0);
     expect(circle.radius).toBeGreaterThan(0);
     expect(createBatteryChallenge(() => 0)).toBe(12);
+  });
+
+  it('generates bounded payloads for all eight new challenges', () => {
+    const flashback = createFlashbackTilesChallenge(() => 0.42);
+    expect(flashback.gridSize).toBe(5);
+    expect(flashback.targetTileIds.length).toBeGreaterThanOrEqual(5);
+    expect(new Set(flashback.targetTileIds).size).toBe(flashback.targetTileIds.length);
+
+    const copycat = createCopycatSequenceChallenge(() => 0.42);
+    expect(copycat.sequence.length).toBeGreaterThanOrEqual(5);
+    expect(copycat.sequence.every((pad) => pad >= 0 && pad <= 3)).toBe(true);
+
+    const crowd = createCrowdCountChallenge(() => 0.42);
+    expect(crowd.characters.length).toBeGreaterThanOrEqual(7);
+    expect(crowd.answerOptions).toHaveLength(4);
+    expect(crowd.answerOptions).toContain(crowd.characters.length);
+
+    const drop = createDropZoneChallenge(() => 0.42);
+    expect(drop.cycleDurationsMs).toHaveLength(3);
+    expect(drop.targetCenter).toBeGreaterThan(0);
+    expect(drop.targetCenter).toBeLessThan(1);
+
+    const shadow = createShadowMatchChallenge(() => 0.42);
+    expect(shadow.cards).toHaveLength(3);
+    expect(shadow.cards.every((card) => card.options.length === 4 && card.options.includes(card.targetShape))).toBe(
+      true
+    );
+
+    expect(createFlagFrenzyChallenge(() => 0.42).signals).toHaveLength(8);
+    expect(createBrakeCheckChallenge(() => 0.42).targets).toHaveLength(2);
+    expect(createSignalSnapChallenge(() => 0.42).cueOffsetsMs).toHaveLength(3);
+  });
+
+  it('scores the intended answer above a clearly wrong answer in every new challenge', () => {
+    expect(scoreFlashbackTiles([1, 2, 3], [1, 2, 3], 2_000).score).toBeGreaterThan(
+      scoreFlashbackTiles([1, 2, 3], [4, 5, 6], 2_000).score
+    );
+    expect(scoreCopycatSequence([0, 1, 2, 3], [0, 1, 2, 3], 2_000).score).toBeGreaterThan(
+      scoreCopycatSequence([0, 1, 2, 3], [3], 2_000).score
+    );
+    expect(scoreCrowdCount(10, 10).score).toBeGreaterThan(scoreCrowdCount(10, 14).score);
+    expect(scoreDropZone(0.5, 0.16, [0.5, 0.5, 0.5]).score).toBeGreaterThan(scoreDropZone(0.5, 0.16, [0, 0, 0]).score);
+    const cards = [{ targetShape: 'star', options: ['moon', 'star', 'heart', 'bolt'] }];
+    expect(scoreShadowMatch(cards, [1], 2_000).score).toBeGreaterThan(scoreShadowMatch(cards, [0], 2_000).score);
+    expect(scoreFlagFrenzy([0, 1, 2, 3], [0, 1, 2, 3]).score).toBeGreaterThan(
+      scoreFlagFrenzy([0, 1, 2, 3], [3, 2, 1, 0]).score
+    );
+    expect(scoreBrakeCheck([0.7, 0.8], [0.69, 0.79]).score).toBeGreaterThan(scoreBrakeCheck([0.7, 0.8], [1, 1]).score);
+    expect(scoreSignalSnap([1_000, 4_000, 7_000], [1_220, 4_250, 7_230]).score).toBeGreaterThan(
+      scoreSignalSnap([1_000, 4_000, 7_000], [-1, -1, -1]).score
+    );
   });
 
   it('scores estimates and center clicks on the shared scale', () => {

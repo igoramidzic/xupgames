@@ -6,6 +6,7 @@ import { listActiveRoomMembers } from '../../roomMembers';
 import { createBatteryChallenge } from './games/batteryPercentage';
 import { createCircleChallenge } from './games/circleCenter';
 import { createPercentageChallenge } from './games/guessPercentage';
+import { createNewChallenge } from './games/newChallenges';
 import { createEmojiChallenge } from './games/orangeEmojis';
 import { createStraightLineTarget } from './games/straightLine';
 import { chooseMiniGame } from './registry';
@@ -26,6 +27,7 @@ export async function createRound(
   const percentageChallenge = miniGameId === 'guessPercentage' ? createPercentageChallenge() : null;
   const circleChallenge = miniGameId === 'circleCenter' ? createCircleChallenge() : null;
   const batteryPercentage = miniGameId === 'batteryPercentage' ? createBatteryChallenge() : null;
+  const challengePayload = createNewChallenge(miniGameId);
   const percentageAnswer =
     percentageChallenge?.segments.find((segment) => segment.color === percentageChallenge.targetColor)?.percentage ??
     null;
@@ -64,6 +66,7 @@ export async function createRound(
           circleGapRotation: circleChallenge.gapRotation,
         }),
     ...(numericAnswer === null ? {} : { numericAnswer }),
+    ...(challengePayload === null ? {} : { challengePayload }),
   });
   const round = await ctx.db.get('miniGamesRounds', roundId);
   if (round === null) throw new Error('The mini-game round could not be created.');

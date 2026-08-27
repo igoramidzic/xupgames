@@ -9,6 +9,14 @@ export const MINI_GAME_IDS = [
   'guessPercentage',
   'circleCenter',
   'batteryPercentage',
+  'flashbackTiles',
+  'copycatSequence',
+  'crowdCount',
+  'dropZone',
+  'shadowMatch',
+  'flagFrenzy',
+  'brakeCheck',
+  'signalSnap',
 ] as const;
 
 export type MiniGameId = (typeof MINI_GAME_IDS)[number];
@@ -43,6 +51,54 @@ export const MINI_GAME_DEFINITIONS = [
     title: 'Guess the battery',
     eyebrow: 'Charge check',
     instructions: 'Estimate the charge shown in the battery without counting pixels.',
+  },
+  {
+    id: 'flashbackTiles',
+    title: 'Flashback Tiles',
+    eyebrow: 'Visual memory',
+    instructions: 'Remember the lit tiles, then tap the same pattern after it disappears.',
+  },
+  {
+    id: 'copycatSequence',
+    title: 'Copycat Sequence',
+    eyebrow: 'Pattern recall',
+    instructions: 'Watch the four pads, then repeat their pattern in the same order.',
+  },
+  {
+    id: 'crowdCount',
+    title: 'Crowd Count',
+    eyebrow: 'Keep count',
+    instructions: 'Count every bean that crosses the stage, then choose the total.',
+  },
+  {
+    id: 'dropZone',
+    title: 'Drop Zone',
+    eyebrow: 'Perfect timing',
+    instructions: 'Release three packages as close to the center of the landing pad as you can.',
+  },
+  {
+    id: 'shadowMatch',
+    title: 'Shadow Match',
+    eyebrow: 'Shape finder',
+    instructions: 'Choose the silhouette that matches each object.',
+  },
+  {
+    id: 'flagFrenzy',
+    title: 'Flag Frenzy',
+    eyebrow: 'Quick match',
+    instructions: 'Press the pad that matches each signal. Keep the streak alive.',
+  },
+  {
+    id: 'brakeCheck',
+    title: 'Brake Check',
+    eyebrow: 'Hold and release',
+    instructions: 'Hold to fill the meter and release as close to the target line as possible.',
+  },
+  {
+    id: 'signalSnap',
+    title: 'Signal Snap',
+    eyebrow: 'Reaction test',
+    instructions: 'Wait for each signal to change, then tap as quickly as you can.',
   },
 ] as const satisfies ReadonlyArray<{
   id: MiniGameId;

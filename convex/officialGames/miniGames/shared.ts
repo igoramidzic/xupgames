@@ -1,6 +1,6 @@
 export const MINI_GAMES_SELECTION_MS = 3_200;
 export const MINI_GAMES_ROUND_MS = 10_000;
-export const MINI_GAMES_RESULTS_MS = 4_000;
+export const MINI_GAMES_RESULTS_MS = 8_000;
 
 export type NormalizedPoint = { x: number; y: number };
 
