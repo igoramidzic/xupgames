@@ -51,6 +51,7 @@ import type * as officialGames_promptArcade_engine from "../officialGames/prompt
 import type * as officialGames_promptArcade_game from "../officialGames/promptArcade/game.js";
 import type * as officialGames_promptArcade_generation from "../officialGames/promptArcade/generation.js";
 import type * as officialGames_promptArcade_lifecycle from "../officialGames/promptArcade/lifecycle.js";
+import type * as officialGames_promptArcade_provider from "../officialGames/promptArcade/provider.js";
 import type * as officialGames_promptArcade_providerRetry from "../officialGames/promptArcade/providerRetry.js";
 import type * as officialGames_promptArcade_rounds from "../officialGames/promptArcade/rounds.js";
 import type * as officialGames_promptArcade_state from "../officialGames/promptArcade/state.js";
@@ -135,6 +136,7 @@ const fullApi: ApiFromModules<{
   "officialGames/promptArcade/game": typeof officialGames_promptArcade_game;
   "officialGames/promptArcade/generation": typeof officialGames_promptArcade_generation;
   "officialGames/promptArcade/lifecycle": typeof officialGames_promptArcade_lifecycle;
+  "officialGames/promptArcade/provider": typeof officialGames_promptArcade_provider;
   "officialGames/promptArcade/providerRetry": typeof officialGames_promptArcade_providerRetry;
   "officialGames/promptArcade/rounds": typeof officialGames_promptArcade_rounds;
   "officialGames/promptArcade/state": typeof officialGames_promptArcade_state;

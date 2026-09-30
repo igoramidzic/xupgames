@@ -9,14 +9,8 @@ import {
   parseGeneratedArtifact,
   validateGeneratedJavaScript,
 } from './officialGames/promptArcade/engine';
-import {
-  isRetryableProviderStatus,
-  PROMPT_ARCADE_PROVIDER_MAX_ATTEMPTS,
-  providerRetryDelayMs,
-} from './officialGames/promptArcade/providerRetry';
+import { GenerationRequestError, requestPromptArcadeArtifact } from './officialGames/promptArcade/provider';
 
-const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
-const REQUEST_TIMEOUT_MS = 45_000;
 const MAX_OUTPUT_TOKENS = 18_000;
 
 // Keep the strict schema to the provider's portable subset. parseGeneratedArtifact
@@ -77,106 +71,28 @@ type GenerationInput = GenerationLease & {
   prompt: string;
 };
 
-class GenerationRequestError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GenerationRequestError';
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function extractResponseText(response: unknown): string | null {
-  if (!isRecord(response) || !Array.isArray(response.output)) return null;
-  const chunks: string[] = [];
-  for (const output of response.output) {
-    if (!isRecord(output) || !Array.isArray(output.content)) continue;
-    for (const content of output.content) {
-      if (isRecord(content) && content.type === 'output_text' && typeof content.text === 'string') {
-        chunks.push(content.text);
-      }
-    }
-  }
-  return chunks.length === 0 ? null : chunks.join('');
-}
-
-async function requestArtifact(
-  apiKey: string,
-  model: string,
-  safetyIdentifier: string,
-  input: string
-): Promise<{ rawText: string; parsed: unknown }> {
-  for (let attempt = 1; attempt <= PROMPT_ARCADE_PROVIDER_MAX_ATTEMPTS; attempt += 1) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    let response: Response;
-    try {
-      response = await fetch(OPENAI_RESPONSES_URL, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          instructions: SYSTEM_PROMPT,
-          input,
-          max_output_tokens: MAX_OUTPUT_TOKENS,
-          safety_identifier: safetyIdentifier,
-          store: false,
-          text: {
-            format: {
-              type: 'json_schema',
-              name: 'prompt_arcade_game',
-              strict: true,
-              schema: OUTPUT_SCHEMA,
-            },
-          },
-        }),
-        signal: controller.signal,
-      });
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new GenerationRequestError('Game generation timed out. You can revise the prompt and try again.');
-      }
-      throw new GenerationRequestError('The game generator could not be reached. You can try again.');
-    } finally {
-      clearTimeout(timeout);
-    }
-    if (!response.ok) {
-      const diagnostic = (await response.text()).slice(0, 2_000);
-      console.error(
-        `Prompt Arcade generation failed with HTTP ${response.status} on attempt ${attempt}: ${diagnostic}`
-      );
-      const retryable = isRetryableProviderStatus(response.status);
-      if (retryable && attempt < PROMPT_ARCADE_PROVIDER_MAX_ATTEMPTS) {
-        const delayMs = providerRetryDelayMs(attempt, response.headers.get('retry-after'), Date.now());
-        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
-        continue;
-      }
-      if (retryable) {
-        throw new GenerationRequestError(
-          `The game generator remained temporarily unavailable after ${PROMPT_ARCADE_PROVIDER_MAX_ATTEMPTS} attempts (${response.status}). You can try again.`
-        );
-      }
-      throw new GenerationRequestError(`The game generator returned an error (${response.status}). You can try again.`);
-    }
-    const payload: unknown = await response.json();
-    const rawText = extractResponseText(payload);
-    if (rawText === null) {
-      throw new GenerationRequestError('The game generator returned no game. You can try again.');
-    }
-    try {
-      return { rawText, parsed: JSON.parse(rawText) as unknown };
-    } catch {
-      return { rawText, parsed: null };
-    }
-  }
-  throw new GenerationRequestError('The game generator remained temporarily unavailable. You can try again.');
+async function requestArtifact(apiKey: string, model: string, safetyIdentifier: string, input: string) {
+  return await requestPromptArcadeArtifact(apiKey, {
+    model,
+    instructions: SYSTEM_PROMPT,
+    input,
+    max_output_tokens: MAX_OUTPUT_TOKENS,
+    safety_identifier: safetyIdentifier,
+    store: false,
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'prompt_arcade_game',
+        strict: true,
+        schema: OUTPUT_SCHEMA,
+      },
+    },
+  });
 }
 
 function validationMessage(errors: readonly string[]) {

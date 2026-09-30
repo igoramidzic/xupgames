@@ -1,4 +1,5 @@
 import { parse } from 'acorn';
+import { PROMPT_ARCADE_PROVIDER_BUDGET_MS } from './providerRetry';
 
 export const PROMPT_ARCADE_MAX_PLAYERS = 30;
 export const PROMPT_ARCADE_MAX_PROMPT_CHARACTERS = 1_000;
@@ -7,7 +8,7 @@ export const PROMPT_ARCADE_MAX_DURATION_MS = 45_000;
 export const PROMPT_ARCADE_MAX_CODE_BYTES = 60_000;
 export const PROMPT_ARCADE_COUNTDOWN_MS = 8_000;
 export const PROMPT_ARCADE_RESULTS_MS = 10_000;
-export const PROMPT_ARCADE_STALE_GENERATION_MS = 120_000;
+export const PROMPT_ARCADE_STALE_GENERATION_MS = PROMPT_ARCADE_PROVIDER_BUDGET_MS + 30_000;
 export const PROMPT_ARCADE_ARTIFACT_GRACE_MS = 60 * 60 * 1_000;
 
 export type PromptArcadeScoringMode = 'speed' | 'quality' | 'qualityAndSpeed';
