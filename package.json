@@ -15,6 +15,8 @@
     "build": "pnpm --filter web build",
     "build:web": "pnpm --filter web build",
     "build:site": "pnpm --filter site build",
+    "deploy:web": "pnpm build:web && wrangler deploy",
+    "preview:cloudflare": "wrangler dev",
     "preview": "pnpm --filter web preview",
     "preview:web": "pnpm --filter web preview",
     "preview:site": "pnpm --filter site preview",
@@ -46,6 +48,7 @@
     "jsdom": "^29.1.1",
     "mintlify": "^4.2.813",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "wrangler": "^4.145.0"
   }
 }

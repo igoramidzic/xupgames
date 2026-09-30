@@ -36,5 +36,8 @@ jobs:
       - name: Build web application
         run: pnpm build:web
 
+      - name: Validate Cloudflare deployment configuration
+        run: pnpm exec wrangler deploy --dry-run
+
       - name: Build marketing site
         run: pnpm build:site

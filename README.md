@@ -61,6 +61,49 @@ pnpm exec convex env set OPENAI_PROMPT_ARCADE_MODEL '<responses-api-model-id>'
 The model must support strict Structured Outputs in the OpenAI Responses API.
 Neither value is sent to the browser or embedded in generated game code.
 
+## Cloudflare Workers deployment
+
+The game client is hosted on the existing Cloudflare Worker **`xupgames`**.
+The root `wrangler.jsonc` serves `web/dist` as static assets and falls back to
+`index.html` for browser navigation, so shared room links work on direct visits
+and refreshes. Convex remains the realtime backend; no Worker script is needed.
+
+In the `xupgames` Worker's **Settings → Build**, connect this repository and use:
+
+| Setting | Value |
+| --- | --- |
+| Root directory | Repository root (`/`) |
+| Build command | `pnpm build:web` |
+| Deploy command | `pnpm exec wrangler deploy` |
+| Non-production branch deploy command (if enabled) | `pnpm exec wrangler versions upload` |
+| Build variable `VITE_CONVEX_URL` | Your production Convex URL (`https://<deployment>.convex.cloud`) |
+| Build variable `NODE_VERSION` | `24` |
+
+The repository pins pnpm through `packageManager`. `VITE_CONVEX_URL` must be
+available **during the build**: Vite embeds it in the browser bundle, so setting
+it only as a Worker runtime variable has no effect. Configure a development
+Convex URL for preview builds if previews should use a separate backend.
+Keep backend secrets in Convex, never in `VITE_*` variables.
+
+To deploy from your machine, authenticate once and provide the target Convex URL:
+
+```bash
+pnpm exec wrangler login
+VITE_CONVEX_URL=https://<deployment>.convex.cloud pnpm deploy:web
+```
+
+To validate the upload without publishing, run `pnpm build:web` followed by
+`pnpm exec wrangler deploy --dry-run`. To check Cloudflare routing locally, run
+`pnpm preview:cloudflare` after building, then open a room URL directly.
+
+Custom domains remain configured on the existing Worker in Cloudflare. Backend
+releases still use the separate **Deploy Convex to Production** GitHub workflow.
+The Astro marketing site under `site/` is a separate build and is not included
+in this Worker.
+
+See Cloudflare's [static SPA routing](https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/)
+and [Workers Builds configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/).
+
 ## How games are organized
 
 Shared infrastructure owns rooms, guest identity, memberships, passwords,
