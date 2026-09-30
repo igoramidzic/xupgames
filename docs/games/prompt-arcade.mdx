@@ -125,6 +125,21 @@ otherwise using jittered backoff; player actions remain independent and
 parallel. The UI exposes queued versus generating states so backpressure is
 visible instead of disguised as progress.
 
+Each generation or repair phase has a two-minute provider deadline, including
+all retries, backoff, and response-body reads. The stale-job watchdog waits
+another 30 seconds beyond that deadline. A timeout does not require rewriting
+the player's prompt.
+
+In Convex Logs, filter for `promptArcadeActions:submitPrompt`,
+`promptArcadeActions:retryGeneration`, or `promptArcadeActions:generateBotPrompt`.
+Include successful executions: generation failures are caught and saved to the
+entry for display in the UI, so the action itself can finish successfully.
+Provider logs include the model, elapsed time, HTTP status, a client request ID,
+and OpenAI's request ID when response headers arrive. They omit API keys,
+player prompts, generated code, and raw provider error bodies. Requests use
+`store: false`; use Convex's request logs to diagnose generation independently
+of OpenAI response storage.
+
 Configure generation with Convex deployment environment variables:
 
 ```bash
