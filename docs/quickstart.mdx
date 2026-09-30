@@ -22,8 +22,9 @@ pnpm setup:convex
 The first `setup:convex` run asks you to sign in and create or choose a Convex
 project, or to run Convex locally without an account. It pushes the backend,
 generates types, and runs the idempotent game-catalog sync. Convex writes the
-deployment name and URL to the ignored root `.env.local`; the nested Vite app
-already reads that file.
+deployment name and URL to the ignored root `.env.local`. The web app defaults
+to Xup Games' shared development backend. To connect your own deployment, set
+its URL as `VITE_CONVEX_URL` in `web/.env.development.local`.
 
 ## Run the app
 
@@ -44,8 +45,9 @@ pnpm dev:convex
 pnpm dev:web
 ```
 
-Use `web/.env.local` with `VITE_CONVEX_URL` only when you intentionally want the
-web client to override the deployment URL generated at the root. Never put
+Use `web/.env.development.local` with `VITE_CONVEX_URL` to override the shared
+development backend. Production builds use `web/.env.production`; use
+`pnpm build:web:preview` to build against development instead. Never put
 backend secrets in a `VITE_` variable because Vite exposes those values to the
 browser.
 

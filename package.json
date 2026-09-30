@@ -14,6 +14,7 @@
     "dev:all": "concurrently -n web,convex,site,docs -c blue,green,magenta,yellow --kill-others-on-fail \"pnpm dev:web\" \"pnpm dev:convex\" \"pnpm dev:site\" \"pnpm dev:docs\"",
     "build": "pnpm --filter web build",
     "build:web": "pnpm --filter web build",
+    "build:web:preview": "pnpm --filter web build:preview",
     "build:site": "pnpm --filter site build",
     "deploy:web": "pnpm build:web && wrangler deploy",
     "preview:cloudflare": "wrangler dev",

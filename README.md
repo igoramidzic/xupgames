@@ -30,7 +30,9 @@ pnpm setup:convex
 community game catalog into the database. The first run prompts you to sign in
 and create or select a Convex project, or to use a local anonymous deployment.
 It writes the development deployment name and URL to the ignored root
-`.env.local`; the Vite config reads that root URL automatically.
+`.env.local`. The web app defaults to Xup Games' development backend; to use
+your own deployment, set its URL as `VITE_CONVEX_URL` in
+`web/.env.development.local`.
 
 If you already have a deployment, the setup command reuses it. To deliberately
 choose another project, follow the [Convex project configuration guide](https://docs.convex.dev/cli/overview)
@@ -47,7 +49,7 @@ Open the Vite URL printed by the `web` process (normally
 `pnpm dev:convex` and `pnpm dev:web` separately.
 
 If you need to point only the web client at an existing deployment, copy
-`web/.env.example` to `web/.env.local` and set `VITE_CONVEX_URL`. Backend secrets
+`web/.env.example` to `web/.env.development.local` and set `VITE_CONVEX_URL`. Backend secrets
 belong in Convex deployment environment variables, never in a Vite variable.
 
 Prompt Arcade also needs two Convex deployment environment variables before it
@@ -76,20 +78,29 @@ In the `xupgames` Worker's **Settings → Build**, connect this repository and u
 | Build command | `pnpm build:web` |
 | Deploy command | `pnpm exec wrangler deploy` |
 | Non-production branch deploy command (if enabled) | `pnpm exec wrangler versions upload` |
-| Build variable `VITE_CONVEX_URL` | Your production Convex URL (`https://<deployment>.convex.cloud`) |
 | Build variable `NODE_VERSION` | `24` |
 
-The repository pins pnpm through `packageManager`. `VITE_CONVEX_URL` must be
-available **during the build**: Vite embeds it in the browser bundle, so setting
-it only as a Worker runtime variable has no effect. Configure a development
-Convex URL for preview builds if previews should use a separate backend.
+The repository pins pnpm through `packageManager`. The public backend URLs are
+configured in code: `web/.env.production` selects `peaceful-chicken-822` for
+`pnpm build:web`, and `web/.env.development` selects `merry-albatross-626` for
+`pnpm dev:web`. Use `pnpm build:web:preview` to build a preview against the
+development backend. A normal build always uses production mode, even on a
+non-production Git branch.
+
+No Cloudflare `VITE_CONVEX_URL` build variable is required. An existing build
+variable overrides these files, so remove it to use the checked-in defaults.
+Vite embeds the URL during the build; Worker runtime variables cannot change it.
 Keep backend secrets in Convex, never in `VITE_*` variables.
 
-To deploy from your machine, authenticate once and provide the target Convex URL:
+The production Convex deployment is `peaceful-chicken-822`; development uses
+`merry-albatross-626`. Configure `OPENAI_API_KEY` and
+`OPENAI_PROMPT_ARCADE_MODEL` separately in each deployment to use Prompt Arcade.
+
+To deploy from your machine, authenticate once:
 
 ```bash
 pnpm exec wrangler login
-VITE_CONVEX_URL=https://<deployment>.convex.cloud pnpm deploy:web
+pnpm deploy:web
 ```
 
 To validate the upload without publishing, run `pnpm build:web` followed by
